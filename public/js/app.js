@@ -2,15 +2,15 @@
    PROXY SERVER LOG - MAIN FRONTEND APPLICATION CONTROLLER
    ========================================================================== */
 
-document.addEventListener('DOMContentLoaded', async () => {
-  // State variables
-  let applications = [];
-  let currentAppId = localStorage.getItem('proxy_selected_app_id') || null;
-  let logsList = [];
-  let selectedLogId = null;
-  let selectedLogDetail = null;
-  let currentTheme = localStorage.getItem('proxy_theme') || 'dark';
+// --- Module-level state (accessible by all functions) ---
+let applications = [];
+let currentAppId = localStorage.getItem('proxy_selected_app_id') || null;
+let logsList = [];
+let selectedLogId = null;
+let selectedLogDetail = null;
+let currentTheme = localStorage.getItem('proxy_theme') || 'dark';
 
+document.addEventListener('DOMContentLoaded', async () => {
   // Initialize Theme
   applyTheme(currentTheme);
 
@@ -375,32 +375,7 @@ function attachEventListeners() {
     }
   };
 
-  // Copy cURL Button
-  document.getElementById('copy-curl-btn').onclick = () => {
-    if (!selectedLogDetail) return;
-    const { reqMeta, requestBody } = selectedLogDetail;
-    const url = reqMeta.targetUrl + (reqMeta.endpoint || '');
-    let curl = `curl -X ${reqMeta.method} "${url}"`;
-
-    if (reqMeta.headers) {
-      Object.keys(reqMeta.headers).forEach(k => {
-        if (!['host', 'content-length'].includes(k.toLowerCase())) {
-          curl += ` -H "${k}: ${reqMeta.headers[k]}"`;
-        }
-      });
-    }
-
-    if (requestBody) {
-      const escapedBody = requestBody.replace(/"/g, '\\"');
-      curl += ` -d "${escapedBody}"`;
-    }
-
-    navigator.clipboard.writeText(curl);
-    showToast('cURL command copied to clipboard', 'success');
-  };
-
   // Manage / Settings Modal (Web Applications Manager)
-  document.getElementById('settings-btn').onclick = () => openAppManagerModal();
   document.getElementById('manage-apps-btn').onclick = () => openAppManagerModal();
 
   // Tab View Switchers (Body vs Headers)
@@ -450,7 +425,7 @@ function renderAppManagerList() {
           <div style="font-size:0.8rem; color:var(--text-muted);">FrontEnd: ${escapeHtml(app.frontEndUrl)} | Backends: ${escapeHtml(beNames)}</div>
         </div>
         <div style="display:flex; gap:6px;">
-          <button class="btn btn-primary" onclick="editApp('${app.id}')">Edit</button>
+          <button class="btn btn-info" onclick="editApp('${app.id}')">Edit</button>
           <button class="btn btn-danger" onclick="deleteApp('${app.id}')">Delete</button>
         </div>
       </div>

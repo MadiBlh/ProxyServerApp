@@ -1,11 +1,18 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Proxy Server Log Dashboard</title>
   <meta name="description" content="Local proxy server tool to intercept, log, inspect, and replay web application requests and responses.">
   <link rel="stylesheet" href="/css/styles.css">
+  <!-- Apply saved theme before first paint to prevent FOUC -->
+  <script>
+    (function() {
+      var theme = localStorage.getItem('proxy_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
 </head>
 <body>
 
@@ -17,19 +24,18 @@
     </div>
 
     <div class="nav-controls">
-      <!-- Web Application Selector Dropdown -->
+      <!-- Application Selector Dropdown -->
       <div class="app-select-container">
-        <span class="app-select-label">Web Application:</span>
+        <span class="app-select-label">Application:</span>
         <select id="app-dropdown" class="app-dropdown">
           <option value="">Loading applications...</option>
         </select>
       </div>
 
       <nav class="nav-links">
-        <button id="nav-logs-btn" class="nav-btn">📋 Logs</button>
-        <button id="manage-apps-btn" class="nav-btn">⚙️ Manage Application</button>
-        <button id="remove-logs-btn" class="nav-btn danger">🗑️ Remove All Logs</button>
-        <button id="settings-btn" class="nav-btn">🛠️ Settings</button>
+        <button id="nav-logs-btn" class="nav-btn">Logs</button>
+        <button id="manage-apps-btn" class="nav-btn">Manage Application</button>
+        <button id="remove-logs-btn" class="nav-btn danger">Remove All Logs</button>
         <button id="theme-toggle-btn" class="theme-toggle" title="Toggle Theme">☀️</button>
       </nav>
     </div>
@@ -39,29 +45,23 @@
   <section class="toolbar">
     <div class="action-buttons">
       <!-- Reload all logs -->
-      <button id="reload-logs-btn" class="btn">
-        <span>🔄</span> Reload Logs
+      <button id="reload-logs-btn" class="btn btn-success">
+        Reload Logs
       </button>
 
       <!-- Export selected request -->
-      <button id="export-req-btn" class="btn">
-        <span>💾</span> Export Request
+      <button id="export-req-btn" class="btn btn-primary-outline">
+        Export Request
       </button>
 
       <!-- Replay selected request -->
-      <button id="replay-req-btn" class="btn btn-primary">
-        <span>⚡</span> Replay Request
-      </button>
-
-      <!-- Copy cURL -->
-      <button id="copy-curl-btn" class="btn">
-        <span>📋</span> Copy as cURL
+      <button id="replay-req-btn" class="btn btn-primary-outline">
+        Replay Request
       </button>
     </div>
 
     <!-- Search field for endpoint API -->
     <div class="search-box">
-      <span class="search-icon">🔍</span>
       <input type="text" id="search-input" class="search-input" placeholder="Search API endpoint (e.g. /api/users, /SOAP)...">
     </div>
   </section>
@@ -90,9 +90,9 @@
       <div class="detail-pane">
         <div class="detail-header">
           <div class="pane-title">
-            <span>REQUEST</span>
-            <span id="req-method-badge" class="method-badge method-GET">GET</span>
-            <span id="req-url-text" style="font-family: 'Fira Code', monospace; font-size: 0.85rem;">Select a request call from the left list</span>
+            <span class="uppercase">REQUEST</span>
+            <span id="req-method-badge" class="method-badge method-GET uppercase">GET</span>
+            <span id="req-url-text" style="font-family: 'Fira Code', monospace; font-size: 0.70rem;">Select a request call from the left list</span>
           </div>
           <div class="pane-controls">
             <button class="tab-btn active" data-tab="body">Body (Monaco)</button>
@@ -108,8 +108,8 @@
       <div class="detail-pane">
         <div class="detail-header">
           <div class="pane-title">
-            <span>RESPONSE</span>
-            <span id="res-status-badge" class="btn" style="padding: 2px 8px; font-size: 0.75rem;">-</span>
+            <span class="uppercase">RESPONSE</span>
+            <span id="res-status-badge" class="btn uppercase" style="padding: 2px 8px; font-size: 0.70rem;">-</span>
             <span id="res-duration-text" style="font-size: 0.8rem; color: var(--text-muted);">-</span>
           </div>
           <div class="pane-controls">
@@ -209,12 +209,12 @@
       <div class="modal-body">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <p style="font-size: 0.88rem; color: var(--text-secondary);">Configured Web Applications and Backend Services stored in <code>config/</code>:</p>
-          <button id="add-new-app-btn" class="btn btn-primary">+ Add Application</button>
+          <button id="add-new-app-btn" class="btn btn-primary-outline">+ Add Application</button>
         </div>
         <div id="app-manager-list" style="margin-top: 10px;"></div>
       </div>
       <div class="modal-footer">
-        <button class="btn" onclick="closeModal('app-manager-modal')">Close</button>
+        <button class="btn btn-error-outline" onclick="closeModal('app-manager-modal')">Close</button>
       </div>
     </div>
   </div>

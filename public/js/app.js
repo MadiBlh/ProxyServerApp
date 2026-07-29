@@ -2,15 +2,15 @@
    PROXY SERVER LOG - MAIN FRONTEND APPLICATION CONTROLLER
    ========================================================================== */
 
-document.addEventListener('DOMContentLoaded', async () => {
-  // State variables
-  let applications = [];
-  let currentAppId = localStorage.getItem('proxy_selected_app_id') || null;
-  let logsList = [];
-  let selectedLogId = null;
-  let selectedLogDetail = null;
-  let currentTheme = localStorage.getItem('proxy_theme') || 'dark';
+// --- Module-level state (accessible by all functions) ---
+let applications = [];
+let currentAppId = localStorage.getItem('proxy_selected_app_id') || null;
+let logsList = [];
+let selectedLogId = null;
+let selectedLogDetail = null;
+let currentTheme = localStorage.getItem('proxy_theme') || 'dark';
 
+document.addEventListener('DOMContentLoaded', async () => {
   // Initialize Theme
   applyTheme(currentTheme);
 

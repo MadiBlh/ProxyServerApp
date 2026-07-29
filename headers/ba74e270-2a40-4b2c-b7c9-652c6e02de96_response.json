@@ -1,0 +1,19 @@
+{
+  "id": "ba74e270-2a40-4b2c-b7c9-652c6e02de96",
+  "appId": "dcd6fc61-13d7-469b-b384-fbda762ede36",
+  "statusCode": 200,
+  "statusText": "OK",
+  "durationMs": 15,
+  "contentType": "application/json; charset=utf-8",
+  "fileExtension": "json",
+  "headers": {
+    "x-powered-by": "Express",
+    "access-control-allow-origin": "*",
+    "content-type": "application/json; charset=utf-8",
+    "content-length": "154",
+    "etag": "W/\"9a-RXyqJQtETkGEJvq6774nVnSp99M\"",
+    "date": "Wed, 29 Jul 2026 17:11:37 GMT",
+    "connection": "close"
+  },
+  "error": null
+}

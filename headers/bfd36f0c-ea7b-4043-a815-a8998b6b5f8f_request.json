@@ -1,0 +1,22 @@
+{
+  "id": "bfd36f0c-ea7b-4043-a815-a8998b6b5f8f",
+  "appId": "app-default-1",
+  "appName": "Sample JSON Store API",
+  "timestamp": "2026-07-29T13:42:10.213Z",
+  "method": "POST",
+  "endpoint": "/posts",
+  "targetUrl": "https://jsonplaceholder.typicode.com",
+  "contentType": "application/json",
+  "fileExtension": "json",
+  "headers": {
+    "host": "127.0.0.1:4005",
+    "connection": "keep-alive",
+    "content-type": "application/json",
+    "accept": "*/*",
+    "accept-language": "*",
+    "sec-fetch-mode": "cors",
+    "user-agent": "node",
+    "accept-encoding": "gzip, deflate",
+    "content-length": "59"
+  }
+}

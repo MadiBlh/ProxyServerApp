@@ -1,0 +1,578 @@
+/* ==========================================================================
+   PROXY SERVER LOG - MAIN FRONTEND APPLICATION CONTROLLER
+   ========================================================================== */
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // State variables
+  let applications = [];
+  let currentAppId = localStorage.getItem('proxy_selected_app_id') || null;
+  let logsList = [];
+  let selectedLogId = null;
+  let selectedLogDetail = null;
+  let currentTheme = localStorage.getItem('proxy_theme') || 'dark';
+
+  // Initialize Theme
+  applyTheme(currentTheme);
+
+  // Initialize Monaco Editors
+  try {
+    await window.monacoManager.initMonacoEditors(currentTheme);
+  } catch (err) {
+    console.error('Failed to load Monaco Editor from CDN:', err);
+  }
+
+  // Load Initial Applications
+  await loadApplications();
+
+  // Connect SSE for Real-time Logs Feed
+  initSseFeed();
+
+  // Attach Event Listeners
+  attachEventListeners();
+});
+
+// --- Theme Management ---
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('proxy_theme', theme);
+  const themeBtn = document.getElementById('theme-toggle-btn');
+  if (themeBtn) {
+    themeBtn.innerHTML = theme === 'dark' ? '☀️' : '🌙';
+  }
+  if (window.monacoManager) {
+    window.monacoManager.setMonacoTheme(theme);
+  }
+}
+
+// --- Applications API Management ---
+async function loadApplications() {
+  try {
+    const res = await fetch('/api/applications');
+    applications = await res.json();
+
+    const dropdown = document.getElementById('app-dropdown');
+    dropdown.innerHTML = '';
+
+    if (applications.length === 0) {
+      dropdown.innerHTML = '<option value="">No apps configured</option>';
+      currentAppId = null;
+      renderLogs([]);
+      return;
+    }
+
+    applications.forEach(app => {
+      const opt = document.createElement('option');
+      opt.value = app.id;
+      opt.textContent = `${app.name} ${app.isActive ? '' : '(Inactive)'}`;
+      dropdown.appendChild(opt);
+    });
+
+    // Restore selected app or choose first
+    if (currentAppId && applications.some(a => a.id === currentAppId)) {
+      dropdown.value = currentAppId;
+    } else {
+      currentAppId = applications[0].id;
+      dropdown.value = currentAppId;
+    }
+
+    localStorage.setItem('proxy_selected_app_id', currentAppId);
+
+    // Load logs for current app
+    await loadLogsForApp(currentAppId);
+
+  } catch (err) {
+    showToast('Failed to load web applications', 'error');
+  }
+}
+
+// --- Logs Management ---
+async function loadLogsForApp(appId) {
+  try {
+    const res = await fetch(`/api/logs?appId=${appId}`);
+    logsList = await res.json();
+    renderLogs(logsList);
+
+    if (logsList.length > 0) {
+      selectLog(logsList[0].id);
+    } else {
+      clearLogDetailsView();
+    }
+  } catch (err) {
+    showToast('Failed to load logs', 'error');
+  }
+}
+
+function renderLogs(logs) {
+  const container = document.getElementById('logs-list-container');
+  container.innerHTML = '';
+
+  const filterText = (document.getElementById('search-input')?.value || '').toLowerCase();
+
+  const filteredLogs = logs.filter(log => {
+    const endpoint = (log.endpoint || '').toLowerCase();
+    const method = (log.method || '').toLowerCase();
+    return endpoint.includes(filterText) || method.includes(filterText);
+  });
+
+  if (filteredLogs.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📡</div>
+        <p>No logged requests found</p>
+      </div>
+    `;
+    return;
+  }
+
+  filteredLogs.forEach(log => {
+    const li = document.createElement('li');
+    li.className = `log-item ${log.id === selectedLogId ? 'active' : ''}`;
+    li.onclick = () => selectLog(log.id);
+
+    const isOk = log.status === 'OK' || (log.statusCode >= 200 && log.statusCode < 400);
+    const dotClass = isOk ? 'green' : 'red';
+
+    const formattedTime = new Date(log.timestamp).toLocaleTimeString();
+
+    li.innerHTML = `
+      <div class="status-dot ${dotClass}" title="Status: ${log.statusCode || 'FAILED'}"></div>
+      <div class="log-info">
+        <div class="log-endpoint" title="${escapeHtml(log.endpoint)}">${escapeHtml(log.endpoint)}</div>
+        <div class="log-meta">
+          <span class="method-badge method-${log.method}">${log.method}</span>
+          <span>${log.statusCode || 'ERR'}</span>
+          <span>•</span>
+          <span>${formattedTime}</span>
+          <span>•</span>
+          <span>${log.durationMs}ms</span>
+        </div>
+      </div>
+    `;
+    container.appendChild(li);
+  });
+}
+
+async function selectLog(logId) {
+  selectedLogId = logId;
+
+  // Highlight active list item
+  const items = document.querySelectorAll('.log-item');
+  items.forEach(item => item.classList.remove('active'));
+
+  // Re-render list to ensure selection state matches
+  renderLogs(logsList);
+
+  try {
+    const res = await fetch(`/api/logs/${logId}`);
+    selectedLogDetail = await res.json();
+    renderLogDetail(selectedLogDetail);
+  } catch (err) {
+    showToast('Failed to load log detail', 'error');
+  }
+}
+
+function renderLogDetail(detail) {
+  const { reqMeta, resMeta, requestBody, responseBody } = detail;
+
+  // Request Section Header
+  document.getElementById('req-method-badge').className = `method-badge method-${reqMeta.method}`;
+  document.getElementById('req-method-badge').textContent = reqMeta.method;
+  document.getElementById('req-url-text').textContent = reqMeta.targetUrl + (reqMeta.endpoint || '');
+
+  // Response Section Header
+  const statusCode = resMeta.statusCode || 500;
+  const isOk = resMeta.statusText === 'OK' || (statusCode >= 200 && statusCode < 400);
+  const statusBadge = document.getElementById('res-status-badge');
+  statusBadge.textContent = `${statusCode} ${resMeta.statusText || ''}`;
+  statusBadge.className = `btn ${isOk ? 'btn-primary' : 'btn-danger'}`;
+  document.getElementById('res-duration-text').textContent = `${resMeta.durationMs || 0} ms`;
+
+  // Render Headers
+  renderHeadersView('request-headers-view', reqMeta.headers || {});
+  renderHeadersView('response-headers-view', resMeta.headers || {});
+
+  // Render Monaco Editor Content
+  window.monacoManager.setRequestBodyContent(requestBody, reqMeta.fileExtension);
+  window.monacoManager.setResponseBodyContent(responseBody, resMeta.fileExtension);
+}
+
+function renderHeadersView(containerId, headersObj) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+
+  const keys = Object.keys(headersObj);
+  if (keys.length === 0) {
+    container.innerHTML = '<div class="text-muted">No headers</div>';
+    return;
+  }
+
+  keys.forEach(key => {
+    const row = document.createElement('div');
+    row.className = 'header-row';
+    row.innerHTML = `
+      <span class="header-key">${escapeHtml(key)}:</span>
+      <span class="header-val">${escapeHtml(String(headersObj[key]))}</span>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function clearLogDetailsView() {
+  selectedLogId = null;
+  selectedLogDetail = null;
+  document.getElementById('req-url-text').textContent = '-';
+  document.getElementById('res-status-badge').textContent = '-';
+  document.getElementById('res-duration-text').textContent = '-';
+  document.getElementById('request-headers-view').innerHTML = '';
+  document.getElementById('response-headers-view').innerHTML = '';
+  window.monacoManager.setRequestBodyContent('');
+  window.monacoManager.setResponseBodyContent('');
+}
+
+// --- SSE Realtime Feed ---
+function initSseFeed() {
+  const evtSource = new EventSource('/api/events');
+  evtSource.onmessage = (event) => {
+    try {
+      const logSummary = JSON.parse(event.data);
+      if (logSummary.appId === currentAppId) {
+        logsList.unshift(logSummary);
+        renderLogs(logsList);
+        // Auto select newly arrived log if none selected
+        if (!selectedLogId) {
+          selectLog(logSummary.id);
+        }
+      }
+    } catch (e) {
+      console.error('Error handling SSE event:', e);
+    }
+  };
+}
+
+// --- Event Listeners ---
+function attachEventListeners() {
+  // Theme toggle
+  document.getElementById('theme-toggle-btn').onclick = () => {
+    currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(currentTheme);
+  };
+
+  // App Selector Change
+  document.getElementById('app-dropdown').onchange = (e) => {
+    currentAppId = e.target.value;
+    localStorage.setItem('proxy_selected_app_id', currentAppId);
+    loadLogsForApp(currentAppId);
+  };
+
+  // Search Filter
+  document.getElementById('search-input').oninput = () => {
+    renderLogs(logsList);
+  };
+
+  // Reload Logs Button
+  document.getElementById('reload-logs-btn').onclick = () => {
+    loadLogsForApp(currentAppId);
+    showToast('Logs reloaded', 'success');
+  };
+
+  // Clear All Logs Button
+  document.getElementById('remove-logs-btn').onclick = async () => {
+    if (confirm('Are you sure you want to remove all log files from the server?')) {
+      try {
+        await fetch('/api/logs', { method: 'DELETE' });
+        logsList = [];
+        renderLogs([]);
+        clearLogDetailsView();
+        showToast('All logs cleared successfully', 'success');
+      } catch (err) {
+        showToast('Failed to clear logs', 'error');
+      }
+    }
+  };
+
+  // Export Request Button
+  document.getElementById('export-req-btn').onclick = () => {
+    if (!selectedLogId) {
+      showToast('Please select a request log to export', 'error');
+      return;
+    }
+    document.getElementById('export-filename-input').value = `export_${selectedLogId.substring(0, 8)}`;
+    openModal('export-modal');
+  };
+
+  document.getElementById('confirm-export-btn').onclick = async () => {
+    const fileName = document.getElementById('export-filename-input').value.trim();
+    if (!fileName) {
+      alert('Please enter a valid file name prefix');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/logs/${selectedLogId}/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Saved files: ${data.files.requestFile} & ${data.files.responseFile}`, 'success');
+        closeModal('export-modal');
+      } else {
+        showToast(data.error || 'Export failed', 'error');
+      }
+    } catch (err) {
+      showToast('Export error', 'error');
+    }
+  };
+
+  // Replay Request Button
+  document.getElementById('replay-req-btn').onclick = () => {
+    if (!selectedLogDetail) {
+      showToast('Please select a request log to replay', 'error');
+      return;
+    }
+    const { reqMeta, requestBody } = selectedLogDetail;
+    document.getElementById('replay-url-input').value = reqMeta.targetUrl + (reqMeta.endpoint || '');
+    document.getElementById('replay-method-select').value = reqMeta.method;
+    document.getElementById('replay-headers-input').value = JSON.stringify(reqMeta.headers || {}, null, 2);
+    document.getElementById('replay-body-input').value = requestBody || '';
+    document.getElementById('replay-response-output').textContent = '// Click Send Replay to execute';
+    openModal('replay-modal');
+  };
+
+  document.getElementById('execute-replay-btn').onclick = async () => {
+    const url = document.getElementById('replay-url-input').value.trim();
+    const method = document.getElementById('replay-method-select').value;
+    let headers = {};
+    try {
+      headers = JSON.parse(document.getElementById('replay-headers-input').value || '{}');
+    } catch (e) {
+      alert('Invalid JSON in headers field');
+      return;
+    }
+    const body = document.getElementById('replay-body-input').value;
+
+    const out = document.getElementById('replay-response-output');
+    out.textContent = 'Executing replay request...';
+
+    try {
+      const res = await fetch(`/api/logs/${selectedLogId}/replay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customUrl: url,
+          customMethod: method,
+          customHeaders: headers,
+          customBody: body
+        })
+      });
+      const data = await res.json();
+      out.textContent = `STATUS: ${data.statusCode} ${data.statusText || ''} (${data.durationMs}ms)\n\nRESPONSE HEADERS:\n${JSON.stringify(data.headers, null, 2)}\n\nRESPONSE BODY:\n${data.body}`;
+      showToast('Replay executed', data.success ? 'success' : 'error');
+    } catch (err) {
+      out.textContent = `Replay Error: ${err.message}`;
+      showToast('Replay execution failed', 'error');
+    }
+  };
+
+  // Copy cURL Button
+  document.getElementById('copy-curl-btn').onclick = () => {
+    if (!selectedLogDetail) return;
+    const { reqMeta, requestBody } = selectedLogDetail;
+    const url = reqMeta.targetUrl + (reqMeta.endpoint || '');
+    let curl = `curl -X ${reqMeta.method} "${url}"`;
+
+    if (reqMeta.headers) {
+      Object.keys(reqMeta.headers).forEach(k => {
+        if (!['host', 'content-length'].includes(k.toLowerCase())) {
+          curl += ` -H "${k}: ${reqMeta.headers[k]}"`;
+        }
+      });
+    }
+
+    if (requestBody) {
+      const escapedBody = requestBody.replace(/"/g, '\\"');
+      curl += ` -d "${escapedBody}"`;
+    }
+
+    navigator.clipboard.writeText(curl);
+    showToast('cURL command copied to clipboard', 'success');
+  };
+
+  // Manage / Settings Modal (Web Applications Manager)
+  document.getElementById('settings-btn').onclick = () => openAppManagerModal();
+  document.getElementById('manage-apps-btn').onclick = () => openAppManagerModal();
+
+  // Tab View Switchers (Body vs Headers)
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      const targetTab = e.target.dataset.tab;
+      const parentPane = e.target.closest('.detail-pane');
+
+      parentPane.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      e.target.classList.add('active');
+
+      if (targetTab === 'body') {
+        parentPane.querySelector('.monaco-container').style.display = 'block';
+        parentPane.querySelector('.headers-view').style.display = 'none';
+      } else {
+        parentPane.querySelector('.monaco-container').style.display = 'none';
+        parentPane.querySelector('.headers-view').style.display = 'block';
+      }
+    };
+  });
+}
+
+// --- App Manager Modal Logic ---
+function openAppManagerModal() {
+  renderAppManagerList();
+  openModal('app-manager-modal');
+}
+
+function renderAppManagerList() {
+  const container = document.getElementById('app-manager-list');
+  container.innerHTML = '';
+
+  applications.forEach(app => {
+    const item = document.createElement('div');
+    item.className = 'form-group';
+    item.style.padding = '12px';
+    item.style.border = '1px solid var(--border-color)';
+    item.style.borderRadius = '8px';
+    item.style.marginBottom = '10px';
+
+    const beNames = (app.backendUrls || []).map(b => `${b.name} (${b.url})`).join(', ');
+
+    item.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <strong>${escapeHtml(app.name)}</strong> ${app.isActive ? '<span style="color:var(--success-color)">(Active)</span>' : '<span style="color:var(--error-color)">(Inactive)</span>'}
+          <div style="font-size:0.8rem; color:var(--text-muted);">FrontEnd: ${escapeHtml(app.frontEndUrl)} | Backends: ${escapeHtml(beNames)}</div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn btn-primary" onclick="editApp('${app.id}')">Edit</button>
+          <button class="btn btn-danger" onclick="deleteApp('${app.id}')">Delete</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(item);
+  });
+}
+
+window.editApp = (id) => {
+  const app = applications.find(a => a.id === id);
+  if (!app) return;
+  document.getElementById('edit-app-id').value = app.id;
+  document.getElementById('edit-app-name').value = app.name;
+  document.getElementById('edit-app-frontend').value = app.frontEndUrl;
+  const be = app.backendUrls && app.backendUrls[0] ? app.backendUrls[0] : { name: 'Main Backend', url: '' };
+  document.getElementById('edit-be-name').value = be.name;
+  document.getElementById('edit-be-url').value = be.url;
+  document.getElementById('edit-app-active').checked = app.isActive;
+
+  openModal('edit-app-modal');
+};
+
+window.deleteApp = async (id) => {
+  if (confirm('Delete this web application config?')) {
+    try {
+      await fetch(`/api/applications/${id}`, { method: 'DELETE' });
+      await loadApplications();
+      renderAppManagerList();
+      showToast('Application deleted', 'success');
+    } catch (err) {
+      showToast('Delete failed', 'error');
+    }
+  }
+};
+
+document.getElementById('add-new-app-btn').onclick = () => {
+  document.getElementById('edit-app-id').value = '';
+  document.getElementById('edit-app-name').value = 'New Web Application';
+  document.getElementById('edit-app-frontend').value = 'http://localhost:3000';
+  document.getElementById('edit-be-name').value = 'Backend API Service';
+  document.getElementById('edit-be-url').value = 'https://api.example.com';
+  document.getElementById('edit-app-active').checked = true;
+
+  openModal('edit-app-modal');
+};
+
+document.getElementById('save-app-config-btn').onclick = async () => {
+  const id = document.getElementById('edit-app-id').value;
+  const name = document.getElementById('edit-app-name').value.trim();
+  const frontEndUrl = document.getElementById('edit-app-frontend').value.trim();
+  const beName = document.getElementById('edit-be-name').value.trim();
+  const beUrl = document.getElementById('edit-be-url').value.trim();
+  const isActive = document.getElementById('edit-app-active').checked;
+
+  const payload = {
+    name,
+    frontEndUrl,
+    backendUrls: [{ name: beName, url: beUrl }],
+    isActive
+  };
+
+  try {
+    if (id) {
+      await fetch(`/api/applications/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+    closeModal('edit-app-modal');
+    await loadApplications();
+    renderAppManagerList();
+    showToast('Application configuration saved', 'success');
+  } catch (err) {
+    showToast('Failed to save application config', 'error');
+  }
+};
+
+// --- Modal Helpers ---
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('active');
+}
+
+window.closeModal = closeModal;
+
+// --- Toast Notifications ---
+function showToast(message, type = 'info') {
+  let container = document.querySelector('.toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span>${message}</span>`;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.remove();
+  }, 3500);
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}

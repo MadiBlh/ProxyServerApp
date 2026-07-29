@@ -1,0 +1,29 @@
+{
+  "id": "fd6c2893-4f45-487e-83a5-cba8368e11b6",
+  "appId": "dcd6fc61-13d7-469b-b384-fbda762ede36",
+  "appName": "TodoApp",
+  "timestamp": "2026-07-29T17:14:48.067Z",
+  "method": "PUT",
+  "endpoint": "/api/tasks/6",
+  "targetUrl": "http://localhost:5000",
+  "contentType": "application/json",
+  "fileExtension": "json",
+  "headers": {
+    "host": "localhost:4000",
+    "connection": "close",
+    "content-length": "19",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+    "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\", \"Google Chrome\";v=\"150\"",
+    "content-type": "application/json",
+    "sec-ch-ua-mobile": "?0",
+    "accept": "*/*",
+    "origin": "http://localhost:5173",
+    "sec-fetch-site": "same-origin",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-dest": "empty",
+    "referer": "http://localhost:5173/",
+    "accept-encoding": "gzip, deflate, br, zstd",
+    "accept-language": "en-US,en;q=0.9,fr;q=0.8"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "proxy-server-log",
+  "version": "1.0.0",
+  "description": "Local proxy server tool to intercept, log, and inspect web application requests and responses.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "proxy",
+    "logger",
+    "http-proxy",
+    "soap",
+    "rest",
+    "express"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "http-proxy": "^1.18.1",
+    "uuid": "^11.0.5"
+  }
+}

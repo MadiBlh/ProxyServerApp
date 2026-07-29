@@ -1,0 +1,28 @@
+{
+  "id": "099837cd-9502-4545-8127-74434e8bf416",
+  "appId": "dcd6fc61-13d7-469b-b384-fbda762ede36",
+  "appName": "TodoApp",
+  "timestamp": "2026-07-29T17:16:23.405Z",
+  "method": "DELETE",
+  "endpoint": "/api/contributors/4",
+  "targetUrl": "http://localhost:5000",
+  "contentType": "text/plain",
+  "fileExtension": "txt",
+  "headers": {
+    "host": "localhost:4000",
+    "connection": "close",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+    "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\", \"Google Chrome\";v=\"150\"",
+    "sec-ch-ua-mobile": "?0",
+    "accept": "*/*",
+    "origin": "http://localhost:5173",
+    "sec-fetch-site": "same-origin",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-dest": "empty",
+    "referer": "http://localhost:5173/",
+    "accept-encoding": "gzip, deflate, br, zstd",
+    "accept-language": "en-US,en;q=0.9,fr;q=0.8",
+    "content-length": "0"
+  }
+}

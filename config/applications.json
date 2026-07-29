@@ -1,0 +1,41 @@
+[
+  {
+    "id": "app-default-1",
+    "name": "Sample JSON Store API",
+    "frontEndUrl": "http://localhost:3000",
+    "backendUrls": [
+      {
+        "id": "be-1",
+        "name": "JSON Placeholder API",
+        "url": "https://jsonplaceholder.typicode.com"
+      }
+    ],
+    "isActive": true
+  },
+  {
+    "id": "app-default-2",
+    "name": "Sample SOAP Calculator Service",
+    "frontEndUrl": "http://localhost:3001",
+    "backendUrls": [
+      {
+        "id": "be-2",
+        "name": "Calculator SOAP Backend",
+        "url": "http://www.dneonline.com"
+      }
+    ],
+    "isActive": true
+  },
+  {
+    "id": "dcd6fc61-13d7-469b-b384-fbda762ede36",
+    "name": "TodoApp",
+    "frontEndUrl": "http://localhost:5173",
+    "backendUrls": [
+      {
+        "id": "df099b21-0069-4899-9ec7-1687638e975a",
+        "name": "Backend API Service",
+        "url": "http://localhost:5000"
+      }
+    ],
+    "isActive": true
+  }
+]

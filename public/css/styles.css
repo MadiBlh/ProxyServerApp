@@ -24,6 +24,8 @@
   --error-bg: rgba(243, 139, 168, 0.15);
   --warning-color: #f9e2af;
   --warning-bg: rgba(249, 226, 175, 0.15);
+  --info-color: #89b4fa;
+  --info-bg: rgba(137, 180, 250, 0.15);
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
@@ -53,6 +55,8 @@
   --error-bg: rgba(243, 139, 168, 0.15);
   --warning-color: #f9e2af;   /* Mocha Yellow */
   --warning-bg: rgba(249, 226, 175, 0.15);
+  --info-color: #89b4fa;      /* Mocha Blue */
+  --info-bg: rgba(137, 180, 250, 0.15);
   
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
@@ -84,6 +88,8 @@
   --error-bg: rgba(210, 15, 57, 0.15);
   --warning-color: #df8e1d;   /* Latte Yellow */
   --warning-bg: rgba(223, 142, 29, 0.15);
+  --info-color: #1e66f5;        /* Latte Blue */
+  --info-bg: rgba(30, 102, 245, 0.15);
   
   --shadow-sm: 0 1px 3px 0 rgba(76, 79, 105, 0.08);
   --shadow-md: 0 4px 6px -1px rgba(76, 79, 105, 0.12), 0 2px 4px -1px rgba(76, 79, 105, 0.08);
@@ -109,6 +115,9 @@ body {
   overflow: hidden;
 }
 
+.uppercase {
+  text-transform: uppercase;
+}
 /* ==========================================================================
    NAVBAR SECTION
    ========================================================================== */
@@ -166,7 +175,7 @@ body {
 
 .app-select-label {
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--text-muted);
   text-transform: uppercase;
 }
@@ -175,10 +184,15 @@ select.app-dropdown {
   background: transparent;
   border: none;
   color: var(--text-primary);
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.9rem;
   outline: none;
   cursor: pointer;
+}
+
+select.app-dropdown option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .nav-links {
@@ -199,6 +213,10 @@ select.app-dropdown {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.danger {
+  color: var(--error-color);
 }
 
 .nav-btn:hover {
@@ -254,7 +272,7 @@ select.app-dropdown {
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -263,6 +281,7 @@ select.app-dropdown {
   background: var(--bg-input);
   color: var(--text-primary);
   box-shadow: var(--shadow-sm);
+  transition: all 0.5s ease;
 }
 
 .btn:hover {
@@ -273,23 +292,77 @@ select.app-dropdown {
 
 .btn-primary {
   background: var(--accent-color);
-  color: #ffffff;
+  color: var(--bg-primary);
   border: 1px solid var(--accent-color);
 }
 
 .btn-primary:hover {
-  background: var(--accent-hover);
-  color: #ffffff;
+  opacity: 0.9;
 }
 
 .btn-danger {
   background: var(--error-color);
-  color: #ffffff;
+  color: var(--bg-primary);
   border: 1px solid var(--error-color);
 }
 
 .btn-danger:hover {
   opacity: 0.9;
+}
+
+.btn-success {
+  background: var(--success-color);
+  color: var(--bg-primary);
+  border: 1px solid var(--success-color);
+}
+
+.btn-success:hover {
+  opacity: 0.9;
+}
+
+.btn-info {
+  background: var(--info-color);
+  color: var(--bg-primary);
+}
+
+.btn-info:hover {
+  opacity: 0.9;
+}
+
+.btn-primary-outline {
+  background: var(--bg-hover);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.btn-primary-outline:hover {
+  border: 1px solid var(--border-color);
+  background: var(--accent-color);
+  color: var(--bg-hover);
+}
+
+.btn-danger-outline {
+  background: var(--bg-hover);
+  border-color: var(--warning-color);
+  color: var(--warning-color);
+}
+
+.btn-danger-outline:hover {
+  border: 1px solid var(--border-color);
+  background: var(--warning-color);
+  color: var(--bg-hover);
+}
+
+.btn-error-outline {
+  background: var(--bg-hover);
+  border-color: var(--error-color);
+  color: var(--error-color);
+}
+
+.btn-error-outline:hover {
+  border: 1px solid var(--border-color);
+  background: var(--error-color);
+  color: var(--bg-hover);
 }
 
 .search-box {
@@ -346,8 +419,8 @@ select.app-dropdown {
 
 .sidebar-header {
   padding: 12px 16px;
-  font-size: 0.8rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 600;
   text-transform: uppercase;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border-color);
@@ -443,14 +516,14 @@ select.app-dropdown {
 [data-theme="dark"] .method-GET    { background: rgba(137, 180, 250, 0.15); color: #89b4fa; } /* Mocha Blue */
 [data-theme="dark"] .method-POST   { background: rgba(166, 227, 161, 0.15); color: #a6e3a1; } /* Mocha Green */
 [data-theme="dark"] .method-PUT    { background: rgba(249, 226, 175, 0.15); color: #f9e2af; } /* Mocha Yellow */
-[data-theme="dark"] .method-DELETE { background: rgba(243, 139, 168, 0.15); color: #f38ba8; } /* Mocha Red */
+[data-theme="dark"] .method-DELETE { background: rgba(243, 139, 168, 0.15); color: #fab387; } /* Mocha Red */
 [data-theme="dark"] .method-PATCH  { background: rgba(203, 166, 247, 0.15); color: #cba6f7; } /* Mocha Mauve */
 
 /* Catppuccin Latte (Light) — method badges */
 [data-theme="light"] .method-GET    { background: rgba(30, 102, 245, 0.15);  color: #1e66f5; } /* Latte Blue */
 [data-theme="light"] .method-POST   { background: rgba(64, 160, 43, 0.15);   color: #40a02b; } /* Latte Green */
 [data-theme="light"] .method-PUT    { background: rgba(223, 142, 29, 0.15);  color: #df8e1d; } /* Latte Yellow */
-[data-theme="light"] .method-DELETE { background: rgba(210, 15, 57, 0.15);   color: #d20f39; } /* Latte Red */
+[data-theme="light"] .method-DELETE { background: rgba(210, 15, 57, 0.15);   color: #fe640b; } /* Latte Red */
 [data-theme="light"] .method-PATCH  { background: rgba(136, 57, 239, 0.15);  color: #8839ef; } /* Latte Mauve */
 
 /* Right Section: Split (Top: Request, Bottom: Response) */
@@ -483,8 +556,7 @@ select.app-dropdown {
 
 .pane-title {
   font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-weight: 600;
   letter-spacing: 0.5px;
   color: var(--text-secondary);
   display: flex;

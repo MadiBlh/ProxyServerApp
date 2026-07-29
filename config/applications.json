@@ -31,9 +31,16 @@
     "frontEndUrl": "http://localhost:5173",
     "backendUrls": [
       {
-        "id": "df099b21-0069-4899-9ec7-1687638e975a",
+        "id": "c06bb168-4ee1-458c-9794-cf764cfd501a",
         "name": "Backend API Service",
-        "url": "http://localhost:5000"
+        "url": "http://localhost:5000",
+        "pathPrefix": ""
+      },
+      {
+        "id": "0a372283-a95c-4328-a35d-ba1a980633ec",
+        "name": "Saop API",
+        "url": "http://localhost:3005",
+        "pathPrefix": ""
       }
     ],
     "isActive": true

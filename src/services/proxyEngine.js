@@ -59,6 +59,7 @@ proxy.on('proxyRes', (proxyRes, req, res) => {
       id: requestId,
       appId: app.id,
       appName: app.name,
+      backendName: req._proxyBackendService ? req._proxyBackendService.name : null,
       targetUrl,
       method: req.method,
       endpoint: req.url,
@@ -75,6 +76,7 @@ proxy.on('proxyRes', (proxyRes, req, res) => {
       id: requestId,
       appId: app.id,
       appName: app.name,
+      backendName: req._proxyBackendService ? req._proxyBackendService.name : undefined,
       timestamp: reqMeta.timestamp,
       method: req.method,
       endpoint: req.url,
@@ -161,23 +163,46 @@ function proxyMiddleware(req, res, next) {
       });
     }
 
-    // Determine target backend url
-    const backendService = targetApp.backendUrls[0];
-    const targetBackendUrl = backendService.url;
+    // Remove proxy route prefix from target request URL if using /proxy/:appId/...
+    let requestPath = req.originalUrl || req.url;
+    if (req.params.appId) {
+      const routePrefix = `/proxy/${req.params.appId}`;
+      if (requestPath.startsWith(routePrefix)) {
+        requestPath = requestPath.substring(routePrefix.length) || '/';
+      }
+    }
+    req.url = requestPath;
+
+    // --- Multi-backend routing by pathPrefix ---
+    const sortedBackends = [...targetApp.backendUrls].sort((a, b) => {
+      const aLen = (a.pathPrefix || '').length;
+      const bLen = (b.pathPrefix || '').length;
+      return bLen - aLen; // longest prefix first
+    });
+
+    let selectedBackend = null;
+
+    for (const be of sortedBackends) {
+      const prefix = (be.pathPrefix || '').trim();
+      if (prefix && requestPath.startsWith(prefix)) {
+        selectedBackend = be;
+        break;
+      }
+    }
+
+    // Fallback: use first backend with no prefix (the default backend)
+    if (!selectedBackend) {
+      selectedBackend = sortedBackends.find(be => !(be.pathPrefix || '').trim())
+                        || sortedBackends[sortedBackends.length - 1];
+    }
+
+    const targetBackendUrl = selectedBackend.url;
 
     req._proxyRequestId = uuidv4();
     req._proxyStartTime = Date.now();
     req._proxyApp = targetApp;
+    req._proxyBackendService = selectedBackend;
     req._proxyTargetUrl = targetBackendUrl;
-
-    // Remove proxy route prefix from target request URL if using /proxy/:appId/...
-    let originalPath = req.originalUrl || req.url;
-    if (req.params.appId) {
-      const prefix = `/proxy/${req.params.appId}`;
-      if (originalPath.startsWith(prefix)) {
-        req.url = originalPath.substring(prefix.length) || '/';
-      }
-    }
 
     // Re-stream buffered body for http-proxy
     const Stream = require('stream');

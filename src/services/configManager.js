@@ -76,7 +76,8 @@ function createApplication(appData) {
     backendUrls: (appData.backendUrls || []).map(be => ({
       id: be.id || uuidv4(),
       name: be.name || 'Backend Service',
-      url: be.url || ''
+      url: be.url || '',
+      pathPrefix: be.pathPrefix || ''
     })),
     isActive: appData.isActive !== undefined ? appData.isActive : true
   };
@@ -97,7 +98,8 @@ function updateApplication(id, appData) {
     backendUrls: (appData.backendUrls || apps[index].backendUrls || []).map(be => ({
       id: be.id || uuidv4(),
       name: be.name || 'Backend Service',
-      url: be.url || ''
+      url: be.url || '',
+      pathPrefix: be.pathPrefix || ''
     }))
   };
   saveApplications(apps);

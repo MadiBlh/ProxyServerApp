@@ -668,7 +668,7 @@ select.app-dropdown option {
   border: 1px solid var(--border-color);
   border-radius: 12px;
   width: 90%;
-  max-width: 600px;
+  max-width: 784px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -769,4 +769,78 @@ select.app-dropdown option {
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
+}
+
+/* ==========================================================================
+   BACKEND SERVICE ROW (multi-backend editor inside modal)
+   ========================================================================== */
+
+.backend-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 14px;
+  position: relative;
+  animation: fadeSlideDown 0.2s ease;
+}
+
+@keyframes fadeSlideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.backend-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.backend-row-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.backend-row-fields {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 0.8fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.backend-row-fields .form-group {
+  gap: 4px;
+}
+
+.backend-row-fields .form-label {
+  font-size: 0.75rem;
+}
+
+.backend-row-remove {
+  background: transparent;
+  border: 1px solid var(--error-color);
+  color: var(--error-color);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.backend-row-remove:hover {
+  background: var(--error-bg);
+}
+
+.backend-row-default-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  background: var(--accent-light);
+  color: var(--accent-color);
+  border-radius: 4px;
 }

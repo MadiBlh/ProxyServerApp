@@ -47,7 +47,7 @@ function applyTheme(theme) {
 // --- Applications API Management ---
 async function loadApplications() {
   try {
-    const res = await fetch('/api/applications');
+    const res = await fetch('/dashboard-api/applications');
     applications = await res.json();
 
     const dropdown = document.getElementById('app-dropdown');
@@ -88,7 +88,7 @@ async function loadApplications() {
 // --- Logs Management ---
 async function loadLogsForApp(appId) {
   try {
-    const res = await fetch(`/api/logs?appId=${appId}`);
+    const res = await fetch(`/dashboard-api/logs?appId=${appId}`);
     logsList = await res.json();
     renderLogs(logsList);
 
@@ -163,7 +163,7 @@ async function selectLog(logId) {
   renderLogs(logsList);
 
   try {
-    const res = await fetch(`/api/logs/${logId}`);
+    const res = await fetch(`/dashboard-api/logs/${logId}`);
     selectedLogDetail = await res.json();
     renderLogDetail(selectedLogDetail);
   } catch (err) {
@@ -231,7 +231,7 @@ function clearLogDetailsView() {
 
 // --- SSE Realtime Feed ---
 function initSseFeed() {
-  const evtSource = new EventSource('/api/events');
+  const evtSource = new EventSource('/dashboard-api/events');
   evtSource.onmessage = (event) => {
     try {
       const logSummary = JSON.parse(event.data);
@@ -279,7 +279,7 @@ function attachEventListeners() {
   document.getElementById('remove-logs-btn').onclick = async () => {
     if (confirm('Are you sure you want to remove all log files from the server?')) {
       try {
-        await fetch('/api/logs', { method: 'DELETE' });
+        await fetch('/dashboard-api/logs', { method: 'DELETE' });
         logsList = [];
         renderLogs([]);
         clearLogDetailsView();
@@ -308,7 +308,7 @@ function attachEventListeners() {
     }
 
     try {
-      const res = await fetch(`/api/logs/${selectedLogId}/export`, {
+      const res = await fetch(`/dashboard-api/logs/${selectedLogId}/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName })
@@ -356,7 +356,7 @@ function attachEventListeners() {
     out.textContent = 'Executing replay request...';
 
     try {
-      const res = await fetch(`/api/logs/${selectedLogId}/replay`, {
+      const res = await fetch(`/dashboard-api/logs/${selectedLogId}/replay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -408,6 +408,11 @@ function renderAppManagerList() {
   const container = document.getElementById('app-manager-list');
   container.innerHTML = '';
 
+  if (applications.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted); font-size:0.9rem;">No applications configured yet.</p>';
+    return;
+  }
+
   applications.forEach(app => {
     const item = document.createElement('div');
     item.className = 'form-group';
@@ -416,17 +421,27 @@ function renderAppManagerList() {
     item.style.borderRadius = '8px';
     item.style.marginBottom = '10px';
 
-    const beNames = (app.backendUrls || []).map(b => `${b.name} (${b.url})`).join(', ');
+    const backends = (app.backendUrls || []);
+    const beLines = backends.map(b => {
+      const prefix = b.pathPrefix ? ` [prefix: ${escapeHtml(b.pathPrefix)}]` : ' [default]';
+      return `<li style="font-size:0.78rem; color:var(--text-muted);"><code style="color:var(--accent-color);">${escapeHtml(b.name)}</code> → ${escapeHtml(b.url)}${prefix}</li>`;
+    }).join('');
 
     item.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <strong>${escapeHtml(app.name)}</strong> ${app.isActive ? '<span style="color:var(--success-color)">(Active)</span>' : '<span style="color:var(--error-color)">(Inactive)</span>'}
-          <div style="font-size:0.8rem; color:var(--text-muted);">FrontEnd: ${escapeHtml(app.frontEndUrl)} | Backends: ${escapeHtml(beNames)}</div>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 12px;">
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <strong style="font-size:0.95rem;">${escapeHtml(app.name)}</strong>
+            ${app.isActive
+              ? '<span style="color:var(--success-color); font-size:0.78rem; font-weight:600;">● Active</span>'
+              : '<span style="color:var(--error-color); font-size:0.78rem; font-weight:600;">● Inactive</span>'}
+          </div>
+          <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:4px;">Frontend: <code>${escapeHtml(app.frontEndUrl)}</code></div>
+          <ul style="margin: 0 0 0 4px; padding: 0; list-style: none;">${beLines || '<li style="color:var(--text-muted); font-size:0.78rem;">No backends configured</li>'}</ul>
         </div>
-        <div style="display:flex; gap:6px;">
-          <button class="btn btn-info" onclick="editApp('${app.id}')">Edit</button>
-          <button class="btn btn-danger" onclick="deleteApp('${app.id}')">Delete</button>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          <button class="btn btn-primary" style="padding:5px 12px;" onclick="editApp('${app.id}')">Edit</button>
+          <button class="btn btn-danger" style="padding:5px 12px;" onclick="deleteApp('${app.id}')">Delete</button>
         </div>
       </div>
     `;
@@ -440,10 +455,13 @@ window.editApp = (id) => {
   document.getElementById('edit-app-id').value = app.id;
   document.getElementById('edit-app-name').value = app.name;
   document.getElementById('edit-app-frontend').value = app.frontEndUrl;
-  const be = app.backendUrls && app.backendUrls[0] ? app.backendUrls[0] : { name: 'Main Backend', url: '' };
-  document.getElementById('edit-be-name').value = be.name;
-  document.getElementById('edit-be-url').value = be.url;
   document.getElementById('edit-app-active').checked = app.isActive;
+
+  // Populate backend services list
+  const list = document.getElementById('backend-services-list');
+  list.innerHTML = '';
+  const backends = app.backendUrls && app.backendUrls.length > 0 ? app.backendUrls : [{ name: 'Main Backend', url: '', pathPrefix: '' }];
+  backends.forEach(be => addBackendRow(be));
 
   openModal('edit-app-modal');
 };
@@ -451,7 +469,7 @@ window.editApp = (id) => {
 window.deleteApp = async (id) => {
   if (confirm('Delete this web application config?')) {
     try {
-      await fetch(`/api/applications/${id}`, { method: 'DELETE' });
+      await fetch(`/dashboard-api/applications/${id}`, { method: 'DELETE' });
       await loadApplications();
       renderAppManagerList();
       showToast('Application deleted', 'success');
@@ -465,9 +483,12 @@ document.getElementById('add-new-app-btn').onclick = () => {
   document.getElementById('edit-app-id').value = '';
   document.getElementById('edit-app-name').value = 'New Web Application';
   document.getElementById('edit-app-frontend').value = 'http://localhost:3000';
-  document.getElementById('edit-be-name').value = 'Backend API Service';
-  document.getElementById('edit-be-url').value = 'https://api.example.com';
   document.getElementById('edit-app-active').checked = true;
+
+  // Start with one default backend row
+  const list = document.getElementById('backend-services-list');
+  list.innerHTML = '';
+  addBackendRow({ name: 'Main Backend', url: '', pathPrefix: '' });
 
   openModal('edit-app-modal');
 };
@@ -476,26 +497,38 @@ document.getElementById('save-app-config-btn').onclick = async () => {
   const id = document.getElementById('edit-app-id').value;
   const name = document.getElementById('edit-app-name').value.trim();
   const frontEndUrl = document.getElementById('edit-app-frontend').value.trim();
-  const beName = document.getElementById('edit-be-name').value.trim();
-  const beUrl = document.getElementById('edit-be-url').value.trim();
   const isActive = document.getElementById('edit-app-active').checked;
 
-  const payload = {
-    name,
-    frontEndUrl,
-    backendUrls: [{ name: beName, url: beUrl }],
-    isActive
-  };
+  const backendUrls = readBackendRows();
+
+  if (backendUrls.length === 0) {
+    showToast('Please add at least one backend service', 'error');
+    return;
+  }
+
+  const hasInvalidUrl = backendUrls.some(be => !be.url.trim());
+  if (hasInvalidUrl) {
+    showToast('All backend services must have a valid URL', 'error');
+    return;
+  }
+
+  const hasInvalidPrefix = backendUrls.some(be => !be.pathPrefix || be.pathPrefix === '/');
+  if (hasInvalidPrefix) {
+    showToast('Path Prefix is required for every backend service (e.g. /api, /auth)', 'error');
+    return;
+  }
+
+  const payload = { name, frontEndUrl, backendUrls, isActive };
 
   try {
     if (id) {
-      await fetch(`/api/applications/${id}`, {
+      await fetch(`/dashboard-api/applications/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
     } else {
-      await fetch('/api/applications', {
+      await fetch('/dashboard-api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -509,6 +542,99 @@ document.getElementById('save-app-config-btn').onclick = async () => {
     showToast('Failed to save application config', 'error');
   }
 };
+
+// --- Add-Backend button inside edit modal ---
+document.getElementById('add-backend-btn').onclick = () => {
+  addBackendRow({ name: '', url: '', pathPrefix: '/api' });
+};
+
+/**
+ * Renders one backend service row inside the backend-services-list container.
+ * @param {{ name: string, url: string, pathPrefix?: string }} be
+ */
+function addBackendRow(be = { name: '', url: '', pathPrefix: '/api' }) {
+  const list = document.getElementById('backend-services-list');
+  const idx = list.children.length;
+
+  const row = document.createElement('div');
+  row.className = 'backend-row';
+  row.dataset.backendIdx = idx;
+
+  const isDefault = idx === 0;
+
+  row.innerHTML = `
+    <div class="backend-row-header">
+      <span class="backend-row-title">Backend #${idx + 1}</span>
+      <div style="display:flex; align-items:center; gap:8px;">
+        ${isDefault ? '<span class="backend-row-default-badge">Primary</span>' : ''}
+        <button type="button" class="backend-row-remove">Remove</button>
+      </div>
+    </div>
+    <div class="backend-row-fields">
+      <div class="form-group">
+        <label class="form-label">Service Name:</label>
+        <input type="text" class="form-control be-name" placeholder="e.g. Auth API" value="${escapeHtml(be.name)}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target URL:</label>
+        <input type="text" class="form-control be-url" placeholder="http://localhost:5000" value="${escapeHtml(be.url)}">
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="color:var(--accent-color); font-weight:700;">Path Prefix *:</label>
+        <input type="text" class="form-control be-prefix" placeholder="e.g. /api" value="${escapeHtml(be.pathPrefix || '')}">
+      </div>
+    </div>
+  `;
+
+  row.querySelector('.backend-row-remove').onclick = () => {
+    row.remove();
+    reindexBackendRows();
+  };
+
+  list.appendChild(row);
+}
+
+/**
+ * Re-index all backend rows after removal.
+ */
+function reindexBackendRows() {
+  const list = document.getElementById('backend-services-list');
+  Array.from(list.children).forEach((row, i) => {
+    row.querySelector('.backend-row-title').textContent = `Backend #${i + 1}`;
+    const existingBadge = row.querySelector('.backend-row-default-badge');
+    if (i === 0 && !existingBadge) {
+      const header = row.querySelector('.backend-row-header > div');
+      const badge = document.createElement('span');
+      badge.className = 'backend-row-default-badge';
+      badge.textContent = 'Primary';
+      header.insertBefore(badge, header.querySelector('.backend-row-remove'));
+    } else if (i !== 0 && existingBadge) {
+      existingBadge.remove();
+    }
+  });
+}
+
+/**
+ * Reads all backend rows from the list and returns an array of backend objects with normalized pathPrefix.
+ * @returns {{ name: string, url: string, pathPrefix: string }[]}
+ */
+function readBackendRows() {
+  const list = document.getElementById('backend-services-list');
+  return Array.from(list.children).map(row => {
+    let prefix = row.querySelector('.be-prefix').value.trim();
+    if (prefix && !prefix.startsWith('/')) {
+      prefix = '/' + prefix;
+    }
+    if (prefix.length > 1 && prefix.endsWith('/')) {
+      prefix = prefix.slice(0, -1);
+    }
+    return {
+      name: row.querySelector('.be-name').value.trim(),
+      url: row.querySelector('.be-url').value.trim(),
+      pathPrefix: prefix
+    };
+  });
+}
 
 // --- Modal Helpers ---
 function openModal(id) {

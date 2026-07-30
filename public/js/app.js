@@ -133,6 +133,14 @@ function renderLogs(logs) {
     const dotClass = isOk ? 'green' : 'red';
 
     const formattedTime = new Date(log.timestamp).toLocaleTimeString();
+    const isRedirect = log.routeType === 'redirect';
+    const badgeStyle = isRedirect
+      ? 'background:rgba(234, 179, 8, 0.15); color:#eab308; border: 1px solid rgba(234, 179, 8, 0.3);'
+      : 'background:var(--accent-light); color:var(--accent-color);';
+
+    const backendPill = log.backendName
+      ? `<span style="font-size:0.68rem; padding:1px 6px; border-radius:4px; ${badgeStyle} font-weight:600;">${isRedirect ? '🔀 ' : ''}${escapeHtml(log.backendName)}</span>`
+      : '';
 
     li.innerHTML = `
       <div class="status-dot ${dotClass}" title="Status: ${log.statusCode || 'FAILED'}"></div>
@@ -145,6 +153,7 @@ function renderLogs(logs) {
           <span>${formattedTime}</span>
           <span>•</span>
           <span>${log.durationMs}ms</span>
+          ${backendPill}
         </div>
       </div>
     `;
@@ -427,6 +436,11 @@ function renderAppManagerList() {
       return `<li style="font-size:0.78rem; color:var(--text-muted);"><code style="color:var(--accent-color);">${escapeHtml(b.name)}</code> → ${escapeHtml(b.url)}${prefix}</li>`;
     }).join('');
 
+    const redirects = (app.redirectUrls || []);
+    const redLines = redirects.map(r => {
+      return `<li style="font-size:0.78rem; color:var(--text-muted);"><span style="color:#eab308;">🔀 ${escapeHtml(r.name)}</span> [prefix: <code>${escapeHtml(r.pathPrefix)}</code>] → ${escapeHtml(r.targetUrl)}</li>`;
+    }).join('');
+
     item.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:flex-start; gap: 12px;">
         <div style="flex:1; min-width:0;">
@@ -437,7 +451,12 @@ function renderAppManagerList() {
               : '<span style="color:var(--error-color); font-size:0.78rem; font-weight:600;">● Inactive</span>'}
           </div>
           <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:4px;">Frontend: <code>${escapeHtml(app.frontEndUrl)}</code></div>
-          <ul style="margin: 0 0 0 4px; padding: 0; list-style: none;">${beLines || '<li style="color:var(--text-muted); font-size:0.78rem;">No backends configured</li>'}</ul>
+          <div style="font-size:0.78rem; font-weight:600; color:var(--text-color); margin-top:6px;">Backend Services:</div>
+          <ul style="margin: 2px 0 6px 4px; padding: 0; list-style: none;">${beLines || '<li style="color:var(--text-muted); font-size:0.78rem;">No backends configured</li>'}</ul>
+          ${redirects.length > 0 ? `
+            <div style="font-size:0.78rem; font-weight:600; color:#eab308; margin-top:4px;">API Redirections / Forwarding:</div>
+            <ul style="margin: 2px 0 0 4px; padding: 0; list-style: none;">${redLines}</ul>
+          ` : ''}
         </div>
         <div style="display:flex; gap:6px; flex-shrink:0;">
           <button class="btn btn-primary" style="padding:5px 12px;" onclick="editApp('${app.id}')">Edit</button>
@@ -458,10 +477,16 @@ window.editApp = (id) => {
   document.getElementById('edit-app-active').checked = app.isActive;
 
   // Populate backend services list
-  const list = document.getElementById('backend-services-list');
-  list.innerHTML = '';
-  const backends = app.backendUrls && app.backendUrls.length > 0 ? app.backendUrls : [{ name: 'Main Backend', url: '', pathPrefix: '' }];
+  const beList = document.getElementById('backend-services-list');
+  beList.innerHTML = '';
+  const backends = app.backendUrls && app.backendUrls.length > 0 ? app.backendUrls : [{ name: 'Main Backend', url: '', pathPrefix: '/api' }];
   backends.forEach(be => addBackendRow(be));
+
+  // Populate API redirections list
+  const redList = document.getElementById('redirect-services-list');
+  redList.innerHTML = '';
+  const redirects = app.redirectUrls || [];
+  redirects.forEach(red => addRedirectRow(red));
 
   openModal('edit-app-modal');
 };
@@ -486,9 +511,13 @@ document.getElementById('add-new-app-btn').onclick = () => {
   document.getElementById('edit-app-active').checked = true;
 
   // Start with one default backend row
-  const list = document.getElementById('backend-services-list');
-  list.innerHTML = '';
-  addBackendRow({ name: 'Main Backend', url: '', pathPrefix: '' });
+  const beList = document.getElementById('backend-services-list');
+  beList.innerHTML = '';
+  addBackendRow({ name: 'Main Backend', url: '', pathPrefix: '/api' });
+
+  // Clear redirections
+  const redList = document.getElementById('redirect-services-list');
+  redList.innerHTML = '';
 
   openModal('edit-app-modal');
 };
@@ -500,6 +529,7 @@ document.getElementById('save-app-config-btn').onclick = async () => {
   const isActive = document.getElementById('edit-app-active').checked;
 
   const backendUrls = readBackendRows();
+  const redirectUrls = readRedirectRows();
 
   if (backendUrls.length === 0) {
     showToast('Please add at least one backend service', 'error');
@@ -518,7 +548,13 @@ document.getElementById('save-app-config-btn').onclick = async () => {
     return;
   }
 
-  const payload = { name, frontEndUrl, backendUrls, isActive };
+  const hasInvalidRedirection = redirectUrls.some(red => !red.targetUrl.trim() || !red.pathPrefix || red.pathPrefix === '/');
+  if (hasInvalidRedirection) {
+    showToast('All API redirections must have a Target URL and Path Prefix (e.g. /external/payment)', 'error');
+    return;
+  }
+
+  const payload = { name, frontEndUrl, backendUrls, redirectUrls, isActive };
 
   try {
     if (id) {
@@ -631,6 +667,85 @@ function readBackendRows() {
     return {
       name: row.querySelector('.be-name').value.trim(),
       url: row.querySelector('.be-url').value.trim(),
+      pathPrefix: prefix
+    };
+  });
+}
+
+// --- Add-Redirect button inside edit modal ---
+document.getElementById('add-redirect-btn').onclick = () => {
+  addRedirectRow({ name: '', targetUrl: '', pathPrefix: '/external' });
+};
+
+/**
+ * Renders one API redirection row inside the redirect-services-list container.
+ * @param {{ name: string, targetUrl: string, pathPrefix?: string }} red
+ */
+function addRedirectRow(red = { name: '', targetUrl: '', pathPrefix: '/external' }) {
+  const list = document.getElementById('redirect-services-list');
+  const idx = list.children.length;
+
+  const row = document.createElement('div');
+  row.className = 'backend-row';
+  row.style.borderColor = 'rgba(234, 179, 8, 0.4)';
+  row.dataset.redirectIdx = idx;
+
+  row.innerHTML = `
+    <div class="backend-row-header">
+      <span class="backend-row-title" style="color:#eab308;">🔀 Redirection #${idx + 1}</span>
+      <button type="button" class="backend-row-remove">Remove</button>
+    </div>
+    <div class="backend-row-fields">
+      <div class="form-group">
+        <label class="form-label">Service Name:</label>
+        <input type="text" class="form-control red-name" placeholder="e.g. Payment Gateway" value="${escapeHtml(red.name)}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target URL *:</label>
+        <input type="text" class="form-control red-url" placeholder="https://api.stripe.com" value="${escapeHtml(red.targetUrl || red.url || '')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="color:#eab308; font-weight:700;">Path Prefix *:</label>
+        <input type="text" class="form-control red-prefix" placeholder="e.g. /external/payment" value="${escapeHtml(red.pathPrefix || '')}">
+      </div>
+    </div>
+  `;
+
+  row.querySelector('.backend-row-remove').onclick = () => {
+    row.remove();
+    reindexRedirectRows();
+  };
+
+  list.appendChild(row);
+}
+
+/**
+ * Re-index all redirect rows after removal.
+ */
+function reindexRedirectRows() {
+  const list = document.getElementById('redirect-services-list');
+  Array.from(list.children).forEach((row, i) => {
+    row.querySelector('.backend-row-title').textContent = `🔀 Redirection #${i + 1}`;
+  });
+}
+
+/**
+ * Reads all redirect rows from the list and returns an array of redirect objects.
+ * @returns {{ name: string, targetUrl: string, pathPrefix: string }[]}
+ */
+function readRedirectRows() {
+  const list = document.getElementById('redirect-services-list');
+  return Array.from(list.children).map(row => {
+    let prefix = row.querySelector('.red-prefix').value.trim();
+    if (prefix && !prefix.startsWith('/')) {
+      prefix = '/' + prefix;
+    }
+    if (prefix.length > 1 && prefix.endsWith('/')) {
+      prefix = prefix.slice(0, -1);
+    }
+    return {
+      name: row.querySelector('.red-name').value.trim(),
+      targetUrl: row.querySelector('.red-url').value.trim(),
       pathPrefix: prefix
     };
   });

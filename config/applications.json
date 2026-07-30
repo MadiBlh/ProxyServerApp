@@ -11,6 +11,7 @@
         "pathPrefix": "/posts"
       }
     ],
+    "redirectUrls": [],
     "isActive": true
   },
   {
@@ -25,6 +26,7 @@
         "pathPrefix": "/calculator"
       }
     ],
+    "redirectUrls": [],
     "isActive": true
   },
   {
@@ -33,15 +35,23 @@
     "frontEndUrl": "http://localhost:5173",
     "backendUrls": [
       {
-        "id": "c06bb168-4ee1-458c-9794-cf764cfd501a",
+        "id": "81235513-7e3f-4cfb-9483-53289d479e20",
         "name": "Backend API Service",
         "url": "http://localhost:5000",
-        "pathPrefix": "/todo"
+        "pathPrefix": "/api"
+      }
+    ],
+    "redirectUrls": [
+      {
+        "id": "a63f0bd8-c4ad-495f-85be-5d45e4b1097d",
+        "name": "External Payment API",
+        "targetUrl": "http://localhost:9007",
+        "pathPrefix": "/external/payment"
       },
       {
-        "id": "0a372283-a95c-4328-a35d-ba1a980633ec",
+        "id": "f19c6dac-316c-44cd-b359-14c87205046a",
         "name": "SOAP API",
-        "url": "http://localhost:9006",
+        "targetUrl": "http://localhost:3005",
         "pathPrefix": "/soap"
       }
     ],

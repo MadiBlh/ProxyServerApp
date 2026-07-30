@@ -34,7 +34,7 @@ function getFileExtension(contentType, bodyStr) {
   return 'txt';
 }
 
-function saveLogEntry({ id, appId, appName, backendName, targetUrl, method, endpoint, requestHeaders, requestBody, statusCode, responseHeaders, responseBody, durationMs, error }) {
+function saveLogEntry({ id, appId, appName, backendName, routeType, targetUrl, method, endpoint, requestHeaders, requestBody, statusCode, responseHeaders, responseBody, durationMs, error }) {
   ensureDirectories();
 
   const reqExt = getFileExtension(requestHeaders['content-type'], requestBody);
@@ -55,6 +55,7 @@ function saveLogEntry({ id, appId, appName, backendName, targetUrl, method, endp
     appId,
     appName,
     backendName: backendName || null,
+    routeType: routeType || 'backend',
     timestamp: new Date().toISOString(),
     method: method || 'GET',
     endpoint: endpoint || targetUrl || '/',
@@ -115,6 +116,7 @@ function getAllLogs(appIdFilter = null) {
         appId: reqMeta.appId,
         appName: reqMeta.appName,
         backendName: reqMeta.backendName || null,
+        routeType: reqMeta.routeType || 'backend',
         timestamp: reqMeta.timestamp,
         method: reqMeta.method,
         endpoint: reqMeta.endpoint,

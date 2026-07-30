@@ -221,7 +221,7 @@
 
   <!-- MODAL: EDIT / ADD APPLICATION -->
   <div id="edit-app-modal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 680px;">
+    <div class="modal-card">
       <div class="modal-header">
         <h3 class="modal-title">Application Configuration</h3>
         <button class="modal-close" onclick="closeModal('edit-app-modal')">✕</button>
@@ -248,8 +248,19 @@
             </button>
           </div>
           <div id="backend-services-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+        </div>
+
+        <!-- API Redirections / Forwarding section -->
+        <div class="form-group" style="margin-top: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label class="form-label" style="margin: 0; color: var(--accent-color);">🔀 API Redirections / Forwarding (Backend to External APIs)</label>
+            <button type="button" id="add-redirect-btn" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.8rem;">
+              + Add Redirection
+            </button>
+          </div>
+          <div id="redirect-services-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
           <p style="font-size: 0.76rem; color: var(--text-muted); margin-top: 6px;">
-            💡 Set a <strong>Path Prefix</strong> (e.g. <code>/api</code>) to route requests matching that prefix to this backend. Leave empty to use this as the default backend.
+            💡 Configure external API redirections for outbound calls made by your backend. Requests matching <strong>Path Prefix</strong> (e.g. <code>/external/payment</code>) will log headers & body and forward to <strong>Target URL</strong>.
           </p>
         </div>
 

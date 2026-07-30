@@ -62,6 +62,7 @@ proxy.on('proxyRes', (proxyRes, req, res) => {
       appId: app.id,
       appName: app.name,
       backendName: req._proxyBackendService ? req._proxyBackendService.name : null,
+      routeType: req._proxyBackendService ? req._proxyBackendService.routeType : 'backend',
       targetUrl,
       method: req.method,
       endpoint: req.url,
@@ -79,6 +80,7 @@ proxy.on('proxyRes', (proxyRes, req, res) => {
       appId: app.id,
       appName: app.name,
       backendName: req._proxyBackendService ? req._proxyBackendService.name : undefined,
+      routeType: req._proxyBackendService ? req._proxyBackendService.routeType : 'backend',
       timestamp: reqMeta.timestamp,
       method: req.method,
       endpoint: req.url,
@@ -170,30 +172,40 @@ function proxyMiddleware(req, res, next) {
 
     if (explicitAppId) {
       targetApp = activeApps.find(a => a.id === explicitAppId);
-      if (targetApp && targetApp.backendUrls && targetApp.backendUrls.length > 0) {
-        const sorted = [...targetApp.backendUrls].sort((a, b) => (b.pathPrefix || '').length - (a.pathPrefix || '').length);
-        selectedBackend = sorted.find(be => (be.pathPrefix || '').trim() && requestPath.startsWith(be.pathPrefix.trim())) || sorted[0];
+      if (targetApp) {
+        const routes = [
+          ...(targetApp.backendUrls || []).map(b => ({ ...b, url: b.url, routeType: 'backend' })),
+          ...(targetApp.redirectUrls || []).map(r => ({ ...r, url: r.targetUrl, routeType: 'redirect' }))
+        ].sort((a, b) => (b.pathPrefix || '').length - (a.pathPrefix || '').length);
+        selectedBackend = routes.find(be => (be.pathPrefix || '').trim() && requestPath.startsWith(be.pathPrefix.trim())) || routes[0];
       }
     }
 
-    // If no explicit app ID, search ALL active backend services across ALL active apps by pathPrefix
+    // If no explicit app ID, search ALL active backend and redirect routes across ALL active apps by pathPrefix
     if (!selectedBackend) {
-      const allActiveBackends = [];
+      const allActiveRoutes = [];
       for (const app of activeApps) {
         if (app.backendUrls) {
           app.backendUrls.forEach(be => {
             if (be.url && be.pathPrefix) {
-              allActiveBackends.push({ ...be, app });
+              allActiveRoutes.push({ ...be, url: be.url, routeType: 'backend', app });
+            }
+          });
+        }
+        if (app.redirectUrls) {
+          app.redirectUrls.forEach(red => {
+            if (red.targetUrl && red.pathPrefix) {
+              allActiveRoutes.push({ ...red, url: red.targetUrl, routeType: 'redirect', app });
             }
           });
         }
       }
 
-      // Sort all backend services by pathPrefix length descending (longest/most specific prefix first)
-      allActiveBackends.sort((a, b) => (b.pathPrefix || '').length - (a.pathPrefix || '').length);
+      // Sort all active routes by pathPrefix length descending (longest/most specific prefix first)
+      allActiveRoutes.sort((a, b) => (b.pathPrefix || '').length - (a.pathPrefix || '').length);
 
-      // Find matching backend service by pathPrefix
-      const match = allActiveBackends.find(be => requestPath.startsWith(be.pathPrefix.trim()));
+      // Find matching backend/redirect service by pathPrefix
+      const match = allActiveRoutes.find(be => requestPath.startsWith(be.pathPrefix.trim()));
       if (match) {
         selectedBackend = match;
         targetApp = match.app;

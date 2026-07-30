@@ -97,6 +97,12 @@ function createApplication(appData) {
       url: be.url || '',
       pathPrefix: normalizePathPrefix(be.pathPrefix)
     })),
+    redirectUrls: (appData.redirectUrls || []).map(red => ({
+      id: red.id || uuidv4(),
+      name: red.name || 'API Redirection',
+      targetUrl: red.targetUrl || '',
+      pathPrefix: normalizePathPrefix(red.pathPrefix)
+    })),
     isActive: appData.isActive !== undefined ? appData.isActive : true
   };
   apps.push(newApp);
@@ -118,6 +124,12 @@ function updateApplication(id, appData) {
       name: be.name || 'Backend Service',
       url: be.url || '',
       pathPrefix: normalizePathPrefix(be.pathPrefix)
+    })),
+    redirectUrls: (appData.redirectUrls || apps[index].redirectUrls || []).map(red => ({
+      id: red.id || uuidv4(),
+      name: red.name || 'API Redirection',
+      targetUrl: red.targetUrl || '',
+      pathPrefix: normalizePathPrefix(red.pathPrefix)
     }))
   };
   saveApplications(apps);

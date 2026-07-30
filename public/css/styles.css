@@ -668,7 +668,7 @@ select.app-dropdown option {
   border: 1px solid var(--border-color);
   border-radius: 12px;
   width: 90%;
-  max-width: 784px;
+  max-width: 800px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;

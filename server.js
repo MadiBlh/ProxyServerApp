@@ -45,6 +45,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`====================================================`);
   console.log(`  🚀 PROXY SERVER LOG TOOL RUNNING ON PORT ${PORT}`);
   console.log(`  🌐 Dashboard UI: http://localhost:${PORT}/dashboard`);
-  console.log(`  🔀 Proxy Target:  http://127.0.0.1:${PORT}`);
+  console.log(`  🔀 Proxy Target:  http://localhost:${PORT}`);
   console.log(`====================================================`);
 });

@@ -7,7 +7,8 @@
       {
         "id": "be-1",
         "name": "JSON Placeholder API",
-        "url": "https://jsonplaceholder.typicode.com"
+        "url": "https://jsonplaceholder.typicode.com",
+        "pathPrefix": "/posts"
       }
     ],
     "isActive": true
@@ -20,7 +21,8 @@
       {
         "id": "be-2",
         "name": "Calculator SOAP Backend",
-        "url": "http://www.dneonline.com"
+        "url": "http://www.dneonline.com",
+        "pathPrefix": "/calculator"
       }
     ],
     "isActive": true
@@ -34,13 +36,13 @@
         "id": "c06bb168-4ee1-458c-9794-cf764cfd501a",
         "name": "Backend API Service",
         "url": "http://localhost:5000",
-        "pathPrefix": ""
+        "pathPrefix": "/todo"
       },
       {
         "id": "0a372283-a95c-4328-a35d-ba1a980633ec",
-        "name": "Saop API",
-        "url": "http://localhost:3005",
-        "pathPrefix": ""
+        "name": "SOAP API",
+        "url": "http://localhost:9006",
+        "pathPrefix": "/soap"
       }
     ],
     "isActive": true

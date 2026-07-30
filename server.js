@@ -4,7 +4,6 @@ const path = require('path');
 const apiRoutes = require('./src/routes/api');
 const { proxyMiddleware } = require('./src/services/proxyEngine');
 const configManager = require('./src/services/configManager');
-const logManager = require('./src/services/logManager');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -12,35 +11,38 @@ const PORT = process.env.PORT || 4000;
 // Enable CORS
 app.use(cors());
 
-// Serve static frontend files from /public
-app.use(express.static(path.join(__dirname, 'public')));
+// 1. Dashboard Admin Management API (/dashboard-api/applications, /dashboard-api/logs, /dashboard-api/events)
+app.use('/dashboard-api', apiRoutes);
 
-// Administrative REST API routes
-app.use('/api', apiRoutes);
+// 2. Dashboard UI Static Assets (/dashboard-static/css, /dashboard-static/js)
+app.use('/dashboard-static', express.static(path.join(__dirname, 'public')));
 
-// Explicit Proxy endpoint: /proxy/:appId/*
-app.use('/proxy/:appId', proxyMiddleware);
+// 3. Dashboard UI Page: http://localhost:4000/dashboard
+app.get(['/dashboard', '/dashboard/*'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
-// Global proxy handler if header X-Proxy-App-Id is present
-app.use((req, res, next) => {
-  if (req.headers['x-proxy-app-id']) {
-    return proxyMiddleware(req, res, next);
+// 4. Redirect browser navigation at root GET / to /dashboard
+app.get('/', (req, res, next) => {
+  const accept = req.headers['accept'] || '';
+  if (accept.includes('text/html') && !req.headers['x-proxy-app-id'] && !req.headers['x-app-id']) {
+    return res.redirect('/dashboard');
   }
   next();
 });
 
-// Fallback to index.html for single-page app routes if not an API or proxy call
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// 5. Proxy Server Entrypoint: http://localhost:4000
+//    ALL requests (e.g. Vite target: 'http://localhost:4000' forwarding /api/users, /api/todos, etc.)
+//    pass through proxyMiddleware to the configured backend microservices.
+app.use(proxyMiddleware);
 
 // Initialize default configs
 configManager.getApplications();
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`====================================================`);
   console.log(`  🚀 PROXY SERVER LOG TOOL RUNNING ON PORT ${PORT}`);
-  console.log(`  🌐 Dashboard: http://localhost:${PORT}`);
-  console.log(`  🔀 Proxy Route: http://localhost:${PORT}/proxy/<appId>/...`);
+  console.log(`  🌐 Dashboard UI: http://localhost:${PORT}/dashboard`);
+  console.log(`  🔀 Proxy Target:  http://127.0.0.1:${PORT}`);
   console.log(`====================================================`);
 });

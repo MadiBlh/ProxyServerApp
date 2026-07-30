@@ -47,7 +47,7 @@ function applyTheme(theme) {
 // --- Applications API Management ---
 async function loadApplications() {
   try {
-    const res = await fetch('/api/applications');
+    const res = await fetch('/dashboard-api/applications');
     applications = await res.json();
 
     const dropdown = document.getElementById('app-dropdown');
@@ -88,7 +88,7 @@ async function loadApplications() {
 // --- Logs Management ---
 async function loadLogsForApp(appId) {
   try {
-    const res = await fetch(`/api/logs?appId=${appId}`);
+    const res = await fetch(`/dashboard-api/logs?appId=${appId}`);
     logsList = await res.json();
     renderLogs(logsList);
 
@@ -163,7 +163,7 @@ async function selectLog(logId) {
   renderLogs(logsList);
 
   try {
-    const res = await fetch(`/api/logs/${logId}`);
+    const res = await fetch(`/dashboard-api/logs/${logId}`);
     selectedLogDetail = await res.json();
     renderLogDetail(selectedLogDetail);
   } catch (err) {
@@ -231,7 +231,7 @@ function clearLogDetailsView() {
 
 // --- SSE Realtime Feed ---
 function initSseFeed() {
-  const evtSource = new EventSource('/api/events');
+  const evtSource = new EventSource('/dashboard-api/events');
   evtSource.onmessage = (event) => {
     try {
       const logSummary = JSON.parse(event.data);
@@ -279,7 +279,7 @@ function attachEventListeners() {
   document.getElementById('remove-logs-btn').onclick = async () => {
     if (confirm('Are you sure you want to remove all log files from the server?')) {
       try {
-        await fetch('/api/logs', { method: 'DELETE' });
+        await fetch('/dashboard-api/logs', { method: 'DELETE' });
         logsList = [];
         renderLogs([]);
         clearLogDetailsView();
@@ -308,7 +308,7 @@ function attachEventListeners() {
     }
 
     try {
-      const res = await fetch(`/api/logs/${selectedLogId}/export`, {
+      const res = await fetch(`/dashboard-api/logs/${selectedLogId}/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName })
@@ -356,7 +356,7 @@ function attachEventListeners() {
     out.textContent = 'Executing replay request...';
 
     try {
-      const res = await fetch(`/api/logs/${selectedLogId}/replay`, {
+      const res = await fetch(`/dashboard-api/logs/${selectedLogId}/replay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -469,7 +469,7 @@ window.editApp = (id) => {
 window.deleteApp = async (id) => {
   if (confirm('Delete this web application config?')) {
     try {
-      await fetch(`/api/applications/${id}`, { method: 'DELETE' });
+      await fetch(`/dashboard-api/applications/${id}`, { method: 'DELETE' });
       await loadApplications();
       renderAppManagerList();
       showToast('Application deleted', 'success');
@@ -508,7 +508,13 @@ document.getElementById('save-app-config-btn').onclick = async () => {
 
   const hasInvalidUrl = backendUrls.some(be => !be.url.trim());
   if (hasInvalidUrl) {
-    showToast('All backend services must have a URL', 'error');
+    showToast('All backend services must have a valid URL', 'error');
+    return;
+  }
+
+  const hasInvalidPrefix = backendUrls.some(be => !be.pathPrefix || be.pathPrefix === '/');
+  if (hasInvalidPrefix) {
+    showToast('Path Prefix is required for every backend service (e.g. /api, /auth)', 'error');
     return;
   }
 
@@ -516,13 +522,13 @@ document.getElementById('save-app-config-btn').onclick = async () => {
 
   try {
     if (id) {
-      await fetch(`/api/applications/${id}`, {
+      await fetch(`/dashboard-api/applications/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
     } else {
-      await fetch('/api/applications', {
+      await fetch('/dashboard-api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -539,14 +545,14 @@ document.getElementById('save-app-config-btn').onclick = async () => {
 
 // --- Add-Backend button inside edit modal ---
 document.getElementById('add-backend-btn').onclick = () => {
-  addBackendRow({ name: '', url: '', pathPrefix: '' });
+  addBackendRow({ name: '', url: '', pathPrefix: '/api' });
 };
 
 /**
  * Renders one backend service row inside the backend-services-list container.
  * @param {{ name: string, url: string, pathPrefix?: string }} be
  */
-function addBackendRow(be = { name: '', url: '', pathPrefix: '' }) {
+function addBackendRow(be = { name: '', url: '', pathPrefix: '/api' }) {
   const list = document.getElementById('backend-services-list');
   const idx = list.children.length;
 
@@ -560,22 +566,22 @@ function addBackendRow(be = { name: '', url: '', pathPrefix: '' }) {
     <div class="backend-row-header">
       <span class="backend-row-title">Backend #${idx + 1}</span>
       <div style="display:flex; align-items:center; gap:8px;">
-        ${isDefault ? '<span class="backend-row-default-badge">Default</span>' : ''}
+        ${isDefault ? '<span class="backend-row-default-badge">Primary</span>' : ''}
         <button type="button" class="backend-row-remove">Remove</button>
       </div>
     </div>
     <div class="backend-row-fields">
       <div class="form-group">
-        <label class="form-label">Name:</label>
+        <label class="form-label">Service Name:</label>
         <input type="text" class="form-control be-name" placeholder="e.g. Auth API" value="${escapeHtml(be.name)}">
       </div>
       <div class="form-group">
-        <label class="form-label">URL:</label>
-        <input type="text" class="form-control be-url" placeholder="https://api.example.com" value="${escapeHtml(be.url)}">
+        <label class="form-label">Target URL:</label>
+        <input type="text" class="form-control be-url" placeholder="http://localhost:5000" value="${escapeHtml(be.url)}">
       </div>
       <div class="form-group">
-        <label class="form-label">Path Prefix:</label>
-        <input type="text" class="form-control be-prefix" placeholder="/api/auth" value="${escapeHtml(be.pathPrefix || '')}">
+        <label class="form-label" style="color:var(--accent-color); font-weight:700;">Path Prefix *:</label>
+        <input type="text" class="form-control be-prefix" placeholder="e.g. /api" value="${escapeHtml(be.pathPrefix || '')}">
       </div>
     </div>
   `;
@@ -600,7 +606,7 @@ function reindexBackendRows() {
       const header = row.querySelector('.backend-row-header > div');
       const badge = document.createElement('span');
       badge.className = 'backend-row-default-badge';
-      badge.textContent = 'Default';
+      badge.textContent = 'Primary';
       header.insertBefore(badge, header.querySelector('.backend-row-remove'));
     } else if (i !== 0 && existingBadge) {
       existingBadge.remove();
@@ -609,16 +615,25 @@ function reindexBackendRows() {
 }
 
 /**
- * Reads all backend rows from the list and returns an array of backend objects.
+ * Reads all backend rows from the list and returns an array of backend objects with normalized pathPrefix.
  * @returns {{ name: string, url: string, pathPrefix: string }[]}
  */
 function readBackendRows() {
   const list = document.getElementById('backend-services-list');
-  return Array.from(list.children).map(row => ({
-    name: row.querySelector('.be-name').value.trim(),
-    url: row.querySelector('.be-url').value.trim(),
-    pathPrefix: row.querySelector('.be-prefix').value.trim()
-  }));
+  return Array.from(list.children).map(row => {
+    let prefix = row.querySelector('.be-prefix').value.trim();
+    if (prefix && !prefix.startsWith('/')) {
+      prefix = '/' + prefix;
+    }
+    if (prefix.length > 1 && prefix.endsWith('/')) {
+      prefix = prefix.slice(0, -1);
+    }
+    return {
+      name: row.querySelector('.be-name').value.trim(),
+      url: row.querySelector('.be-url').value.trim(),
+      pathPrefix: prefix
+    };
+  });
 }
 
 // --- Modal Helpers ---

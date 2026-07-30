@@ -12,6 +12,22 @@ function ensureConfigDir() {
   }
 }
 
+/**
+ * Normalizes a path prefix string to always start with '/' and end without trailing '/'
+ * e.g., "api/users" -> "/api/users"
+ */
+function normalizePathPrefix(prefix) {
+  if (!prefix) return '/';
+  let str = prefix.trim();
+  if (!str.startsWith('/')) {
+    str = '/' + str;
+  }
+  if (str.length > 1 && str.endsWith('/')) {
+    str = str.slice(0, -1);
+  }
+  return str;
+}
+
 // Sample default configurations if empty
 const DEFAULT_CONFIG = [
   {
@@ -22,7 +38,8 @@ const DEFAULT_CONFIG = [
       {
         id: "be-1",
         name: "JSON Placeholder API",
-        url: "https://jsonplaceholder.typicode.com"
+        url: "https://jsonplaceholder.typicode.com",
+        pathPrefix: "/posts"
       }
     ],
     isActive: true
@@ -35,7 +52,8 @@ const DEFAULT_CONFIG = [
       {
         id: "be-2",
         name: "Calculator SOAP Backend",
-        url: "http://www.dneonline.com"
+        url: "http://www.dneonline.com",
+        pathPrefix: "/calculator"
       }
     ],
     isActive: true
@@ -77,7 +95,7 @@ function createApplication(appData) {
       id: be.id || uuidv4(),
       name: be.name || 'Backend Service',
       url: be.url || '',
-      pathPrefix: be.pathPrefix || ''
+      pathPrefix: normalizePathPrefix(be.pathPrefix)
     })),
     isActive: appData.isActive !== undefined ? appData.isActive : true
   };
@@ -99,7 +117,7 @@ function updateApplication(id, appData) {
       id: be.id || uuidv4(),
       name: be.name || 'Backend Service',
       url: be.url || '',
-      pathPrefix: be.pathPrefix || ''
+      pathPrefix: normalizePathPrefix(be.pathPrefix)
     }))
   };
   saveApplications(apps);
@@ -123,5 +141,6 @@ module.exports = {
   saveApplications,
   createApplication,
   updateApplication,
-  deleteApplication
+  deleteApplication,
+  normalizePathPrefix
 };

@@ -139,33 +139,11 @@ function proxyMiddleware(req, res, next) {
     req._proxyRawBodyStr = rawReqBuffer.toString('utf8');
     req._proxyRawBuffer = rawReqBuffer;
 
-    // Identify target web app
-    let appId = req.params.appId || req.headers['x-proxy-app-id'] || req.query._appId;
-    let apps = configManager.getApplications();
-
-    let targetApp = null;
-
-    if (appId) {
-      targetApp = apps.find(a => a.id === appId && a.isActive);
-    }
-
-    if (!targetApp) {
-      // If no explicit appId parameter, check active apps host or fallback to first active app
-      const activeApps = apps.filter(a => a.isActive);
-      if (activeApps.length > 0) {
-        targetApp = activeApps[0];
-      }
-    }
-
-    if (!targetApp || !targetApp.backendUrls || targetApp.backendUrls.length === 0) {
-      return res.status(404).json({
-        error: 'No active web application or backend service configured'
-      });
-    }
-
-    // Remove proxy route prefix from target request URL if using /proxy/:appId/...
+    // 1. Determine request path
     let requestPath = req.originalUrl || req.url;
-    if (req.params.appId) {
+
+    // If using explicit /proxy/:appId route, strip prefix
+    if (req.params && req.params.appId) {
       const routePrefix = `/proxy/${req.params.appId}`;
       if (requestPath.startsWith(routePrefix)) {
         requestPath = requestPath.substring(routePrefix.length) || '/';
@@ -173,27 +151,75 @@ function proxyMiddleware(req, res, next) {
     }
     req.url = requestPath;
 
-    // --- Multi-backend routing by pathPrefix ---
-    const sortedBackends = [...targetApp.backendUrls].sort((a, b) => {
-      const aLen = (a.pathPrefix || '').length;
-      const bLen = (b.pathPrefix || '').length;
-      return bLen - aLen; // longest prefix first
-    });
+    let apps = configManager.getApplications();
+    const activeApps = apps.filter(a => a.isActive);
 
+    if (activeApps.length === 0) {
+      return res.status(404).json({
+        error: 'No active web applications configured. Please create an application in the dashboard.'
+      });
+    }
+
+    let targetApp = null;
     let selectedBackend = null;
 
-    for (const be of sortedBackends) {
-      const prefix = (be.pathPrefix || '').trim();
-      if (prefix && requestPath.startsWith(prefix)) {
-        selectedBackend = be;
-        break;
+    // Check if explicit appId header/param/query is provided
+    const explicitAppId = (req.params && req.params.appId) || req.headers['x-proxy-app-id'] || req.headers['x-app-id'] || (req.query && req.query._appId);
+
+    if (explicitAppId) {
+      targetApp = activeApps.find(a => a.id === explicitAppId);
+      if (targetApp && targetApp.backendUrls && targetApp.backendUrls.length > 0) {
+        const sorted = [...targetApp.backendUrls].sort((a, b) => (b.pathPrefix || '').length - (a.pathPrefix || '').length);
+        selectedBackend = sorted.find(be => (be.pathPrefix || '').trim() && requestPath.startsWith(be.pathPrefix.trim())) || sorted[0];
       }
     }
 
-    // Fallback: use first backend with no prefix (the default backend)
+    // If no explicit app ID, search ALL active backend services across ALL active apps by pathPrefix
     if (!selectedBackend) {
-      selectedBackend = sortedBackends.find(be => !(be.pathPrefix || '').trim())
-                        || sortedBackends[sortedBackends.length - 1];
+      const allActiveBackends = [];
+      for (const app of activeApps) {
+        if (app.backendUrls) {
+          app.backendUrls.forEach(be => {
+            if (be.url && be.pathPrefix) {
+              allActiveBackends.push({ ...be, app });
+            }
+          });
+        }
+      }
+
+      // Sort all backend services by pathPrefix length descending (longest/most specific prefix first)
+      allActiveBackends.sort((a, b) => (b.pathPrefix || '').length - (a.pathPrefix || '').length);
+
+      // Find matching backend service by pathPrefix
+      const match = allActiveBackends.find(be => requestPath.startsWith(be.pathPrefix.trim()));
+      if (match) {
+        selectedBackend = match;
+        targetApp = match.app;
+      }
+    }
+
+    // Fallback: If pathPrefix still didn't match (e.g. request to root '/'), try matching Referer/Origin or use first active backend
+    if (!selectedBackend) {
+      const referer = (req.headers['referer'] || req.headers['origin'] || '').toLowerCase();
+      if (referer) {
+        const appMatch = activeApps.find(app => {
+          if (!app.frontEndUrl) return false;
+          const cleanFront = app.frontEndUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+          return referer.includes(cleanFront);
+        });
+        if (appMatch && appMatch.backendUrls && appMatch.backendUrls.length > 0) {
+          targetApp = appMatch;
+          selectedBackend = appMatch.backendUrls[0];
+        }
+      }
+    }
+
+    if (!selectedBackend || !targetApp) {
+      const configuredPrefixes = activeApps.flatMap(a => (a.backendUrls || []).map(b => `'${b.pathPrefix}' (${a.name} → ${b.url})`)).join(', ');
+      return res.status(404).json({
+        error: `No backend service matched path '${requestPath}'. Please check pathPrefix configuration in the dashboard.`,
+        configuredPrefixes: configuredPrefixes || 'None'
+      });
     }
 
     const targetBackendUrl = selectedBackend.url;

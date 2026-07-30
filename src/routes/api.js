@@ -115,4 +115,9 @@ router.get('/events', (req, res) => {
   });
 });
 
+// Fallback for non-admin /api routes (e.g. /api/users, /api/v1/...) -> pass to proxy
+router.use((req, res, next) => {
+  next();
+});
+
 module.exports = router;

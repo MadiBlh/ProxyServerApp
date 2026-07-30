@@ -87,8 +87,8 @@
     <section class="log-detail-container">
 
       <!-- TOP PANEL: REQUEST BODY & HEADERS IN MONACO -->
-      <div class="detail-pane">
-        <div class="detail-header">
+      <div id="request-pane" class="detail-pane">
+        <div class="detail-header" id="request-header">
           <div class="pane-title">
             <span class="uppercase">REQUEST</span>
             <span id="req-method-badge" class="method-badge method-GET uppercase">GET</span>
@@ -97,6 +97,10 @@
           <div class="pane-controls">
             <button class="tab-btn active" data-tab="body">Body (Monaco)</button>
             <button class="tab-btn" data-tab="headers">Headers</button>
+            <button type="button" class="btn-collapse-pane" id="toggle-request-pane-btn" title="Collapse / Expand Request Panel">
+              <span class="collapse-icon">▲</span>
+              <span class="collapse-text">Collapse</span>
+            </button>
           </div>
         </div>
 
@@ -105,8 +109,8 @@
       </div>
 
       <!-- BOTTOM PANEL: RESPONSE BODY & HEADERS IN MONACO -->
-      <div class="detail-pane">
-        <div class="detail-header">
+      <div id="response-pane" class="detail-pane">
+        <div class="detail-header" id="response-header">
           <div class="pane-title">
             <span class="uppercase">RESPONSE</span>
             <span id="res-status-badge" class="btn uppercase" style="padding: 2px 8px; font-size: 0.70rem;">-</span>
@@ -115,6 +119,10 @@
           <div class="pane-controls">
             <button class="tab-btn active" data-tab="body">Body (Monaco)</button>
             <button class="tab-btn" data-tab="headers">Headers</button>
+            <button type="button" class="btn-collapse-pane" id="toggle-response-pane-btn" title="Collapse / Expand Response Panel">
+              <span class="collapse-icon">▲</span>
+              <span class="collapse-text">Collapse</span>
+            </button>
           </div>
         </div>
 

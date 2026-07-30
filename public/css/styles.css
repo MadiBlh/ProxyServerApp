@@ -542,6 +542,48 @@ select.app-dropdown option {
   border-bottom: 1px solid var(--border-color);
   overflow: hidden;
   background: var(--bg-secondary);
+  transition: flex 0.25s cubic-bezier(0.4, 0, 0.2, 1), height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.detail-pane.collapsed {
+  flex: 0 0 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+  overflow: hidden;
+}
+
+.detail-pane.collapsed .monaco-container,
+.detail-pane.collapsed .headers-view {
+  display: none !important;
+}
+
+.btn-collapse-pane {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  margin-left: 6px;
+}
+
+.btn-collapse-pane:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+}
+
+.detail-pane.collapsed .btn-collapse-pane {
+  background: var(--accent-light);
+  color: var(--accent-color);
+  border-color: var(--accent-color);
 }
 
 .detail-header {

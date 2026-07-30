@@ -226,10 +226,16 @@ function setResponseBodyContent(content, ext = 'txt') {
   responseEditor.setValue(formattedContent);
 }
 
+function layoutEditors() {
+  if (requestEditor) requestEditor.layout();
+  if (responseEditor) responseEditor.layout();
+}
+
 window.monacoManager = {
   initMonacoEditors,
   setMonacoTheme,
   setRequestBodyContent,
   setResponseBodyContent,
-  formatXml
+  formatXml,
+  layoutEditors
 };

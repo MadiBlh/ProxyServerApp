@@ -399,12 +399,55 @@ function attachEventListeners() {
       if (targetTab === 'body') {
         parentPane.querySelector('.monaco-container').style.display = 'block';
         parentPane.querySelector('.headers-view').style.display = 'none';
+        if (window.monacoManager && window.monacoManager.layoutEditors) {
+          window.monacoManager.layoutEditors();
+        }
       } else {
         parentPane.querySelector('.monaco-container').style.display = 'none';
         parentPane.querySelector('.headers-view').style.display = 'block';
       }
     };
   });
+
+  // Collapse / Expand Request Panel
+  const reqPane = document.getElementById('request-pane');
+  const toggleReqBtn = document.getElementById('toggle-request-pane-btn');
+  if (toggleReqBtn && reqPane) {
+    toggleReqBtn.onclick = (e) => {
+      e.stopPropagation();
+      togglePane(reqPane, toggleReqBtn);
+    };
+  }
+
+  // Collapse / Expand Response Panel
+  const resPane = document.getElementById('response-pane');
+  const toggleResBtn = document.getElementById('toggle-response-pane-btn');
+  if (toggleResBtn && resPane) {
+    toggleResBtn.onclick = (e) => {
+      e.stopPropagation();
+      togglePane(resPane, toggleResBtn);
+    };
+  }
+
+  function togglePane(pane, btn) {
+    const isCollapsed = pane.classList.toggle('collapsed');
+    const icon = btn.querySelector('.collapse-icon');
+    const text = btn.querySelector('.collapse-text');
+
+    if (isCollapsed) {
+      if (icon) icon.textContent = '▼';
+      if (text) text.textContent = 'Expand';
+    } else {
+      if (icon) icon.textContent = '▲';
+      if (text) text.textContent = 'Collapse';
+    }
+
+    setTimeout(() => {
+      if (window.monacoManager && window.monacoManager.layoutEditors) {
+        window.monacoManager.layoutEditors();
+      }
+    }, 260);
+  }
 }
 
 // --- App Manager Modal Logic ---

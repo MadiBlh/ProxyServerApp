@@ -324,7 +324,7 @@ function attachEventListeners() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`Saved files: ${data.files.requestFile} & ${data.files.responseFile}`, 'success');
+        showToast(`Saved to Downloads: ${data.files.requestFile} & ${data.files.responseFile}`, 'success');
         closeModal('export-modal');
       } else {
         showToast(data.error || 'Export failed', 'error');

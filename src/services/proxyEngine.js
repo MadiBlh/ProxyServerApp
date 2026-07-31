@@ -1,7 +1,7 @@
 require('../utils/bootstrap');
 
 const httpProxy = require('http-proxy');
-const { v4: uuidv4 } = require('uuid');
+const uuidv4 = require('../utils/uuid');
 const configManager = require('./configManager');
 const logManager = require('./logManager');
 

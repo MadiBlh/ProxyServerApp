@@ -184,6 +184,16 @@ function clearAllLogs() {
   return true;
 }
 
+const os = require('os');
+
+function getDownloadsDir() {
+  const dir = path.join(os.homedir(), 'Downloads');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+
 function exportLog(id, customName) {
   const detail = getLogDetail(id);
   if (!detail) return null;
@@ -191,16 +201,21 @@ function exportLog(id, customName) {
   ensureDirectories();
 
   const sanitizeName = customName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const downloadsDir = getDownloadsDir();
 
-  const reqExportPath = path.join(LOGS_DIR, `${sanitizeName}_request.${detail.reqMeta.fileExtension || 'txt'}`);
-  const resExportPath = path.join(LOGS_DIR, `${sanitizeName}_response.${detail.resMeta.fileExtension || 'txt'}`);
+  const reqFileName = `${sanitizeName}_request.${detail.reqMeta.fileExtension || 'txt'}`;
+  const resFileName = `${sanitizeName}_response.${detail.resMeta.fileExtension || 'txt'}`;
 
-  fs.writeFileSync(reqExportPath, detail.requestBody, 'utf8');
-  fs.writeFileSync(resExportPath, detail.responseBody, 'utf8');
+  const reqExportPath = path.join(downloadsDir, reqFileName);
+  const resExportPath = path.join(downloadsDir, resFileName);
+
+  fs.writeFileSync(reqExportPath, detail.requestBody || '', 'utf8');
+  fs.writeFileSync(resExportPath, detail.responseBody || '', 'utf8');
 
   return {
-    requestFile: `${sanitizeName}_request.${detail.reqMeta.fileExtension || 'txt'}`,
-    responseFile: `${sanitizeName}_response.${detail.resMeta.fileExtension || 'txt'}`
+    downloadPath: downloadsDir,
+    requestFile: reqFileName,
+    responseFile: resFileName
   };
 }
 

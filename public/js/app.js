@@ -209,20 +209,63 @@ function renderHeadersView(containerId, headersObj) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
 
+  if (!headersObj || typeof headersObj !== 'object') {
+    container.innerHTML = '<div class="text-muted" style="padding:12px;">No headers available</div>';
+    return;
+  }
+
   const keys = Object.keys(headersObj);
   if (keys.length === 0) {
-    container.innerHTML = '<div class="text-muted">No headers</div>';
+    container.innerHTML = '<div class="text-muted" style="padding:12px;">No headers available</div>';
     return;
   }
 
   keys.forEach(key => {
-    const row = document.createElement('div');
-    row.className = 'header-row';
-    row.innerHTML = `
-      <span class="header-key">${escapeHtml(key)}:</span>
-      <span class="header-val">${escapeHtml(String(headersObj[key]))}</span>
-    `;
-    container.appendChild(row);
+    const val = headersObj[key];
+    const lowerKey = key.toLowerCase();
+    const isCookieHeader = lowerKey === 'cookie' || lowerKey === 'set-cookie';
+
+    if (Array.isArray(val)) {
+      val.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'header-row';
+        if (isCookieHeader) row.style.background = 'rgba(234, 179, 8, 0.08)';
+
+        row.innerHTML = `
+          <span class="header-key" style="${isCookieHeader ? 'color: #eab308; font-weight:700;' : ''}">
+            ${isCookieHeader ? '🍪 ' : ''}${escapeHtml(key)}:
+          </span>
+          <span class="header-val" style="word-break: break-all;">${escapeHtml(String(item))}</span>
+        `;
+        container.appendChild(row);
+      });
+    } else if (lowerKey === 'cookie' && typeof val === 'string' && val.includes(';')) {
+      const cookieItems = val.split(';');
+      cookieItems.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'header-row';
+        row.style.background = 'rgba(234, 179, 8, 0.08)';
+        row.innerHTML = `
+          <span class="header-key" style="color: #eab308; font-weight:700;">
+            🍪 Cookie${cookieItems.length > 1 ? ` #${idx + 1}` : ''}:
+          </span>
+          <span class="header-val" style="word-break: break-all;">${escapeHtml(item.trim())}</span>
+        `;
+        container.appendChild(row);
+      });
+    } else {
+      const row = document.createElement('div');
+      row.className = 'header-row';
+      if (isCookieHeader) row.style.background = 'rgba(234, 179, 8, 0.08)';
+
+      row.innerHTML = `
+        <span class="header-key" style="${isCookieHeader ? 'color: #eab308; font-weight:700;' : ''}">
+          ${isCookieHeader ? '🍪 ' : ''}${escapeHtml(key)}:
+        </span>
+        <span class="header-val" style="word-break: break-all;">${escapeHtml(String(val))}</span>
+      `;
+      container.appendChild(row);
+    }
   });
 }
 

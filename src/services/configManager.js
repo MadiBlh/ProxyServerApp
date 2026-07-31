@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const uuidv4 = require('../utils/uuid');
 
 const CONFIG_DIR = path.join(__dirname, '../../config');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'applications.json');

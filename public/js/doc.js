@@ -28,7 +28,7 @@
     docEl.setAttribute('data-theme', theme);
     localStorage.setItem(THEME_KEY, theme);
     var btn = document.getElementById('theme-toggle-btn');
-    if (btn) btn.innerHTML = theme === 'dark' ? '&#9788;' : '&#9789;';
+    if (btn) btn.innerHTML = theme === 'dark' ? '☀️' : '🌙';
   }
 
   applyDocTheme(localStorage.getItem(THEME_KEY) || 'dark');

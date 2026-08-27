@@ -213,6 +213,8 @@ select.app-dropdown option {
   display: flex;
   align-items: center;
   gap: 6px;
+  text-decoration: none;
+  line-height: 1;
 }
 
 .danger {

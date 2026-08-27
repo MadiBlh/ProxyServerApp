@@ -24,6 +24,11 @@ app.get(['/dashboard', '/dashboard/*'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// 3b. Code Documentation Page: http://localhost:4000/doc
+app.get(['/doc', '/doc/*'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'doc.html'));
+});
+
 // 4. Redirect browser navigation at root GET / to /dashboard
 app.get('/', (req, res, next) => {
   const accept = req.headers['accept'] || '';
@@ -45,6 +50,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`====================================================`);
   console.log(`  🚀 PROXY SERVER LOG TOOL RUNNING ON PORT ${PORT}`);
   console.log(`  🌐 Dashboard UI: http://localhost:${PORT}/dashboard`);
+  console.log(`  📖 Documentation: http://localhost:${PORT}/doc`);
   console.log(`  🔀 Proxy Target:  http://localhost:${PORT}`);
   console.log(`====================================================`);
 });

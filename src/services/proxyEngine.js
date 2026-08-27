@@ -5,11 +5,13 @@ const uuidv4 = require('../utils/uuid');
 const configManager = require('./configManager');
 const logManager = require('./logManager');
 
-// Create http-proxy instance with selfHandleResponse set to true
+// Create http-proxy instance with selfHandleResponse set to true and cookie rewrite support
 const proxy = httpProxy.createProxyServer({
   selfHandleResponse: true,
   changeOrigin: true,
-  secure: false
+  secure: false,
+  cookieDomainRewrite: '*',
+  cookiePathRewrite: '*'
 });
 
 // Real-time clients array for SSE updates
@@ -92,7 +94,15 @@ proxy.on('proxyRes', (proxyRes, req, res) => {
     // Forward original target headers and status to client
     res.status(statusCode);
     Object.keys(responseHeaders).forEach(key => {
-      res.setHeader(key, responseHeaders[key]);
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === 'content-length' || lowerKey === 'transfer-encoding') {
+        return;
+      }
+      try {
+        res.setHeader(key, responseHeaders[key]);
+      } catch (err) {
+        console.warn(`Could not set response header ${key}:`, err.message);
+      }
     });
     res.end(responseBuffer);
   });

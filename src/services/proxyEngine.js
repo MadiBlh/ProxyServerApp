@@ -10,8 +10,10 @@ const proxy = httpProxy.createProxyServer({
   selfHandleResponse: true,
   changeOrigin: true,
   secure: false,
-  cookieDomainRewrite: '*',
-  cookiePathRewrite: '*'
+  // Remove the Domain attribute from all Set-Cookie headers so the browser
+  // scopes each cookie to the current host (localhost) automatically.
+  // Using '*' (string) would write Domain=* which is invalid and rejected by browsers.
+  cookieDomainRewrite: { '*': '' }
 });
 
 // Real-time clients array for SSE updates

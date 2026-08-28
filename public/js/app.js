@@ -628,12 +628,6 @@ document.getElementById('save-app-config-btn').onclick = async () => {
     return;
   }
 
-  const hasInvalidPrefix = backendUrls.some(be => !be.pathPrefix || be.pathPrefix === '/');
-  if (hasInvalidPrefix) {
-    showToast('Path Prefix is required for every backend service (e.g. /api, /auth)', 'error');
-    return;
-  }
-
   const hasInvalidRedirection = redirectUrls.some(red => !red.targetUrl.trim() || !red.pathPrefix || red.pathPrefix === '/');
   if (hasInvalidRedirection) {
     showToast('All API redirections must have a Target URL and Path Prefix (e.g. /external/payment)', 'error');
@@ -702,8 +696,8 @@ function addBackendRow(be = { name: '', url: '', pathPrefix: '/api' }) {
         <input type="text" class="form-control be-url" placeholder="http://localhost:5000" value="${escapeHtml(be.url)}">
       </div>
       <div class="form-group">
-        <label class="form-label" style="color:var(--accent-color); font-weight:700;">Path Prefix *:</label>
-        <input type="text" class="form-control be-prefix" placeholder="e.g. /api" value="${escapeHtml(be.pathPrefix || '')}">
+        <label class="form-label" style="color:var(--accent-color); font-weight:700;">Path Prefix <span style="font-weight:400; color:var(--text-muted);">(optional — leave empty to match all paths)</span>:</label>
+        <input type="text" class="form-control be-prefix" placeholder="e.g. /api  or leave empty to catch all" value="${escapeHtml(be.pathPrefix || '')}">
       </div>
     </div>
   `;

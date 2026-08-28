@@ -4,8 +4,9 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const apiRoutes = require('./src/routes/api');
-const { proxyMiddleware } = require('./src/services/proxyEngine');
+const { proxyMiddleware, sseClients } = require('./src/services/proxyEngine');
 const configManager = require('./src/services/configManager');
+const redirectProxyManager = require('./src/services/redirectProxyManager');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -43,14 +44,49 @@ app.get('/', (req, res, next) => {
 //    pass through proxyMiddleware to the configured backend microservices.
 app.use(proxyMiddleware);
 
-// Initialize default configs
-configManager.getApplications();
+// --- Initialisation ---
+
+// Load config; migrate any legacy redirect URLs that still have pathPrefix but no port
+let apps = configManager.getApplications();
+let migrated = false;
+apps = apps.map(app => {
+  const updatedRedirects = (app.redirectUrls || []).map(red => {
+    if (!red.port) {
+      migrated = true;
+      return {
+        id: red.id,
+        name: red.name,
+        targetUrl: red.targetUrl || red.url || '',
+        port: configManager.assignRedirectPort(undefined, apps)
+      };
+    }
+    return red;
+  });
+  return { ...app, redirectUrls: updatedRedirects };
+});
+if (migrated) {
+  configManager.saveApplications(apps);
+  console.log('  [Migration] Assigned ports to legacy redirect URL entries.');
+}
+
+// Share SSE clients array so redirect proxies broadcast to the same dashboard feed
+redirectProxyManager.setSseClients(sseClients);
+
+// Start dedicated proxy servers for all active redirect URLs
+redirectProxyManager.syncRedirectProxies(apps);
 
 app.listen(PORT, '0.0.0.0', () => {
+  const redirectList = redirectProxyManager.getRunningRedirects();
   console.log(`====================================================`);
   console.log(`  🚀 PROXY SERVER LOG TOOL RUNNING ON PORT ${PORT}`);
   console.log(`  🌐 Dashboard UI: http://localhost:${PORT}/dashboard`);
   console.log(`  📖 Documentation: http://localhost:${PORT}/doc`);
-  console.log(`  🔀 Proxy Target:  http://localhost:${PORT}`);
+  console.log(`  🔀 Main Proxy:    http://localhost:${PORT}`);
+  if (redirectList.length > 0) {
+    console.log(`  --- Redirect Proxies ---`);
+    redirectList.forEach(r => {
+      console.log(`  🔀 ${r.name.padEnd(20)} http://localhost:${r.port}  →  ${r.targetUrl}`);
+    });
+  }
   console.log(`====================================================`);
 });

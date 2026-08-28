@@ -205,13 +205,8 @@ function proxyMiddleware(req, res, next) {
             }
           });
         }
-        if (app.redirectUrls) {
-          app.redirectUrls.forEach(red => {
-            if (red.targetUrl && red.pathPrefix) {
-              allActiveRoutes.push({ ...red, url: red.targetUrl, routeType: 'redirect', app });
-            }
-          });
-        }
+        // Redirect URLs are no longer routed through port 4000 —
+        // each redirect URL has its own dedicated proxy server (redirectProxyManager).
       }
 
       // Sort all active routes by pathPrefix length descending (longest/most specific prefix first).
@@ -277,5 +272,6 @@ function proxyMiddleware(req, res, next) {
 module.exports = {
   proxyMiddleware,
   registerSseClient,
-  unregisterSseClient
+  unregisterSseClient,
+  sseClients
 };

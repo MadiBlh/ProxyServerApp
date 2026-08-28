@@ -58,7 +58,7 @@
         "id": "redir-sample-1",
         "name": "External Payment API",
         "targetUrl": "http://localhost:9007",
-        "pathPrefix": "/external/payment"
+        "port": 4001
       }
     ],
     "isActive": true

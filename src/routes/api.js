@@ -4,6 +4,7 @@ const configManager = require('../services/configManager');
 const logManager = require('../services/logManager');
 const replayService = require('../services/replayService');
 const proxyEngine = require('../services/proxyEngine');
+const redirectProxyManager = require('../services/redirectProxyManager');
 
 // JSON parser for administrative API endpoints
 router.use(express.json());
@@ -20,6 +21,7 @@ router.get('/applications', (req, res) => {
 router.post('/applications', (req, res) => {
   try {
     const newApp = configManager.createApplication(req.body);
+    redirectProxyManager.syncRedirectProxies(configManager.getApplications());
     res.status(201).json(newApp);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -31,6 +33,7 @@ router.put('/applications/:id', (req, res) => {
   try {
     const updated = configManager.updateApplication(req.params.id, req.body);
     if (!updated) return res.status(404).json({ error: 'Application not found' });
+    redirectProxyManager.syncRedirectProxies(configManager.getApplications());
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -41,7 +44,13 @@ router.put('/applications/:id', (req, res) => {
 router.delete('/applications/:id', (req, res) => {
   const deleted = configManager.deleteApplication(req.params.id);
   if (!deleted) return res.status(404).json({ error: 'Application not found' });
+  redirectProxyManager.syncRedirectProxies(configManager.getApplications());
   res.json({ success: true });
+});
+
+// Get active redirect proxy servers status
+router.get('/redirect-proxies', (req, res) => {
+  res.json(redirectProxyManager.getRunningRedirects());
 });
 
 // --- Logs API ---

@@ -269,7 +269,7 @@
           </div>
           <div id="redirect-services-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
           <p style="font-size: 0.76rem; color: var(--text-muted); margin-top: 6px;">
-            💡 Configure external API redirections for outbound calls made by your backend. Requests matching <strong>Path Prefix</strong> (e.g. <code>/external/payment</code>) will log headers & body and forward to <strong>Target URL</strong>.
+            💡 Configure external API redirections. Each redirection runs on its own dedicated proxy port (e.g. <code>http://localhost:4001</code>) and captures request/response logs.
           </p>
         </div>
 

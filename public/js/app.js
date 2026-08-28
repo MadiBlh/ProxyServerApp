@@ -524,7 +524,8 @@ function renderAppManagerList() {
 
     const redirects = (app.redirectUrls || []);
     const redLines = redirects.map(r => {
-      return `<li style="font-size:0.78rem; color:var(--text-muted);"><span style="color:#eab308;">🔀 ${escapeHtml(r.name)}</span> [prefix: <code>${escapeHtml(r.pathPrefix)}</code>] → ${escapeHtml(r.targetUrl)}</li>`;
+      const portText = r.port ? `http://localhost:${r.port}` : 'auto-assigned on save';
+      return `<li style="font-size:0.78rem; color:var(--text-muted);"><span style="color:#eab308;">🔀 ${escapeHtml(r.name)}</span> → <code style="color:var(--accent-color);">${portText}</code> → ${escapeHtml(r.targetUrl)}</li>`;
     }).join('');
 
     item.innerHTML = `
@@ -628,9 +629,9 @@ document.getElementById('save-app-config-btn').onclick = async () => {
     return;
   }
 
-  const hasInvalidRedirection = redirectUrls.some(red => !red.targetUrl.trim() || !red.pathPrefix || red.pathPrefix === '/');
+  const hasInvalidRedirection = redirectUrls.some(red => !red.targetUrl.trim());
   if (hasInvalidRedirection) {
-    showToast('All API redirections must have a Target URL and Path Prefix (e.g. /external/payment)', 'error');
+    showToast('All API redirections must have a Target URL', 'error');
     return;
   }
 
@@ -754,14 +755,14 @@ function readBackendRows() {
 
 // --- Add-Redirect button inside edit modal ---
 document.getElementById('add-redirect-btn').onclick = () => {
-  addRedirectRow({ name: '', targetUrl: '', pathPrefix: '/external' });
+  addRedirectRow({ name: '', targetUrl: '' });
 };
 
 /**
  * Renders one API redirection row inside the redirect-services-list container.
- * @param {{ name: string, targetUrl: string, pathPrefix?: string }} red
+ * @param {{ id?: string, name: string, targetUrl: string, port?: number }} red
  */
-function addRedirectRow(red = { name: '', targetUrl: '', pathPrefix: '/external' }) {
+function addRedirectRow(red = { name: '', targetUrl: '', port: null, id: '' }) {
   const list = document.getElementById('redirect-services-list');
   const idx = list.children.length;
 
@@ -769,6 +770,12 @@ function addRedirectRow(red = { name: '', targetUrl: '', pathPrefix: '/external'
   row.className = 'backend-row';
   row.style.borderColor = 'rgba(234, 179, 8, 0.4)';
   row.dataset.redirectIdx = idx;
+  row.dataset.redirectId = red.id || '';
+  row.dataset.redirectPort = red.port || '';
+
+  const portDisplay = red.port
+    ? `http://localhost:${red.port}`
+    : '(assigned automatically after save)';
 
   row.innerHTML = `
     <div class="backend-row-header">
@@ -785,8 +792,8 @@ function addRedirectRow(red = { name: '', targetUrl: '', pathPrefix: '/external'
         <input type="text" class="form-control red-url" placeholder="https://api.stripe.com" value="${escapeHtml(red.targetUrl || red.url || '')}">
       </div>
       <div class="form-group">
-        <label class="form-label" style="color:#eab308; font-weight:700;">Path Prefix *:</label>
-        <input type="text" class="form-control red-prefix" placeholder="e.g. /external/payment" value="${escapeHtml(red.pathPrefix || '')}">
+        <label class="form-label" style="color:#eab308; font-weight:700;">Proxy URL (Dedicated Port):</label>
+        <input type="text" class="form-control red-port" readonly disabled style="opacity: 0.75; cursor: default; background: var(--bg-hover);" value="${escapeHtml(portDisplay)}">
       </div>
     </div>
   `;
@@ -811,22 +818,17 @@ function reindexRedirectRows() {
 
 /**
  * Reads all redirect rows from the list and returns an array of redirect objects.
- * @returns {{ name: string, targetUrl: string, pathPrefix: string }[]}
+ * @returns {{ id?: string, name: string, targetUrl: string, port?: number }[]}
  */
 function readRedirectRows() {
   const list = document.getElementById('redirect-services-list');
   return Array.from(list.children).map(row => {
-    let prefix = row.querySelector('.red-prefix').value.trim();
-    if (prefix && !prefix.startsWith('/')) {
-      prefix = '/' + prefix;
-    }
-    if (prefix.length > 1 && prefix.endsWith('/')) {
-      prefix = prefix.slice(0, -1);
-    }
+    const portVal = parseInt(row.dataset.redirectPort, 10);
     return {
+      id: row.dataset.redirectId || undefined,
       name: row.querySelector('.red-name').value.trim(),
       targetUrl: row.querySelector('.red-url').value.trim(),
-      pathPrefix: prefix
+      port: !isNaN(portVal) && portVal > 0 ? portVal : undefined
     };
   });
 }

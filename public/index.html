@@ -36,7 +36,7 @@
 
       <nav class="nav-links">
         <button id="nav-logs-btn" class="nav-btn">Logs</button>
-        <button id="manage-apps-btn" class="nav-btn">Manage Application</button>
+        <button id="manage-apps-btn" class="nav-btn">Settings</button>
         <button id="remove-logs-btn" class="nav-btn danger">Remove All Logs</button>
         <a href="/doc" target="_blank" class="nav-btn" title="Open documentation">📖 Docs</a>
         <button id="theme-toggle-btn" class="theme-toggle" title="Toggle Theme">☀️</button>
@@ -144,58 +144,52 @@
         <button class="modal-close" onclick="closeModal('export-modal')">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size: 0.9rem; color: var(--text-secondary);">
-          Enter a custom file prefix name. The files will be saved in <code>logs/</code> directory as:
-        </p>
-        <ul style="font-size: 0.85rem; margin-left: 20px; color: var(--text-muted);">
-          <li><code>&lt;filename&gt;_request.&lt;ext&gt;</code></li>
-          <li><code>&lt;filename&gt;_response.&lt;ext&gt;</code></li>
-        </ul>
         <div class="form-group">
           <label class="form-label">File Prefix Name:</label>
-          <input type="text" id="export-filename-input" class="form-control" placeholder="my_custom_request_log">
+          <input type="text" id="export-filename-input" class="form-control" placeholder="e.g. login_request_test">
+          <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">
+            Files will be saved into your user Downloads directory as <code>{name}_request.{ext}</code> and <code>{name}_response.{ext}</code>
+          </small>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn" onclick="closeModal('export-modal')">Cancel</button>
-        <button id="confirm-export-btn" class="btn btn-primary">Save Files</button>
+        <button class="btn btn-error-outline" onclick="closeModal('export-modal')">Cancel</button>
+        <button id="confirm-export-btn" class="btn btn-primary">Save to Downloads</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: REPLAY REQUEST (REST & SOAP XML) -->
+  <!-- MODAL: REPLAY LOG -->
   <div id="replay-modal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 750px;">
+    <div class="modal-card" style="max-width: 650px;">
       <div class="modal-header">
-        <h3 class="modal-title">Replay Request (REST & SOAP API)</h3>
+        <h3 class="modal-title">⚡ Replay Request</h3>
         <button class="modal-close" onclick="closeModal('replay-modal')">✕</button>
       </div>
       <div class="modal-body">
-        <div style="display: flex; gap: 10px;">
-          <div class="form-group" style="width: 120px;">
-            <label class="form-label">Method:</label>
-            <select id="replay-method-select" class="form-control">
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
-              <option value="PATCH">PATCH</option>
-            </select>
-          </div>
-          <div class="form-group" style="flex: 1;">
-            <label class="form-label">Target URL:</label>
-            <input type="text" id="replay-url-input" class="form-control">
-          </div>
-        </div>
-
         <div class="form-group">
-          <label class="form-label">Headers (JSON format):</label>
-          <textarea id="replay-headers-input" class="form-control" rows="3" style="font-family: 'Fira Code', monospace; font-size: 0.8rem;"></textarea>
+          <label class="form-label">Target URL / Host:</label>
+          <input type="text" id="replay-url-input" class="form-control" placeholder="http://localhost:5000/api/endpoint">
         </div>
-
         <div class="form-group">
-          <label class="form-label">Request Body (JSON or SOAP XML):</label>
-          <textarea id="replay-body-input" class="form-control" rows="6" style="font-family: 'Fira Code', monospace; font-size: 0.8rem;"></textarea>
+          <label class="form-label">HTTP Method:</label>
+          <select id="replay-method-select" class="form-control">
+            <option value="GET">GET</option>
+            <option value="POST">POST</option>
+            <option value="PUT">PUT</option>
+            <option value="DELETE">DELETE</option>
+            <option value="PATCH">PATCH</option>
+            <option value="HEAD">HEAD</option>
+            <option value="OPTIONS">OPTIONS</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Custom Request Headers (JSON format):</label>
+          <textarea id="replay-headers-input" class="form-control" rows="4" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Custom Request Body:</label>
+          <textarea id="replay-body-input" class="form-control" rows="5" style="font-family: monospace; font-size: 0.8rem;"></textarea>
         </div>
 
         <div class="form-group">
@@ -210,22 +204,77 @@
     </div>
   </div>
 
-  <!-- MODAL: MANAGE APPLICATIONS (SETTINGS) -->
-  <div id="app-manager-modal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 700px;">
+  <!-- MODAL: SETTINGS (APPLICATIONS & STORAGE PATHS) -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 750px;">
       <div class="modal-header">
-        <h3 class="modal-title">Manage Web Applications</h3>
-        <button class="modal-close" onclick="closeModal('app-manager-modal')">✕</button>
+        <h3 class="modal-title">⚙️ Settings</h3>
+        <button class="modal-close" onclick="closeModal('settings-modal')">✕</button>
       </div>
+
+      <!-- Settings Tabs -->
+      <div style="display: flex; gap: 8px; padding: 0 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-card-header, transparent);">
+        <button id="tab-settings-apps" class="settings-tab-btn active" style="background: none; border: none; padding: 10px 16px; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--accent-color); border-bottom: 2px solid var(--accent-color);">
+          📱 Web Applications
+        </button>
+        <button id="tab-settings-paths" class="settings-tab-btn" style="background: none; border: none; padding: 10px 16px; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--text-secondary); border-bottom: 2px solid transparent;">
+          📁 Storage & Paths
+        </button>
+      </div>
+
       <div class="modal-body">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <p style="font-size: 0.88rem; color: var(--text-secondary);">Configured Web Applications and Backend Services stored in <code>config/</code>:</p>
-          <button id="add-new-app-btn" class="btn btn-primary-outline">+ Add Application</button>
+        <!-- TAB 1: WEB APPLICATIONS -->
+        <div id="settings-section-apps">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">Configured Web Applications and Backend Services:</p>
+            <button id="add-new-app-btn" class="btn btn-primary-outline">+ Add Application</button>
+          </div>
+          <div id="app-manager-list" style="margin-top: 10px;"></div>
         </div>
-        <div id="app-manager-list" style="margin-top: 10px;"></div>
+
+        <!-- TAB 2: STORAGE & PATHS -->
+        <div id="settings-section-paths" style="display: none;">
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
+            Configure where the Proxy Server stores application definitions (<code>applications.json</code>) and captured request/response logs.
+          </p>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="form-label" style="font-weight: 600;">Configuration Directory:</label>
+              <button type="button" id="reset-config-path-btn" class="btn" style="padding: 2px 8px; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-hover);">Reset to Default</button>
+            </div>
+            <input type="text" id="setting-config-dir" class="form-control" placeholder="e.g. D:/ProxyServerApp/config or leave empty for default">
+            <small style="font-size: 0.74rem; color: var(--text-muted); margin-top: 4px; display: block;">
+              Directory containing <code>applications.json</code>.
+            </small>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="form-label" style="font-weight: 600;">Logs & Capture Directory:</label>
+              <button type="button" id="reset-logs-path-btn" class="btn" style="padding: 2px 8px; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-hover);">Reset to Default</button>
+            </div>
+            <input type="text" id="setting-logs-dir" class="form-control" placeholder="e.g. D:/ProxyServerApp/data or leave empty for default">
+            <small style="font-size: 0.74rem; color: var(--text-muted); margin-top: 4px; display: block;">
+              Base directory where <code>logs/</code> (payloads) and <code>headers/</code> (metadata) are saved.
+            </small>
+          </div>
+
+          <div class="form-group" style="flex-direction: row; align-items: center; gap: 10px; margin-top: 16px; padding: 10px; background: var(--bg-hover); border-radius: 6px;">
+            <input type="checkbox" id="setting-migrate-config" style="width: 16px; height: 16px;">
+            <label for="setting-migrate-config" class="form-label" style="margin: 0; font-size: 0.82rem; cursor: pointer;">
+              Copy existing application configurations (<code>applications.json</code>) to the new configuration directory
+            </label>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; margin-top: 18px;">
+            <button id="save-storage-settings-btn" class="btn btn-primary">💾 Save Storage Settings</button>
+          </div>
+        </div>
       </div>
+
       <div class="modal-footer">
-        <button class="btn btn-error-outline" onclick="closeModal('app-manager-modal')">Close</button>
+        <button class="btn btn-error-outline" onclick="closeModal('settings-modal')">Close</button>
       </div>
     </div>
   </div>

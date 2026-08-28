@@ -1,15 +1,17 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
-
-const LOGS_DIR = path.join(__dirname, '../../logs');
-const HEADERS_DIR = path.join(__dirname, '../../headers');
+const os = require('os');
+const settingsManager = require('./settingsManager');
 
 function ensureDirectories() {
-  if (!fs.existsSync(LOGS_DIR)) {
-    fs.mkdirSync(LOGS_DIR, { recursive: true });
+  const logsDir = settingsManager.getLogsDir();
+  const headersDir = settingsManager.getHeadersDir();
+
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
   }
-  if (!fs.existsSync(HEADERS_DIR)) {
-    fs.mkdirSync(HEADERS_DIR, { recursive: true });
+  if (!fs.existsSync(headersDir)) {
+    fs.mkdirSync(headersDir, { recursive: true });
   }
 }
 
@@ -37,14 +39,17 @@ function getFileExtension(contentType, bodyStr) {
 function saveLogEntry({ id, appId, appName, backendName, routeType, targetUrl, method, endpoint, requestHeaders, requestBody, statusCode, responseHeaders, responseBody, durationMs, error }) {
   ensureDirectories();
 
+  const logsDir = settingsManager.getLogsDir();
+  const headersDir = settingsManager.getHeadersDir();
+
   const reqExt = getFileExtension(requestHeaders['content-type'], requestBody);
   const resExt = getFileExtension(responseHeaders ? responseHeaders['content-type'] : '', responseBody);
 
-  const reqBodyPath = path.join(LOGS_DIR, `${id}_request.${reqExt}`);
-  const resBodyPath = path.join(LOGS_DIR, `${id}_response.${resExt}`);
+  const reqBodyPath = path.join(logsDir, `${id}_request.${reqExt}`);
+  const resBodyPath = path.join(logsDir, `${id}_response.${resExt}`);
 
-  const reqHeaderPath = path.join(HEADERS_DIR, `${id}_request.json`);
-  const resHeaderPath = path.join(HEADERS_DIR, `${id}_response.json`);
+  const reqHeaderPath = path.join(headersDir, `${id}_request.json`);
+  const resHeaderPath = path.join(headersDir, `${id}_response.json`);
 
   // Write body files
   fs.writeFileSync(reqBodyPath, requestBody || '', 'utf8');
@@ -87,9 +92,11 @@ function saveLogEntry({ id, appId, appName, backendName, routeType, targetUrl, m
 
 function getAllLogs(appIdFilter = null) {
   ensureDirectories();
-  if (!fs.existsSync(HEADERS_DIR)) return [];
+  const headersDir = settingsManager.getHeadersDir();
 
-  const files = fs.readdirSync(HEADERS_DIR);
+  if (!fs.existsSync(headersDir)) return [];
+
+  const files = fs.readdirSync(headersDir);
   const reqHeaderFiles = files.filter(f => f.endsWith('_request.json'));
 
   const logEntries = [];
@@ -97,8 +104,8 @@ function getAllLogs(appIdFilter = null) {
   for (const file of reqHeaderFiles) {
     try {
       const uuid = file.replace('_request.json', '');
-      const reqPath = path.join(HEADERS_DIR, file);
-      const resPath = path.join(HEADERS_DIR, `${uuid}_response.json`);
+      const reqPath = path.join(headersDir, file);
+      const resPath = path.join(headersDir, `${uuid}_response.json`);
 
       const reqMeta = JSON.parse(fs.readFileSync(reqPath, 'utf8'));
       let resMeta = { statusCode: 500, statusText: 'FAILED', durationMs: 0, headers: {} };
@@ -138,8 +145,11 @@ function getAllLogs(appIdFilter = null) {
 
 function getLogDetail(id) {
   ensureDirectories();
-  const reqHeaderPath = path.join(HEADERS_DIR, `${id}_request.json`);
-  const resHeaderPath = path.join(HEADERS_DIR, `${id}_response.json`);
+  const logsDir = settingsManager.getLogsDir();
+  const headersDir = settingsManager.getHeadersDir();
+
+  const reqHeaderPath = path.join(headersDir, `${id}_request.json`);
+  const resHeaderPath = path.join(headersDir, `${id}_response.json`);
 
   if (!fs.existsSync(reqHeaderPath)) {
     return null;
@@ -149,14 +159,14 @@ function getLogDetail(id) {
   const resMeta = fs.existsSync(resHeaderPath) ? JSON.parse(fs.readFileSync(resHeaderPath, 'utf8')) : {};
 
   // Read request body file
-  const reqBodyPath = path.join(LOGS_DIR, `${id}_request.${reqMeta.fileExtension || 'txt'}`);
+  const reqBodyPath = path.join(logsDir, `${id}_request.${reqMeta.fileExtension || 'txt'}`);
   let requestBody = '';
   if (fs.existsSync(reqBodyPath)) {
     requestBody = fs.readFileSync(reqBodyPath, 'utf8');
   }
 
   // Read response body file
-  const resBodyPath = path.join(LOGS_DIR, `${id}_response.${resMeta.fileExtension || 'txt'}`);
+  const resBodyPath = path.join(logsDir, `${id}_response.${resMeta.fileExtension || 'txt'}`);
   let responseBody = '';
   if (fs.existsSync(resBodyPath)) {
     responseBody = fs.readFileSync(resBodyPath, 'utf8');
@@ -173,18 +183,27 @@ function getLogDetail(id) {
 
 function clearAllLogs() {
   ensureDirectories();
-  const logFiles = fs.readdirSync(LOGS_DIR);
-  for (const f of logFiles) {
-    fs.unlinkSync(path.join(LOGS_DIR, f));
+  const logsDir = settingsManager.getLogsDir();
+  const headersDir = settingsManager.getHeadersDir();
+
+  if (fs.existsSync(logsDir)) {
+    const logFiles = fs.readdirSync(logsDir);
+    for (const f of logFiles) {
+      const fullPath = path.join(logsDir, f);
+      if (fs.statSync(fullPath).isFile()) fs.unlinkSync(fullPath);
+    }
   }
-  const headerFiles = fs.readdirSync(HEADERS_DIR);
-  for (const f of headerFiles) {
-    fs.unlinkSync(path.join(HEADERS_DIR, f));
+
+  if (fs.existsSync(headersDir)) {
+    const headerFiles = fs.readdirSync(headersDir);
+    for (const f of headerFiles) {
+      const fullPath = path.join(headersDir, f);
+      if (fs.statSync(fullPath).isFile()) fs.unlinkSync(fullPath);
+    }
   }
+
   return true;
 }
-
-const os = require('os');
 
 function getDownloadsDir() {
   const dir = path.join(os.homedir(), 'Downloads');

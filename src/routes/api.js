@@ -5,9 +5,38 @@ const logManager = require('../services/logManager');
 const replayService = require('../services/replayService');
 const proxyEngine = require('../services/proxyEngine');
 const redirectProxyManager = require('../services/redirectProxyManager');
+const settingsManager = require('../services/settingsManager');
 
 // JSON parser for administrative API endpoints
 router.use(express.json());
+
+// --- Settings API (Storage & Directory Paths) ---
+
+// Get current storage & paths settings
+router.get('/settings', (req, res) => {
+  try {
+    res.json(settingsManager.getSettings());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update storage & paths settings
+router.put('/settings', (req, res) => {
+  try {
+    const { configDir, logsDir, migrateExistingConfig } = req.body;
+    const updated = settingsManager.updateSettings({
+      configDir,
+      logsDir,
+      migrateExistingConfig: Boolean(migrateExistingConfig)
+    });
+    // Synchronize redirect proxies with the new configuration
+    redirectProxyManager.syncRedirectProxies(configManager.getApplications());
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
 // --- Applications API ---
 

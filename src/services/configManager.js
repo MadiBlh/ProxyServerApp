@@ -1,14 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const uuidv4 = require('../utils/uuid');
-
-const CONFIG_DIR = path.join(__dirname, '../../config');
-const CONFIG_FILE = path.join(CONFIG_DIR, 'applications.json');
+const settingsManager = require('./settingsManager');
 
 // Ensure directory exists
 function ensureConfigDir() {
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  const configDir = settingsManager.getConfigDir();
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
   }
 }
 
@@ -137,12 +136,13 @@ const DEFAULT_CONFIG = [
 
 function getApplications() {
   ensureConfigDir();
-  if (!fs.existsSync(CONFIG_FILE)) {
+  const configFile = settingsManager.getConfigFile();
+  if (!fs.existsSync(configFile)) {
     saveApplications(DEFAULT_CONFIG);
     return DEFAULT_CONFIG;
   }
   try {
-    const data = fs.readFileSync(CONFIG_FILE, 'utf8');
+    const data = fs.readFileSync(configFile, 'utf8');
     return JSON.parse(data);
   } catch (err) {
     console.error('Error reading config file:', err);
@@ -152,7 +152,8 @@ function getApplications() {
 
 function saveApplications(applications) {
   ensureConfigDir();
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(applications, null, 2), 'utf8');
+  const configFile = settingsManager.getConfigFile();
+  fs.writeFileSync(configFile, JSON.stringify(applications, null, 2), 'utf8');
 }
 
 function getApplicationById(id) {

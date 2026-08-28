@@ -10,8 +10,10 @@ const proxy = httpProxy.createProxyServer({
   selfHandleResponse: true,
   changeOrigin: true,
   secure: false,
-  cookieDomainRewrite: '*',
-  cookiePathRewrite: '*'
+  // Remove the Domain attribute from all Set-Cookie headers so the browser
+  // scopes each cookie to the current host (localhost) automatically.
+  // Using '*' (string) would write Domain=* which is invalid and rejected by browsers.
+  cookieDomainRewrite: { '*': '' }
 });
 
 // Real-time clients array for SSE updates
@@ -197,25 +199,26 @@ function proxyMiddleware(req, res, next) {
       for (const app of activeApps) {
         if (app.backendUrls) {
           app.backendUrls.forEach(be => {
-            if (be.url && be.pathPrefix) {
+            if (be.url) {
+              // Backends with no prefix are catch-alls (match '/') — still included
               allActiveRoutes.push({ ...be, url: be.url, routeType: 'backend', app });
             }
           });
         }
-        if (app.redirectUrls) {
-          app.redirectUrls.forEach(red => {
-            if (red.targetUrl && red.pathPrefix) {
-              allActiveRoutes.push({ ...red, url: red.targetUrl, routeType: 'redirect', app });
-            }
-          });
-        }
+        // Redirect URLs are no longer routed through port 4000 —
+        // each redirect URL has its own dedicated proxy server (redirectProxyManager).
       }
 
-      // Sort all active routes by pathPrefix length descending (longest/most specific prefix first)
+      // Sort all active routes by pathPrefix length descending (longest/most specific prefix first).
+      // Backends with no prefix sort to the end and act as catch-alls.
       allActiveRoutes.sort((a, b) => (b.pathPrefix || '').length - (a.pathPrefix || '').length);
 
-      // Find matching backend/redirect service by pathPrefix
-      const match = allActiveRoutes.find(be => requestPath.startsWith(be.pathPrefix.trim()));
+      // Find matching backend/redirect service.
+      // A missing or empty pathPrefix is treated as '/' and matches any path.
+      const match = allActiveRoutes.find(be => {
+        const prefix = (be.pathPrefix || '/').trim() || '/';
+        return requestPath.startsWith(prefix);
+      });
       if (match) {
         selectedBackend = match;
         targetApp = match.app;
@@ -269,5 +272,6 @@ function proxyMiddleware(req, res, next) {
 module.exports = {
   proxyMiddleware,
   registerSseClient,
-  unregisterSseClient
+  unregisterSseClient,
+  sseClients
 };

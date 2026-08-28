@@ -28,6 +28,29 @@ function normalizePathPrefix(prefix) {
   return str;
 }
 
+// First port used for redirect proxy servers (main proxy is BASE_PORT, typically 4000)
+const BASE_REDIRECT_PORT = parseInt(process.env.REDIRECT_BASE_PORT || '4001', 10);
+
+/**
+ * Returns the next unused redirect proxy port by scanning all existing apps.
+ * If this redirect already has a port assigned, returns it unchanged.
+ * @param {string|undefined} existingPort - already-assigned port (preserved if set)
+ * @param {Array} allApps - full current applications array
+ * @returns {number}
+ */
+function assignRedirectPort(existingPort, allApps) {
+  if (existingPort) return existingPort;
+  const usedPorts = new Set();
+  for (const app of allApps) {
+    for (const red of (app.redirectUrls || [])) {
+      if (red.port) usedPorts.add(red.port);
+    }
+  }
+  let port = BASE_REDIRECT_PORT;
+  while (usedPorts.has(port)) port++;
+  return port;
+}
+
 // Sample default configurations if empty
 const DEFAULT_CONFIG = [
   {
@@ -97,15 +120,17 @@ function createApplication(appData) {
       url: be.url || '',
       pathPrefix: normalizePathPrefix(be.pathPrefix)
     })),
-    redirectUrls: (appData.redirectUrls || []).map(red => ({
-      id: red.id || uuidv4(),
-      name: red.name || 'API Redirection',
-      targetUrl: red.targetUrl || '',
-      pathPrefix: normalizePathPrefix(red.pathPrefix)
-    })),
+    redirectUrls: [], // ports assigned below after push (so allApps is up to date)
     isActive: appData.isActive !== undefined ? appData.isActive : true
   };
   apps.push(newApp);
+  // Assign ports now that newApp is in the array (avoids collisions with itself)
+  newApp.redirectUrls = (appData.redirectUrls || []).map(red => ({
+    id: red.id || uuidv4(),
+    name: red.name || 'API Redirection',
+    targetUrl: red.targetUrl || '',
+    port: assignRedirectPort(red.port, apps)
+  }));
   saveApplications(apps);
   return newApp;
 }
@@ -114,6 +139,18 @@ function updateApplication(id, appData) {
   const apps = getApplications();
   const index = apps.findIndex(app => app.id === id);
   if (index === -1) return null;
+
+  // Build updated redirect list — preserve existing ports where possible
+  const existingRedirects = apps[index].redirectUrls || [];
+  const updatedRedirects = (appData.redirectUrls || existingRedirects).map(red => {
+    const existing = existingRedirects.find(e => e.id === red.id);
+    return {
+      id: red.id || uuidv4(),
+      name: red.name || 'API Redirection',
+      targetUrl: red.targetUrl || '',
+      port: assignRedirectPort(red.port || (existing && existing.port), apps)
+    };
+  });
 
   apps[index] = {
     ...apps[index],
@@ -125,12 +162,7 @@ function updateApplication(id, appData) {
       url: be.url || '',
       pathPrefix: normalizePathPrefix(be.pathPrefix)
     })),
-    redirectUrls: (appData.redirectUrls || apps[index].redirectUrls || []).map(red => ({
-      id: red.id || uuidv4(),
-      name: red.name || 'API Redirection',
-      targetUrl: red.targetUrl || '',
-      pathPrefix: normalizePathPrefix(red.pathPrefix)
-    }))
+    redirectUrls: updatedRedirects
   };
   saveApplications(apps);
   return apps[index];
@@ -154,5 +186,6 @@ module.exports = {
   createApplication,
   updateApplication,
   deleteApplication,
-  normalizePathPrefix
+  normalizePathPrefix,
+  assignRedirectPort
 };

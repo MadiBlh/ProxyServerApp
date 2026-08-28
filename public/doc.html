@@ -33,7 +33,7 @@
 
     <div class="topbar-actions">
       <a class="btn-back" href="/dashboard">Back to Dashboard</a>
-      <button id="theme-toggle-btn" class="theme-toggle" title="Toggle Theme">&#9788;</button>
+      <button id="theme-toggle-btn" class="theme-toggle" title="Toggle Theme">☀️</button>
     </div>
   </header>
 
@@ -322,7 +322,7 @@
               <tbody>
                 <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/</code></td><td><span class="file-ref">server.js:28</span></td><td>Browser navigations (Accept: text/html, no proxy headers) are redirected to <code>/dashboard</code>; other requests pass through to the proxy.</td></tr>
                 <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard</code>, <code>/dashboard/*</code></td><td><span class="file-ref">server.js:23</span></td><td>Serves the dashboard SPA shell <code>public/index.html</code>.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/doc</code>, <code>/doc/*</code></td><td><span class="file-ref">server.js</span></td><td>Serves this documentation page <code>public/doc.html</code>.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/doc</code>, <code>/doc/*</code></td><td><span class="file-ref">server.js:28</span></td><td>Serves this documentation page <code>public/doc.html</code>.</td></tr>
                 <tr><td><span class="pill ANY">ANY</span></td><td class="nowrap"><code>/dashboard-static/*</code></td><td><span class="file-ref">server.js:20</span></td><td>Static assets from <code>public/</code> (css, js, html).</td></tr>
                 <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/applications</code></td><td><span class="file-ref">api.js:14</span></td><td>List all configured applications.</td></tr>
                 <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/applications</code></td><td><span class="file-ref">api.js:20</span></td><td>Create application (201; 400 on validation error).</td></tr>
@@ -643,11 +643,12 @@ router.use((req, res, next) =&gt; {
         <section class="doc-section" id="f-app">
           <h2><span class="h-num">18</span> public/js/app.js &mdash; Frontend Controller</h2>
           <p>
-            ~880 lines of framework-free controller logic around five module-level state variables
+            ~880 lines of framework-free controller logic around six module-level state variables
             (<span class="file-ref">app.js:6-11</span>): <code class="inline">applications</code>,
             <code class="inline">currentAppId</code> (persisted in localStorage),
             <code class="inline">logsList</code>, <code class="inline">selectedLogId</code>,
-            <code class="inline">selectedLogDetail</code>.
+            <code class="inline">selectedLogDetail</code>,
+            <code class="inline">currentTheme</code> (persisted in localStorage).
           </p>
 
           <h3>Boot sequence</h3>

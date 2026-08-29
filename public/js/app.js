@@ -427,8 +427,97 @@ function attachEventListeners() {
     }
   };
 
-  // Manage / Settings Modal (Web Applications Manager)
-  document.getElementById('manage-apps-btn').onclick = () => openAppManagerModal();
+  // Manage / Settings Modal
+  const settingsBtn = document.getElementById('settings-btn') || document.getElementById('manage-apps-btn');
+  if (settingsBtn) {
+    settingsBtn.onclick = () => openSettingsModal();
+  }
+
+  // Settings Tabs Switcher
+  const tabApps = document.getElementById('tab-settings-apps');
+  const tabPaths = document.getElementById('tab-settings-paths');
+  const secApps = document.getElementById('settings-section-apps');
+  const secPaths = document.getElementById('settings-section-paths');
+
+  if (tabApps && tabPaths && secApps && secPaths) {
+    tabApps.onclick = () => switchSettingsTab('apps');
+    tabPaths.onclick = () => switchSettingsTab('paths');
+  }
+
+  function switchSettingsTab(tab) {
+    if (tab === 'apps') {
+      tabApps.classList.add('active');
+      tabApps.style.color = 'var(--accent-color)';
+      tabApps.style.borderBottomColor = 'var(--accent-color)';
+      tabPaths.classList.remove('active');
+      tabPaths.style.color = 'var(--text-secondary)';
+      tabPaths.style.borderBottomColor = 'transparent';
+      secApps.style.display = 'block';
+      secPaths.style.display = 'none';
+    } else {
+      tabPaths.classList.add('active');
+      tabPaths.style.color = 'var(--accent-color)';
+      tabPaths.style.borderBottomColor = 'var(--accent-color)';
+      tabApps.classList.remove('active');
+      tabApps.style.color = 'var(--text-secondary)';
+      tabApps.style.borderBottomColor = 'transparent';
+      secApps.style.display = 'none';
+      secPaths.style.display = 'block';
+      loadStorageSettings();
+    }
+  }
+
+  // Reset to Default button handlers
+  const resetConfigBtn = document.getElementById('reset-config-path-btn');
+  if (resetConfigBtn) {
+    resetConfigBtn.onclick = () => {
+      const input = document.getElementById('setting-config-dir');
+      if (input) input.value = '';
+    };
+  }
+
+  const resetLogsBtn = document.getElementById('reset-logs-path-btn');
+  if (resetLogsBtn) {
+    resetLogsBtn.onclick = () => {
+      const input = document.getElementById('setting-logs-dir');
+      if (input) input.value = '';
+    };
+  }
+
+  // Save Storage Settings
+  const saveStorageBtn = document.getElementById('save-storage-settings-btn');
+  if (saveStorageBtn) {
+    saveStorageBtn.onclick = async () => {
+      const configDir = document.getElementById('setting-config-dir').value.trim();
+      const logsDir = document.getElementById('setting-logs-dir').value.trim();
+      const migrateExistingConfig = document.getElementById('setting-migrate-config').checked;
+
+      try {
+        saveStorageBtn.disabled = true;
+        saveStorageBtn.textContent = 'Saving...';
+
+        const res = await fetch('/dashboard-api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ configDir, logsDir, migrateExistingConfig })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to update storage paths');
+
+        showToast('Storage paths updated successfully', 'success');
+        await loadStorageSettings();
+        await loadApplications();
+        renderAppManagerList();
+        loadLogsList();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        saveStorageBtn.disabled = false;
+        saveStorageBtn.textContent = '💾 Save Storage Settings';
+      }
+    };
+  }
 
   // Tab View Switchers (Body vs Headers)
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -493,10 +582,39 @@ function attachEventListeners() {
   }
 }
 
-// --- App Manager Modal Logic ---
-function openAppManagerModal() {
+// --- Settings Modal & Storage Settings Logic ---
+async function loadStorageSettings() {
+  try {
+    const res = await fetch('/dashboard-api/settings');
+    const data = await res.json();
+
+    const configInput = document.getElementById('setting-config-dir');
+    const logsInput = document.getElementById('setting-logs-dir');
+
+    if (configInput) {
+      configInput.value = data.isDefaultConfig ? '' : data.configDir;
+      configInput.placeholder = `Default: ${data.defaults?.configDir || 'config/'}`;
+    }
+
+    if (logsInput) {
+      logsInput.value = data.isDefaultLogs ? '' : data.logsBaseDir;
+      logsInput.placeholder = `Default: ${data.defaults?.logsBaseDir || 'project root'}`;
+    }
+  } catch (err) {
+    console.error('Failed to load storage settings:', err);
+  }
+}
+
+function openSettingsModal() {
   renderAppManagerList();
-  openModal('app-manager-modal');
+  loadStorageSettings();
+  const tabApps = document.getElementById('tab-settings-apps');
+  if (tabApps) tabApps.click();
+  openModal('settings-modal');
+}
+
+function openAppManagerModal() {
+  openSettingsModal();
 }
 
 function renderAppManagerList() {

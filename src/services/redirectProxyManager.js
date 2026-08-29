@@ -9,12 +9,12 @@ const logManager = require('./logManager');
 
 /* ==========================================================================
    REDIRECT PROXY MANAGER
-   Manages one dedicated HTTP proxy server per configured redirectUrl.
-   Each server listens on its own port and forwards ALL traffic (any path)
-   to a single target URL — no path-prefix matching needed.
+   Manages dedicated HTTP proxy servers per configured redirect port.
+   If multiple web applications define the same external target URL,
+   they share the same proxy server port seamlessly without port collision.
    ========================================================================== */
 
-// Map of redirectId -> { server, port, targetUrl, name, appId, appName }
+// Map of port (number) -> { server, proxy, port, targetUrl, subscribers: [ { app, redirect } ] }
 const runningProxies = new Map();
 
 // SSE clients shared with the main proxy engine for the unified log feed
@@ -32,19 +32,55 @@ function broadcastLogEvent(logSummary) {
 }
 
 /**
- * Starts a dedicated proxy server for a single redirect URL entry.
+ * Resolves the most relevant subscriber app for an incoming request on a shared redirect port.
  */
-function startRedirectProxy(redirect, app) {
-  if (runningProxies.has(redirect.id)) {
-    stopRedirectProxy(redirect.id); // restart with fresh config
+function resolveSubscriber(subscribers, req) {
+  if (!subscribers || subscribers.length === 0) {
+    return {
+      app: { id: 'shared', name: 'Shared API Redirect' },
+      redirect: { id: 'shared', name: 'External API' }
+    };
   }
 
-  const { id, name, targetUrl, port } = redirect;
+  // 1. Check explicit header
+  const explicitAppId = req.headers['x-proxy-app-id'] || req.headers['x-app-id'];
+  if (explicitAppId) {
+    const match = subscribers.find(s => s.app.id === explicitAppId);
+    if (match) return match;
+  }
+
+  // 2. Check Referer or Origin header against frontend URLs
+  const referer = (req.headers['referer'] || req.headers['origin'] || '').toLowerCase();
+  if (referer) {
+    const match = subscribers.find(s => {
+      if (!s.app.frontEndUrl) return false;
+      const cleanFront = s.app.frontEndUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+      return referer.includes(cleanFront);
+    });
+    if (match) return match;
+  }
+
+  // 3. Fallback: First subscriber
+  return subscribers[0];
+}
+
+/**
+ * Starts a dedicated proxy server on a specific port for a target URL.
+ * @param {number} port
+ * @param {string} targetUrl
+ * @param {Array<{ app: object, redirect: object }>} subscribers
+ */
+function startRedirectProxy(port, targetUrl, subscribers) {
+  if (runningProxies.has(port)) {
+    stopRedirectProxy(port);
+  }
 
   if (!targetUrl || !port) {
-    console.warn(`[RedirectProxy] Skipping "${name}" — missing targetUrl or port`);
+    console.warn(`[RedirectProxy] Skipping start on port ${port} — missing targetUrl or port`);
     return;
   }
+
+  const primaryName = subscribers.map(s => s.redirect.name).filter(Boolean).join(' / ') || 'API Redirection';
 
   const proxy = httpProxy.createProxyServer({
     target: targetUrl,
@@ -59,6 +95,7 @@ function startRedirectProxy(redirect, app) {
     const startTime = req._redirectStartTime || Date.now();
     const durationMs = Date.now() - startTime;
     const requestId = req._redirectRequestId;
+    const subscriber = req._redirectSubscriber || resolveSubscriber(subscribers, req);
     const responseHeaders = proxyRes.headers;
     const statusCode = proxyRes.statusCode;
 
@@ -70,9 +107,9 @@ function startRedirectProxy(redirect, app) {
 
       const { reqMeta, resMeta } = logManager.saveLogEntry({
         id: requestId,
-        appId: app.id,
-        appName: app.name,
-        backendName: name,
+        appId: subscriber.app.id,
+        appName: subscriber.app.name,
+        backendName: subscriber.redirect.name,
         routeType: 'redirect',
         targetUrl,
         method: req.method,
@@ -87,9 +124,9 @@ function startRedirectProxy(redirect, app) {
 
       broadcastLogEvent({
         id: requestId,
-        appId: app.id,
-        appName: app.name,
-        backendName: name,
+        appId: subscriber.app.id,
+        appName: subscriber.app.name,
+        backendName: subscriber.redirect.name,
         routeType: 'redirect',
         timestamp: reqMeta.timestamp,
         method: req.method,
@@ -115,12 +152,13 @@ function startRedirectProxy(redirect, app) {
     const startTime = req._redirectStartTime || Date.now();
     const durationMs = Date.now() - startTime;
     const requestId = req._redirectRequestId || uuidv4();
+    const subscriber = req._redirectSubscriber || resolveSubscriber(subscribers, req);
 
     logManager.saveLogEntry({
       id: requestId,
-      appId: app.id,
-      appName: app.name,
-      backendName: name,
+      appId: subscriber.app.id,
+      appName: subscriber.app.name,
+      backendName: subscriber.redirect.name,
       routeType: 'redirect',
       targetUrl,
       method: req.method,
@@ -152,6 +190,7 @@ function startRedirectProxy(redirect, app) {
       req._redirectRawBuffer = rawReqBuffer;
       req._redirectRequestId = uuidv4();
       req._redirectStartTime = Date.now();
+      req._redirectSubscriber = resolveSubscriber(subscribers, req);
 
       const Stream = require('stream');
       const bufferStream = new Stream.PassThrough();
@@ -165,58 +204,87 @@ function startRedirectProxy(redirect, app) {
 
   server.on('error', err => {
     if (err.code === 'EADDRINUSE') {
-      console.error(`[RedirectProxy] Port ${port} already in use for "${name}". Skipping.`);
+      console.error(`[RedirectProxy] Port ${port} already in use. Skipping.`);
     } else {
       console.error(`[RedirectProxy :${port}] Server error:`, err.message);
     }
   });
 
   server.listen(port, '0.0.0.0', () => {
-    console.log(`  Redirect proxy  "${name}"  :${port}  ->  ${targetUrl}`);
+    console.log(`  Redirect proxy  "${primaryName}"  :${port}  ->  ${targetUrl}`);
   });
 
-  runningProxies.set(id, { server, port, targetUrl, name, appId: app.id, appName: app.name });
+  runningProxies.set(port, { server, proxy, port, targetUrl, subscribers });
 }
 
 /**
- * Stops the proxy server for the given redirectId.
+ * Stops the proxy server running on the specified port.
+ * @param {number} port
  */
-function stopRedirectProxy(redirectId) {
-  const entry = runningProxies.get(redirectId);
+function stopRedirectProxy(port) {
+  const entry = runningProxies.get(port);
   if (!entry) return;
+  const name = entry.subscribers.map(s => s.redirect.name).join(' / ') || 'Redirect Proxy';
   entry.server.close(() => {
-    console.log(`  Redirect proxy stopped  "${entry.name}"  :${entry.port}`);
+    console.log(`  Redirect proxy stopped  "${name}"  :${entry.port}`);
   });
-  runningProxies.delete(redirectId);
+  runningProxies.delete(port);
 }
 
 /**
- * Reconciles running proxies against the current app config.
- * Starts new ones, stops removed ones. Call after any CRUD operation.
+ * Normalizes URL for comparison.
+ */
+function normalizeTargetUrl(url) {
+  if (!url) return '';
+  return url.trim().replace(/\/+$/, '').toLowerCase();
+}
+
+/**
+ * Reconciles running proxies against all active applications.
+ * Groups by port, starts new servers, updates subscribers, and stops unused ports.
+ * @param {Array} allApps
  */
 function syncRedirectProxies(allApps) {
-  const desired = new Map();
+  // Group all active redirects by port
+  const desiredByPort = new Map(); // port -> { port, targetUrl, subscribers: [] }
+
   for (const app of allApps) {
     if (!app.isActive) continue;
     for (const red of (app.redirectUrls || [])) {
       if (red.targetUrl && red.port) {
-        desired.set(red.id, { redirect: red, app });
+        if (!desiredByPort.has(red.port)) {
+          desiredByPort.set(red.port, {
+            port: red.port,
+            targetUrl: red.targetUrl,
+            subscribers: []
+          });
+        }
+        desiredByPort.get(red.port).subscribers.push({ app, redirect: red });
       }
     }
   }
 
-  // Stop proxies that are no longer in config
-  for (const [id] of runningProxies) {
-    if (!desired.has(id)) stopRedirectProxy(id);
+  // Stop proxies for ports no longer desired
+  for (const [port] of runningProxies) {
+    if (!desiredByPort.has(port)) {
+      stopRedirectProxy(port);
+    }
   }
 
-  // Start proxies that are new or changed
-  for (const [id, { redirect, app }] of desired) {
-    const existing = runningProxies.get(id);
-    const changed = !existing ||
-      existing.port !== redirect.port ||
-      existing.targetUrl !== redirect.targetUrl;
-    if (changed) startRedirectProxy(redirect, app);
+  // Start or update proxies for desired ports
+  for (const [port, desired] of desiredByPort) {
+    const existing = runningProxies.get(port);
+    if (!existing) {
+      startRedirectProxy(port, desired.targetUrl, desired.subscribers);
+    } else {
+      // If targetUrl changed on the same port, restart
+      if (normalizeTargetUrl(existing.targetUrl) !== normalizeTargetUrl(desired.targetUrl)) {
+        startRedirectProxy(port, desired.targetUrl, desired.subscribers);
+      } else {
+        // Just update subscribers list in place
+        existing.subscribers = desired.subscribers;
+      }
+    }
   }
 }
 
@@ -224,15 +292,23 @@ function syncRedirectProxies(allApps) {
  * Returns all currently running redirect proxies (for the dashboard status API).
  */
 function getRunningRedirects() {
-  return Array.from(runningProxies.entries()).map(([id, entry]) => ({
-    id,
-    name: entry.name,
-    port: entry.port,
-    targetUrl: entry.targetUrl,
-    appId: entry.appId,
-    appName: entry.appName,
-    localUrl: `http://localhost:${entry.port}`
-  }));
+  return Array.from(runningProxies.values()).map(entry => {
+    const names = entry.subscribers.map(s => s.redirect.name).filter(Boolean);
+    const appNames = entry.subscribers.map(s => s.app.name).filter(Boolean);
+    const redirectIds = entry.subscribers.map(s => s.redirect.id);
+    const appIds = entry.subscribers.map(s => s.app.id);
+
+    return {
+      id: redirectIds.join(','),
+      name: names.length > 0 ? names.join(' / ') : 'API Redirection',
+      port: entry.port,
+      targetUrl: entry.targetUrl,
+      appId: appIds.join(','),
+      appName: appNames.length > 0 ? appNames.join(' / ') : 'Shared Application',
+      localUrl: `http://localhost:${entry.port}`,
+      subscribersCount: entry.subscribers.length
+    };
+  });
 }
 
 module.exports = {

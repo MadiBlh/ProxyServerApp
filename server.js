@@ -1,4 +1,4 @@
-require('./src/utils/bootstrap');
+﻿require('./src/utils/bootstrap');
 
 const express = require('express');
 const cors = require('cors');
@@ -51,13 +51,14 @@ let apps = configManager.getApplications();
 let migrated = false;
 apps = apps.map(app => {
   const updatedRedirects = (app.redirectUrls || []).map(red => {
+    const targetUrl = red.targetUrl || red.url || '';
     if (!red.port) {
       migrated = true;
       return {
         id: red.id,
         name: red.name,
-        targetUrl: red.targetUrl || red.url || '',
-        port: configManager.assignRedirectPort(undefined, apps)
+        targetUrl: targetUrl,
+        port: configManager.assignRedirectPort(undefined, targetUrl, apps, app.id, red.id)
       };
     }
     return red;

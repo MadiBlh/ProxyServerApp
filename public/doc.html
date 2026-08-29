@@ -64,25 +64,27 @@
         <li><a href="#m-server">9. server.js</a></li>
         <li><a href="#m-bootstrap">10. utils/bootstrap.js</a></li>
         <li><a href="#m-uuid">11. utils/uuid.js</a></li>
-        <li><a href="#m-config">12. services/configManager.js</a></li>
-        <li><a href="#m-log">13. services/logManager.js</a></li>
-        <li><a href="#m-proxy">14. services/proxyEngine.js</a></li>
-        <li><a href="#m-replay">15. services/replayService.js</a></li>
-        <li><a href="#m-api">16. routes/api.js</a></li>
+        <li><a href="#m-settings">12. services/settingsManager.js</a></li>
+        <li><a href="#m-config">13. services/configManager.js</a></li>
+        <li><a href="#m-log">14. services/logManager.js</a></li>
+        <li><a href="#m-proxy">15. services/proxyEngine.js</a></li>
+        <li><a href="#m-redirect">16. services/redirectProxyManager.js</a></li>
+        <li><a href="#m-replay">17. services/replayService.js</a></li>
+        <li><a href="#m-api">18. routes/api.js</a></li>
       </ul>
 
       <div class="toc-group-title">Frontend Modules</div>
       <ul class="toc">
-        <li><a href="#f-index">17. public/index.html</a></li>
-        <li><a href="#f-app">18. public/js/app.js</a></li>
-        <li><a href="#f-monaco">19. public/js/monaco-init.js</a></li>
-        <li><a href="#f-css">20. public/css/styles.css</a></li>
+        <li><a href="#f-index">19. public/index.html</a></li>
+        <li><a href="#f-app">20. public/js/app.js</a></li>
+        <li><a href="#f-monaco">21. public/js/monaco-init.js</a></li>
+        <li><a href="#f-css">22. public/css/styles.css</a></li>
       </ul>
 
       <div class="toc-group-title">Reference (deepest level)</div>
       <ul class="toc">
-        <li><a href="#sec-functions">21. Function Reference</a></li>
-        <li><a href="#sec-lines">22. Line-Level Code Notes</a></li>
+        <li><a href="#sec-functions">23. Function Reference</a></li>
+        <li><a href="#sec-lines">24. Line-Level Code Notes</a></li>
       </ul>
     </aside>
 
@@ -104,7 +106,8 @@
             <span class="meta-chip info">http-proxy 1.18</span>
             <span class="meta-chip success">Zero DB &mdash; file based</span>
             <span class="meta-chip">Vanilla JS dashboard</span>
-            <span class="meta-chip">Port 4000</span>
+            <span class="meta-chip">Main proxy :4000</span>
+            <span class="meta-chip accent">Redirect proxies :4001+</span>
           </div>
         </div>
 
@@ -123,32 +126,37 @@
             while keeping a permanent, browsable record of every exchange.
           </p>
 
-          <h3>One process, three faces</h3>
-          <p>A single Express server exposes three distinct surfaces on the same port:</p>
+          <h3>One process, several faces</h3>
+          <p>A single Express server exposes multiple surfaces on the same port:</p>
           <div class="flow-grid">
             <div class="flow-card">
               <h4>1. Reverse Proxy (default)</h4>
-              <p>Every unmatched path falls through to <span class="file-ref">proxyEngine.proxyMiddleware</span>, which picks an app + backend by path prefix and relays the call (<span class="file-ref">server.js:39</span>).</p>
+              <p>Every unmatched path falls through to <span class="file-ref">proxyEngine.proxyMiddleware</span>, which picks an app + backend by path prefix and relays the call (<span class="file-ref">server.js:45</span>).</p>
             </div>
             <div class="flow-card">
               <h4>2. Admin REST API</h4>
-              <p><code class="inline">/dashboard-api/*</code> manages applications, logs, export, replay and a Server-Sent-Events stream (<span class="file-ref">src/routes/api.js</span>).</p>
+              <p><code class="inline">/dashboard-api/*</code> manages applications, storage paths, logs, export, replay, redirect proxies and a Server-Sent-Events stream (<span class="file-ref">src/routes/api.js</span>).</p>
             </div>
             <div class="flow-card">
               <h4>3. Static Dashboard SPA</h4>
               <p><code class="inline">/dashboard</code> serves <span class="file-ref">public/index.html</span>; assets under <code class="inline">/dashboard-static/*</code>; docs at <code class="inline">/doc</code>.</p>
             </div>
+            <div class="flow-card">
+              <h4>4. Redirect Proxy Servers</h4>
+              <p>Each configured external forwarding target gets its own dedicated proxy server on an auto-assigned port (<code class="inline">:4001</code>+) (<span class="file-ref">redirectProxyManager.js</span>).</p>
+            </div>
           </div>
 
           <h3>Key capabilities</h3>
           <ul class="bullets">
-            <li><strong>Prefix-based routing:</strong> each configured backend declares a <code class="inline">pathPrefix</code>; the longest matching prefix wins (<span class="file-ref">proxyEngine.js:215</span>).</li>
+            <li><strong>Prefix-based routing:</strong> each configured backend declares a <code class="inline">pathPrefix</code>; the longest matching prefix wins (<span class="file-ref">proxyEngine.js:214</span>).</li>
             <li><strong>Capture to disk:</strong> bodies in <code class="inline">logs/</code>, metadata in <code class="inline">headers/</code>, all keyed by one UUID per transaction.</li>
-            <li><strong>Live feed:</strong> new captures are pushed instantly to open dashboards via SSE.</li>
+            <li><strong>Live feed:</strong> new captures are pushed instantly to open dashboards via SSE &mdash; including captures from redirect proxies.</li>
             <li><strong>Inspect:</strong> Monaco editor panes auto-detect JSON/XML and pretty-print; cookie headers get special treatment.</li>
-            <li><strong>Replay:</strong> re-fire any captured call with edited URL/method/headers/body (<span class="file-ref">replayService.js</span>).</li>
+            <li><strong>Replay:</strong> re-fire any captured call with edited URL/method/headers/body (<span class="file-ref">replayService.js:3</span>).</li>
             <li><strong>Export:</strong> save a request/response pair straight into the user's Downloads folder.</li>
-            <li><strong>Redirections:</strong> apps can declare external API forwarding rules (e.g. payment gateway) alongside normal backends.</li>
+            <li><strong>Redirect proxies:</strong> apps can declare external API forwarding rules (e.g. payment gateway) that run on dedicated ports, still fully captured and streamed.</li>
+            <li><strong>Configurable storage:</strong> where <code class="inline">config/</code>, <code class="inline">logs/</code> and <code class="inline">headers/</code> live can be changed via env vars, <code class="inline">settings.json</code> or the dashboard.</li>
           </ul>
 
           <div class="callout ok">
@@ -166,27 +174,34 @@
           <div class="code-block">
             <div class="code-head"><span>system overview</span></div>
 <pre><code>  Browser / Vite app                 Proxy Server App (Node.js :4000)
- +------------------+               +--------------------------------------------------+
- |  localhost:3000  |   any HTTP    |  server.js (Express)                             |
- |  fetch('/api/x') | ------------&gt; |   |-- cors()                                    |
- +------------------+               |   |-- /dashboard-api --&gt; src/routes/api.js      |
-                                    |   |-- /dashboard       --&gt; public/index.html    |
-        Dashboard SPA               |   |-- /doc              --&gt; public/doc.html     |
-        (public/)                   |   '-- /* anything else   --&gt; proxyMiddleware     |
-                                    |                    |                             |
-                                    |                    v  match app + longest prefix |
-                                    |              http-proxy .web(target, buffer)     |
-                                    +------------------------|-------------------------+
-                                             ^               |
-                                             | SSE events    | forwarded
-                                             | (live logs)   v
-                                  +----------------------+  +--------------------------+
-                                  | Backend REST service |  | External API / SOAP svc  |
-                                  | (backendUrls)        |  | (redirectUrls)           |
-                                  +----------------------+  +--------------------------+
+ +------------------+               +----------------------------------------------------+
+ |  localhost:3000  |   any HTTP    |  server.js (Express)                               |
+ |  fetch('/api/x') | ------------&gt; |   |-- cors()                                      |
+ +------------------+               |   |-- /dashboard-api  --&gt; src/routes/api.js       |
+                                    |   |-- /dashboard       --&gt; public/index.html      |
+        Dashboard SPA               |   |-- /doc              --&gt; public/doc.html       |
+        (public/)                   |   '-- /* anything else   --&gt; proxyMiddleware      |
+                                    |                    |                               |
+                                    |                    v  match app + longest prefix  |
+                                    |              http-proxy .web(target, buffer)      |
+                                    +------------------------|--------------------------+
+                                             ^                | forwarded
+                                             | SSE events     v
+                                             |             +--------------------------+
+                                             |             | Backend REST / SOAP svc   |
+                                             |             | (backendUrls, prefix-based)|
+                                             |             +--------------------------+
+                                             |
+   Redirect proxies (:4001, :4002, ...)     |  also captures + broadcasts to the SAME feed
+   +----------------------+                 |
+   | redirectProxyManager | -----------------&gt; External API / Payment Gateway
+   | one server per       |                    (redirectUrls, matched by targetUrl)
+   | unique target URL    |
+   +----------------------+
 
   Disk artifacts:
-    config/applications.json          app + backend configuration
+    config/applications.json          app + backend configuration (+ redirect ports)
+    settings.json                     optional storage-path overrides (gitignored)
     logs/{uuid}_request.{ext}         captured request body
     logs/{uuid}_response.{ext}        captured response body
     headers/{uuid}_request.json       captured request metadata + headers
@@ -205,13 +220,14 @@
               <thead><tr><th>Piece</th><th>Choice</th><th>Why / Where used</th></tr></thead>
               <tbody>
                 <tr><td>Runtime</td><td>Node.js (no build step)</td><td>Plain CommonJS modules; started via <code class="inline">npm start</code> or watched via <code class="inline">npm run dev</code> (<span class="file-ref">package.json</span>).</td></tr>
-                <tr><td>HTTP framework</td><td>express ^4.21.2</td><td>Routing, static serving, JSON parsing (<span class="file-ref">server.js</span>, <span class="file-ref">api.js:9</span>).</td></tr>
-                <tr><td>Proxy core</td><td>http-proxy ^1.18.1</td><td><code class="inline">selfHandleResponse</code> mode so responses can be buffered + logged before reaching the client (<span class="file-ref">proxyEngine.js:9</span>).</td></tr>
-                <tr><td>CORS</td><td>cors ^2.8.5</td><td>Allows dashboards/tools from other origins to query the admin API (<span class="file-ref">server.js:14</span>).</td></tr>
+                <tr><td>HTTP framework</td><td>express ^4.21.2</td><td>Routing, static serving, JSON parsing (<span class="file-ref">server.js</span>, <span class="file-ref">api.js:11</span>).</td></tr>
+                <tr><td>Proxy core</td><td>http-proxy ^1.18.1</td><td><code class="inline">selfHandleResponse</code> mode so responses can be buffered + logged before reaching the client (<span class="file-ref">proxyEngine.js:10</span>).</td></tr>
+                <tr><td>Redirect proxies</td><td>http-proxy + core http</td><td>A dedicated Express/http server per external target URL (<span class="file-ref">redirectProxyManager.js:73</span>).</td></tr>
+                <tr><td>CORS</td><td>cors ^2.8.5</td><td>Allows dashboards/tools from other origins to query the admin API (<span class="file-ref">server.js:15</span>).</td></tr>
                 <tr><td>Editor</td><td>Monaco 0.45.0 via cdnjs</td><td>Lazy-loaded AMD loader; read-only viewers for bodies (<span class="file-ref">monaco-init.js:21-22</span>).</td></tr>
                 <tr><td>UI</td><td>Hand-written HTML/CSS/JS</td><td>No framework; Catppuccin Mocha/Latte theming via CSS variables (<span class="file-ref">styles.css</span>).</td></tr>
                 <tr><td>IDs</td><td>Custom UUID v4</td><td>Dependency-free RFC-4122 generator (<span class="file-ref">uuid.js</span>).</td></tr>
-                <tr><td>Realtime</td><td>Server-Sent Events</td><td>Native <code class="inline">EventSource</code> on client; raw <code class="inline">text/event-stream</code> writes on server (<span class="file-ref">api.js:106</span>).</td></tr>
+                <tr><td>Realtime</td><td>Server-Sent Events</td><td>Native <code class="inline">EventSource</code> on client; raw <code class="inline">text/event-stream</code> writes on server (<span class="file-ref">api.js:144</span>).</td></tr>
                 <tr><td>Replay HTTP</td><td>Native fetch</td><td>Node global fetch used to re-execute captured requests (<span class="file-ref">replayService.js:34</span>).</td></tr>
               </tbody>
             </table>
@@ -228,27 +244,30 @@
 <pre><code>ProxyServerApp/
 |-- server.js                     Express bootstrap; mounts admin API, static UI, doc page, proxy
 |-- package.json                  scripts: start / dev(watch); deps: express, cors, http-proxy
+|-- settings.json                 Optional storage-path overrides (gitignored)
 |-- config/
 |   '-- applications.json         Persisted app config (auto-created with samples on first run)
 |-- logs/                         Captured request/response BODIES: {uuid}_request.{ext}
 |-- headers/                      Captured METADATA: {uuid}_request.json / _response.json
 |-- public/
-|   |-- index.html                Dashboard SPA shell (navbar, split panes, 4 modals)
+|   |-- index.html                Dashboard SPA shell (navbar, split panes, settings + app editor)
 |   |-- doc.html                  This documentation page (served at /doc)
 |   |-- css/
-|   |   |-- styles.css            Catppuccin design system (888 lines) for the dashboard
+|   |   |-- styles.css            Catppuccin design system (890 lines) for the dashboard
 |   |   '-- doc.css               Styles for this documentation page
 |   '-- js/
-|       |-- app.js                Dashboard controller: state, fetching, SSE, modals (880 lines)
+|       |-- app.js                Dashboard controller: state, fetching, SSE, modals (994 lines)
 |       |-- monaco-init.js        Monaco loading, Catppuccin themes, formatting helpers
 |       '-- doc.js                Interactivity for this page (scroll-spy, search, copy)
 '-- src/
     |-- routes/
     |   '-- api.js                All /dashboard-api endpoints (REST + SSE)
     |-- services/
-    |   |-- configManager.js      CRUD over config/applications.json
+    |   |-- settingsManager.js    Configurable storage paths (env / settings.json)
+    |   |-- configManager.js      CRUD over config/applications.json + redirect port assignment
     |   |-- logManager.js         Write/read/clear/export capture files
-    |   |-- proxyEngine.js        http-proxy wiring, route matching, SSE broadcaster
+    |   |-- proxyEngine.js        Main http-proxy wiring, route matching, SSE broadcaster
+    |   |-- redirectProxyManager.js  Dedicated proxy servers per redirect port
     |   '-- replayService.js      Re-fires a captured request via fetch()
     '-- utils/
         |-- bootstrap.js          util._extend polyfill (silences DEP0060 warning)
@@ -262,25 +281,36 @@
         <section class="doc-section" id="sec-lifecycle">
           <h2><span class="h-num">05</span> Proxied Request Lifecycle (end to end)</h2>
           <ol class="steps">
-            <li>A client hits any path on port 4000. Express middleware chain runs: CORS &rarr; admin API &rarr; static &rarr; dashboard/doc &rarr; root redirect; everything else reaches <strong>proxyMiddleware</strong> (<span class="file-ref">server.js:39</span>).</li>
-            <li>The middleware buffers the <strong>entire raw request body</strong> in memory, stashing <code class="inline">req._proxyRawBodyStr</code> and <code class="inline">req._proxyRawBuffer</code> (<span class="file-ref">proxyEngine.js:147-154</span>).</li>
-            <li>It resolves the effective path, optionally stripping an explicit <code class="inline">/proxy/:appId</code> prefix (<span class="file-ref">proxyEngine.js:157-166</span>), then loads config and keeps only active apps (<span class="file-ref">proxyEngine.js:168-169</span>).</li>
+            <li>A client hits any path on port 4000. Express middleware chain runs: CORS &rarr; admin API &rarr; static &rarr; dashboard/doc &rarr; root redirect; everything else reaches <strong>proxyMiddleware</strong> (<span class="file-ref">server.js:45</span>).</li>
+            <li>The middleware buffers the <strong>entire raw request body</strong> in memory, stashing <code class="inline">req._proxyRawBodyStr</code> and <code class="inline">req._proxyRawBuffer</code> (<span class="file-ref">proxyEngine.js:149-156</span>).</li>
+            <li>It resolves the effective path, optionally stripping an explicit <code class="inline">/proxy/:appId</code> prefix (<span class="file-ref">proxyEngine.js:159-168</span>), then loads config and keeps only active apps (<span class="file-ref">proxyEngine.js:170-171</span>).</li>
             <li><strong>Target selection cascade:</strong>
               <ul class="bullets">
-                <li>a) explicit app id from route param, <code class="inline">x-proxy-app-id</code>/<code class="inline">x-app-id</code> header or <code class="inline">_appId</code> query (<span class="file-ref">proxyEngine.js:181</span>);</li>
-                <li>b) global scan of every active backend + redirection across all apps, matched by <strong>longest pathPrefix first</strong> (<span class="file-ref">proxyEngine.js:195-223</span>);</li>
-                <li>c) fallback: match app whose <code class="inline">frontEndUrl</code> appears in Referer/Origin, use its first backend (<span class="file-ref">proxyEngine.js:226-239</span>);</li>
-                <li>d) still nothing &rarr; 404 listing the configured prefixes (<span class="file-ref">proxyEngine.js:241-247</span>).</li>
+                <li>a) explicit app id from route param, <code class="inline">x-proxy-app-id</code>/<code class="inline">x-app-id</code> header or <code class="inline">_appId</code> query (<span class="file-ref">proxyEngine.js:183</span>);</li>
+                <li>b) global scan of every active <em>backend</em> across all active apps, matched by <strong>longest pathPrefix first</strong>; backends with no prefix act as catch-alls. Redirections are excluded here &mdash; they have their own ports (<span class="file-ref">proxyEngine.js:197-223</span>);</li>
+                <li>c) fallback: match app whose <code class="inline">frontEndUrl</code> appears in Referer/Origin, use its first backend (<span class="file-ref">proxyEngine.js:229-241</span>);</li>
+                <li>d) still nothing &rarr; 404 listing the configured prefixes (<span class="file-ref">proxyEngine.js:244-250</span>).</li>
               </ul>
             </li>
-            <li>Request is stamped with correlation state: <code class="inline">_proxyRequestId</code> (UUID), <code class="inline">_proxyStartTime</code>, <code class="inline">_proxyApp</code>, <code class="inline">_proxyBackendService</code>, <code class="inline">_proxyTargetUrl</code> (<span class="file-ref">proxyEngine.js:251-255</span>).</li>
-            <li>The buffered body is wrapped in a <code class="inline">PassThrough</code> stream (it was already consumed) and handed to <code class="inline">proxy.web(req, res, &#123; target, buffer &#125;)</code> (<span class="file-ref">proxyEngine.js:258-265</span>).</li>
-            <li>Upstream responds. Because <code class="inline">selfHandleResponse: true</code> (<span class="file-ref">proxyEngine.js:10</span>), the <code class="inline">proxyRes</code> handler collects chunks, computes duration, and calls <strong>logManager.saveLogEntry</strong> which writes four files (<span class="file-ref">proxyEngine.js:57-77</span>, details in section 13).</li>
-            <li>A compact summary is broadcast to every SSE subscriber (<span class="file-ref">proxyEngine.js:80-92</span>).</li>
-            <li>Status code plus upstream headers are copied to the client &mdash; except <code class="inline">content-length</code> / <code class="inline">transfer-encoding</code> &mdash; and the buffered body is flushed with <code class="inline">res.end(buffer)</code> (<span class="file-ref">proxyEngine.js:94-108</span>).</li>
-            <li>The dashboard's <code class="inline">EventSource</code> receives the summary, filters by the currently selected app, and prepends it to the list (<span class="file-ref">app.js:287-297</span>). Clicking a row fetches <code class="inline">/dashboard-api/logs/:id</code> and renders bodies into the Monaco panes.</li>
-            <li>If upstream is unreachable, the <code class="inline">error</code> handler records a FAILED capture with status 502 and answers the client with a JSON error (<span class="file-ref">proxyEngine.js:111-140</span>).</li>
+            <li>Request is stamped with correlation state: <code class="inline">_proxyRequestId</code> (UUID), <code class="inline">_proxyStartTime</code>, <code class="inline">_proxyApp</code>, <code class="inline">_proxyBackendService</code>, <code class="inline">_proxyTargetUrl</code> (<span class="file-ref">proxyEngine.js:254-258</span>).</li>
+            <li>The buffered body is wrapped in a <code class="inline">PassThrough</code> stream (it was already consumed) and handed to <code class="inline">proxy.web(req, res, &#123; target, buffer &#125;)</code> (<span class="file-ref">proxyEngine.js:260-268</span>).</li>
+            <li>Upstream responds. Because <code class="inline">selfHandleResponse: true</code> (<span class="file-ref">proxyEngine.js:10</span>), the <code class="inline">proxyRes</code> handler collects chunks, computes duration, and calls <strong>logManager.saveLogEntry</strong> which writes four files (<span class="file-ref">proxyEngine.js:53-79</span>, details in section 14).</li>
+            <li>A compact summary is broadcast to every SSE subscriber (<span class="file-ref">proxyEngine.js:82-94</span>).</li>
+            <li>Status code plus upstream headers are copied to the client &mdash; except <code class="inline">content-length</code> / <code class="inline">transfer-encoding</code> &mdash; and the buffered body is flushed with <code class="inline">res.end(buffer)</code> (<span class="file-ref">proxyEngine.js:96-109</span>).</li>
+            <li>The dashboard's <code class="inline">EventSource</code> receives the summary, filters by the currently selected app, and prepends it to the list (<span class="file-ref">app.js:285-302</span>). Clicking a row fetches <code class="inline">/dashboard-api/logs/:id</code> and renders bodies into the Monaco panes.</li>
+            <li>If upstream is unreachable, the <code class="inline">error</code> handler records a FAILED capture with status 502 and answers the client with a JSON error (<span class="file-ref">proxyEngine.js:113-142</span>).</li>
           </ol>
+
+          <h3>Redirect proxy lifecycle</h3>
+          <p>
+            A request to a redirect port (<code class="inline">http://localhost:4001</code>, etc.) never
+            touches <code class="inline">proxyMiddleware</code>. The subscriber app is resolved from the
+            <code class="inline">x-proxy-app-id</code>/<code class="inline">x-app-id</code> header, the
+            Referer/Origin, or the first subscriber of that shared port
+            (<span class="file-ref">redirectProxyManager.js:37-65</span>), then the request flows through
+            the same buffer &rarr; log &rarr; broadcast &rarr; forward pipeline of that port's own
+            http-proxy instance (<span class="file-ref">redirectProxyManager.js:94-147</span>).
+          </p>
         </section>
 
         <!-- ============================================================
@@ -291,16 +321,24 @@
 
           <h3>Design notes</h3>
           <ul class="bullets">
-            <li><code class="inline">router.use(express.json())</code> parses bodies only for these administrative endpoints (<span class="file-ref">api.js:9</span>) &mdash; proxied traffic never goes through here because the proxy middleware consumes it first.</li>
-            <li>All CRUD delegates to <span class="file-ref">configManager</span>; validation errors surface as HTTP 400, missing resources as 404.</li>
-            <li>The trailing catch-all inside the router just calls <code class="inline">next()</code> (<span class="file-ref">api.js:119-121</span>): unknown paths such as <code class="inline">/api/users</code> intentionally fall out of <code class="inline">/dashboard-api</code> and continue toward the proxy.</li>
+            <li><code class="inline">router.use(express.json())</code> parses bodies only for these administrative endpoints (<span class="file-ref">api.js:11</span>) &mdash; proxied traffic never goes through here because the proxy middleware consumes it first.</li>
+            <li>All CRUD delegates to <span class="file-ref">configManager</span> / <span class="file-ref">settingsManager</span>; validation errors surface as HTTP 400, missing resources as 404.</li>
+            <li>Every application create/update/delete re-runs <span class="file-ref">redirectProxyManager</span> so redirect servers mirror the stored config immediately (<span class="file-ref">api.js:53</span>).</li>
+            <li>The trailing catch-all inside the router just calls <code class="inline">next()</code> (<span class="file-ref">api.js:157-159</span>): unknown paths such as <code class="inline">/api/users</code> intentionally fall out of <code class="inline">/dashboard-api</code> and continue toward the proxy.</li>
+          </ul>
+
+          <h3>Settings API</h3>
+          <ul class="bullets">
+            <li><code class="inline">GET /dashboard-api/settings</code> returns the effective paths plus flags (<code class="inline">isDefaultConfig</code>, <code class="inline">isDefaultLogs</code>) and the defaults (<span class="file-ref">api.js:16-22</span>).</li>
+            <li><code class="inline">PUT /dashboard-api/settings</code> accepts <code class="inline">configDir</code>, <code class="inline">logsDir</code> and <code class="inline">migrateExistingConfig</code>; it persists to <code class="inline">settings.json</code>, optionally copies <code class="inline">applications.json</code>, and re-syncs redirect proxies (<span class="file-ref">api.js:25-39</span>).</li>
           </ul>
 
           <h3>SSE channel mechanics</h3>
           <ul class="bullets">
-            <li><code class="inline">GET /dashboard-api/events</code> sets the three canonical SSE headers and registers the <code class="inline">res</code> object in <code class="inline">sseClients[]</code> (<span class="file-ref">api.js:106-116</span>, <span class="file-ref">proxyEngine.js:20-22</span>).</li>
-            <li>On socket close the client is removed (<span class="file-ref">proxyEngine.js:24-27</span>), preventing leaks.</li>
-            <li><code class="inline">broadcastLogEvent</code> writes <code class="inline">data: &#123;JSON&#125;\n\n</code> to each subscriber, swallowing per-client write errors (<span class="file-ref">proxyEngine.js:29-38</span>).</li>
+            <li><code class="inline">GET /dashboard-api/events</code> sets the three canonical SSE headers and registers the <code class="inline">res</code> object in <code class="inline">sseClients[]</code> (<span class="file-ref">api.js:144-154</span>, <span class="file-ref">proxyEngine.js:22-24</span>).</li>
+            <li>On socket close the client is removed (<span class="file-ref">proxyEngine.js:26-29</span>), preventing leaks.</li>
+            <li><code class="inline">broadcastLogEvent</code> writes <code class="inline">data: &#123;JSON&#125;\n\n</code> to each subscriber, swallowing per-client write errors (<span class="file-ref">proxyEngine.js:31-40</span>).</li>
+            <li><span class="file-ref">server.js:74</span> hands the same <code class="inline">sseClients</code> array to <code class="inline">redirectProxyManager</code>, so redirect-port captures appear in the same unified live feed.</li>
           </ul>
 
           <h3>Replay semantics</h3>
@@ -322,21 +360,24 @@
             <table class="doc-table" id="routes-table">
               <thead><tr><th>Method</th><th>Path</th><th>Defined at</th><th>Description</th></tr></thead>
               <tbody>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/</code></td><td><span class="file-ref">server.js:28</span></td><td>Browser navigations (Accept: text/html, no proxy headers) are redirected to <code>/dashboard</code>; other requests pass through to the proxy.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard</code>, <code>/dashboard/*</code></td><td><span class="file-ref">server.js:23</span></td><td>Serves the dashboard SPA shell <code>public/index.html</code>.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/doc</code>, <code>/doc/*</code></td><td><span class="file-ref">server.js:28</span></td><td>Serves this documentation page <code>public/doc.html</code>.</td></tr>
-                <tr><td><span class="pill ANY">ANY</span></td><td class="nowrap"><code>/dashboard-static/*</code></td><td><span class="file-ref">server.js:20</span></td><td>Static assets from <code>public/</code> (css, js, html).</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/applications</code></td><td><span class="file-ref">api.js:14</span></td><td>List all configured applications.</td></tr>
-                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/applications</code></td><td><span class="file-ref">api.js:20</span></td><td>Create application (201; 400 on validation error).</td></tr>
-                <tr><td><span class="pill PUT">PUT</span></td><td class="nowrap"><code>/dashboard-api/applications/:id</code></td><td><span class="file-ref">api.js:30</span></td><td>Update application (404 if id unknown).</td></tr>
-                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/applications/:id</code></td><td><span class="file-ref">api.js:41</span></td><td>Delete application.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs?appId=</code></td><td><span class="file-ref">api.js:50</span></td><td>List log summaries, newest first, optionally filtered by app.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs/:id</code></td><td><span class="file-ref">api.js:57</span></td><td>Full detail: both metadata objects plus request/response bodies as text.</td></tr>
-                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/logs</code></td><td><span class="file-ref">api.js:64</span></td><td>Delete every file in <code>logs/</code> and <code>headers/</code>.</td></tr>
-                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/export</code></td><td><span class="file-ref">api.js:74</span></td><td>Copy the pair into <code>~/Downloads</code> under a sanitized prefix.</td></tr>
-                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/replay</code></td><td><span class="file-ref">api.js:89</span></td><td>Execute the stored (or overridden) request; returns status, duration, headers, body.</td></tr>
-                <tr><td><span class="pill SSE">SSE</span></td><td class="nowrap"><code>/dashboard-api/events</code></td><td><span class="file-ref">api.js:106</span></td><td>Server-Sent Events stream of new capture summaries.</td></tr>
-                <tr><td><span class="pill ANY">ANY</span></td><td class="nowrap">anything else</td><td><span class="file-ref">server.js:39</span></td><td>Falls through to <code>proxyMiddleware</code>: routed by pathPrefix to a backend and fully logged.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/</code></td><td><span class="file-ref">server.js:34</span></td><td>Browser navigations (Accept: text/html, no proxy headers) are redirected to <code>/dashboard</code>; other requests pass through to the proxy.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard</code>, <code>/dashboard/*</code></td><td><span class="file-ref">server.js:24</span></td><td>Serves the dashboard SPA shell <code>public/index.html</code>.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/doc</code>, <code>/doc/*</code></td><td><span class="file-ref">server.js:29</span></td><td>Serves this documentation page <code>public/doc.html</code>.</td></tr>
+                <tr><td><span class="pill ANY">ANY</span></td><td class="nowrap"><code>/dashboard-static/*</code></td><td><span class="file-ref">server.js:21</span></td><td>Static assets from <code>public/</code> (css, js, html).</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/settings</code></td><td><span class="file-ref">api.js:16</span></td><td>Current storage &amp; path settings.</td></tr>
+                <tr><td><span class="pill PUT">PUT</span></td><td class="nowrap"><code>/dashboard-api/settings</code></td><td><span class="file-ref">api.js:25</span></td><td>Update storage paths; optionally migrate <code>applications.json</code>; re-syncs redirect proxies.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/redirect-proxies</code></td><td><span class="file-ref">api.js:81</span></td><td>Status of all running redirect proxy servers (port, target, subscribers).</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/applications</code></td><td><span class="file-ref">api.js:44</span></td><td>List all configured applications.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/applications</code></td><td><span class="file-ref">api.js:50</span></td><td>Create application (201; 400 on validation error).</td></tr>
+                <tr><td><span class="pill PUT">PUT</span></td><td class="nowrap"><code>/dashboard-api/applications/:id</code></td><td><span class="file-ref">api.js:61</span></td><td>Update application (404 if id unknown).</td></tr>
+                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/applications/:id</code></td><td><span class="file-ref">api.js:73</span></td><td>Delete application.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs?appId=</code></td><td><span class="file-ref">api.js:88</span></td><td>List log summaries, newest first, optionally filtered by app.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs/:id</code></td><td><span class="file-ref">api.js:95</span></td><td>Full detail: both metadata objects plus request/response bodies as text.</td></tr>
+                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/logs</code></td><td><span class="file-ref">api.js:102</span></td><td>Delete every file in <code>logs/</code> and <code>headers/</code>.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/export</code></td><td><span class="file-ref">api.js:112</span></td><td>Copy the pair into <code>~/Downloads</code> under a sanitized prefix.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/replay</code></td><td><span class="file-ref">api.js:127</span></td><td>Execute the stored (or overridden) request; returns status, duration, headers, body.</td></tr>
+                <tr><td><span class="pill SSE">SSE</span></td><td class="nowrap"><code>/dashboard-api/events</code></td><td><span class="file-ref">api.js:144</span></td><td>Server-Sent Events stream of new capture summaries.</td></tr>
+                <tr><td><span class="pill ANY">ANY</span></td><td class="nowrap">anything else</td><td><span class="file-ref">server.js:45</span></td><td>Falls through to <code>proxyMiddleware</code>: routed by pathPrefix to a backend and fully logged.</td></tr>
               </tbody>
             </table>
           </div>
@@ -349,34 +390,51 @@
           <h2><span class="h-num">08</span> Data Model &amp; Storage</h2>
 
           <h3>config/applications.json</h3>
-          <p>Written by <span class="file-ref">configManager.saveApplications</span> with 2-space indentation. Shape (see defaults at <span class="file-ref">configManager.js:32-61</span>):</p>
+          <p>Written by <span class="file-ref">configManager.saveApplications</span> with 2-space indentation. Shape (see defaults at <span class="file-ref">configManager.js:106-135</span>):</p>
           <div class="code-block">
             <div class="code-head"><span>application entry</span></div>
 <pre><code>{
   "id": "app-default-1",                       // stable id (uuidv4 unless provided)
   "name": "Sample JSON Store API",
   "frontEndUrl": "http://localhost:3000",      // used by the Referer fallback matcher
-  "backendUrls": [                             // internal backends to relay to
+  "backendUrls": [                             // internal backends relayed through :4000
     { "id": "be-1", "name": "JSON Placeholder API",
       "url": "https://jsonplaceholder.typicode.com", "pathPrefix": "/posts" }
   ],
   "redirectUrls": [                            // external forwarding rules (optional)
     { "id": "red-1", "name": "Payment Gateway",
-      "targetUrl": "https://api.example.com", "pathPrefix": "/external/payment" }
+      "targetUrl": "https://api.example.com", "port": 4001 }  // port auto-assigned
   ],
   "isActive": true                             // inactive apps are skipped by routing
 }</code></pre>
           </div>
+          <p>
+            <code class="inline">backendUrls</code> are relayed by the main proxy on port 4000 and matched by
+            <code class="inline">pathPrefix</code>. <code class="inline">redirectUrls</code> do <em>not</em>
+            declare a prefix &mdash; each receives a dedicated proxy server on an auto-assigned
+            <code class="inline">port</code> (see section 13 &amp; 16). Multiple apps pointing at the same
+            <code class="inline">targetUrl</code> share one port.
+          </p>
+
+          <h3>settings.json (optional)</h3>
+          <p>
+            When the user customizes storage through the dashboard or <code class="inline">PUT /settings</code>,
+            <span class="file-ref">settingsManager</span> persists
+            <code class="inline">&#123; configDir, logsDir &#125;</code> to <code class="inline">settings.json</code>
+            in the project root (empty strings = project defaults). Resolution order everywhere is:
+            environment variable &rarr; <code class="inline">settings.json</code> &rarr; project default
+            (<span class="file-ref">settingsManager.js:51-63</span>).
+          </p>
 
           <h3>Capture artifacts (per transaction)</h3>
           <div class="table-scroll">
             <table class="doc-table">
               <thead><tr><th>File</th><th>Writer</th><th>Contents</th></tr></thead>
               <tbody>
-                <tr><td class="nowrap"><code>logs/{id}_request.{ext}</code></td><td><span class="file-ref">logManager.js:50</span></td><td>Raw request body (empty string if none).</td></tr>
-                <tr><td class="nowrap"><code>logs/{id}_response.{ext}</code></td><td><span class="file-ref">logManager.js:51</span></td><td>Raw response body, or <code>Error: ...</code> when upstream failed.</td></tr>
-                <tr><td class="nowrap"><code>headers/{id}_request.json</code></td><td><span class="file-ref">logManager.js:82</span></td><td>reqMeta: appId, appName, backendName, routeType, timestamp, method, endpoint, targetUrl, contentType, fileExtension, full headers.</td></tr>
-                <tr><td class="nowrap"><code>headers/{id}_response.json</code></td><td><span class="file-ref">logManager.js:83</span></td><td>resMeta: statusCode, statusText (OK/FAILED), durationMs, contentType, fileExtension, headers, error.</td></tr>
+                <tr><td class="nowrap"><code>logs/{id}_request.{ext}</code></td><td><span class="file-ref">logManager.js:55</span></td><td>Raw request body (empty string if none).</td></tr>
+                <tr><td class="nowrap"><code>logs/{id}_response.{ext}</code></td><td><span class="file-ref">logManager.js:56</span></td><td>Raw response body, or <code>Error: ...</code> when upstream failed.</td></tr>
+                <tr><td class="nowrap"><code>headers/{id}_request.json</code></td><td><span class="file-ref">logManager.js:87</span></td><td>reqMeta: appId, appName, backendName, routeType, timestamp, method, endpoint, targetUrl, contentType, fileExtension, full headers.</td></tr>
+                <tr><td class="nowrap"><code>headers/{id}_response.json</code></td><td><span class="file-ref">logManager.js:88</span></td><td>resMeta: statusCode, statusText (OK/FAILED), durationMs, contentType, fileExtension, headers, error.</td></tr>
               </tbody>
             </table>
           </div>
@@ -387,15 +445,15 @@
             <code class="inline">json/xml/html/js/css/txt</code> using the Content-Type substring,
             falling back to a first-character sniff of the body (<code class="inline">{</code> or
             <code class="inline">[</code> &rarr; json, <code class="inline">&lt;</code> &rarr; xml)
-            (<span class="file-ref">logManager.js:17-35</span>). The chosen extension drives both the
+            (<span class="file-ref">logManager.js:19-37</span>). The chosen extension drives both the
             stored filename and the Monaco language on the client.
           </p>
 
           <h3>Exports</h3>
           <p>
             Export sanitizes the user-supplied prefix with <code class="inline">[^a-zA-Z0-9_-] &rarr; _</code>
-            (<span class="file-ref">logManager.js:203</span>) and writes two files into
-            <code class="inline">os.homedir()/Downloads</code> (<span class="file-ref">logManager.js:189-195</span>).
+            (<span class="file-ref">logManager.js:222</span>) and writes two files into
+            <code class="inline">os.homedir()/Downloads</code> (<span class="file-ref">logManager.js:208-214</span>).
           </p>
         </section>
 
@@ -406,19 +464,21 @@
         <section class="doc-section" id="m-server">
           <h2><span class="h-num">09</span> server.js &mdash; Entry Point</h2>
           <p>
-            Fifty lines that wire everything together. Order of <code class="inline">app.use</code>
-            calls is critical: specific mounts must precede the catch-all proxy.
+            Orders all of the <code class="inline">app.use</code> mounts; specific mounts must
+            precede the catch-all proxy.
           </p>
           <ul class="bullets">
             <li>L1: requires <span class="file-ref">bootstrap.js</span> <em>first</em>, so the <code class="inline">util._extend</code> polyfill exists before http-proxy loads.</li>
-            <li>L10-11: app instance; <code class="inline">PORT = process.env.PORT || 4000</code>.</li>
-            <li>L14: global CORS. L17: admin API mount. L20: static mount. L23-25: dashboard SPA. L28-34: conditional root redirect.</li>
-            <li>L39: <code class="inline">app.use(proxyMiddleware)</code> &mdash; the default face of the server.</li>
-            <li>L42: <code class="inline">configManager.getApplications()</code> eagerly seeds <code class="inline">config/applications.json</code> with sample apps on first boot.</li>
-            <li>L44-50: listens on <code class="inline">0.0.0.0</code> so LAN devices can use the proxy; prints startup banner.</li>
+            <li>L3-9: requires express, cors, the admin router, proxy middleware, and both service managers.</li>
+            <li>L11-12: app instance; <code class="inline">PORT = process.env.PORT || 4000</code>.</li>
+            <li>L15: global CORS. L18: admin API mount. L21: static mount. L24-31: dashboard SPA + doc page. L34-40: conditional root redirect.</li>
+            <li>L45: <code class="inline">app.use(proxyMiddleware)</code> &mdash; the default face of the server.</li>
+            <li>L50-71: loads <code class="inline">configManager.getApplications()</code> (which seeds <code class="inline">config/applications.json</code> with sample apps on first boot) and migrates legacy redirect entries that lack a <code class="inline">port</code>, assigning one via <code class="inline">configManager.assignRedirectPort</code>.</li>
+            <li>L74-77: shares the SSE client array with <span class="file-ref">redirectProxyManager</span> and starts one proxy server per active redirect URL.</li>
+            <li>L79-93: listens on <code class="inline">0.0.0.0</code> so LAN devices can use the proxy; prints a startup banner including the redirect proxy list.</li>
           </ul>
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">server.js:36-39</span><h4>The catch-all mount</h4></div>
+            <div class="line-note-head"><span class="loc-chip">server.js:45</span><h4>The catch-all mount</h4></div>
             <div class="code-block"><pre><code>// 5. Proxy Server Entrypoint: http://localhost:4000
 //    ALL requests (e.g. Vite target: 'http://localhost:4000' forwarding /api/users, /api/todos, etc.)
 //    pass through proxyMiddleware to the configured backend microservices.
@@ -468,27 +528,65 @@ app.use(proxyMiddleware);</code></pre></div>
 });</code></pre></div>
             <p><code class="inline">(Math.random() * 16) | 0</code> yields 0..15. For the variant slot, <code class="inline">(r &amp; 0x3) | 0x8</code> restricts the two high bits per RFC-4122, producing one of <code class="inline">8/9/a/b</code>. The literal <code class="inline">4</code> in the template fixes the version field.</p>
           </div>
-          <p>Used for: application/backend ids (<span class="file-ref">configManager.js:91</span>), per-request capture ids (<span class="file-ref">proxyEngine.js:251</span>) and error-path fallback ids (<span class="file-ref">proxyEngine.js:115</span>).</p>
+          <p>Used for: application/backend ids (<span class="file-ref">configManager.js:167</span>), per-request capture ids (<span class="file-ref">proxyEngine.js:254</span>) and error-path fallback ids (<span class="file-ref">proxyEngine.js:117</span>).</p>
+        </section>
+
+        <section class="doc-section" id="m-settings">
+          <h2><span class="h-num">12</span> src/services/settingsManager.js &mdash; Storage Paths</h2>
+          <p>
+            Centralizes every paths decision for the app. Resolution order for all three directories is
+            strictly: environment variable &rarr; <code class="inline">settings.json</code> &rarr;
+            project-root default.
+          </p>
+          <div class="table-scroll">
+            <table class="doc-table">
+              <thead><tr><th>Path</th><th>Env var</th><th>settings.json</th><th>Default</th></tr></thead>
+              <tbody>
+                <tr><td><code>apps file</code></td><td><code>PROXY_CONFIG_DIR</code></td><td><code>configDir</code></td><td><code>&lt;root&gt;/config</code></td></tr>
+                <tr><td><code>logs/</code></td><td rowspan="2"><code>PROXY_LOGS_DIR</code> (base)</td><td rowspan="2"><code>logsDir</code> (base)</td><td><code>&lt;root&gt;/logs</code></td></tr>
+                <tr><td><code>headers/</code></td><td><code>&lt;root&gt;/headers</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            The functions are tiny &mdash; <code class="inline">getConfigDir</code>
+            (<span class="file-ref">settingsManager.js:51-63</span>), <code class="inline">getLogsDir</code>
+            (75-89), <code class="inline">getHeadersDir</code> (94-108),
+            <code class="inline">getLogsBaseDir</code> (113-125) &mdash; each resolving the same precedence chain.
+            <code class="inline">getSettings</code> (130-153) returns the effective paths plus "is default?"
+            flags for the dashboard. <code class="inline">updateSettings</code> (159-207) validates/creates
+            directories, optionally copies <code class="inline">applications.json</code> into the new config
+            dir, and writes <code class="inline">settings.json</code> (empty string means "use default").
+          </p>
+          <p>
+            Note that a custom <code class="inline">PROXY_LOGS_DIR</code>/<code class="inline">logsDir</code>
+            is treated as a <em>base</em>: the actual capture dirs are
+            <code class="inline">&#123;base&#125;/logs</code> and <code class="inline">&#123;base&#125;/headers</code>,
+            so one storage root keeps both artifacts together.
+          </p>
         </section>
 
         <section class="doc-section" id="m-config">
-          <h2><span class="h-num">12</span> src/services/configManager.js &mdash; Configuration Store</h2>
+          <h2><span class="h-num">13</span> src/services/configManager.js &mdash; Configuration Store</h2>
           <p>
             Synchronous CRUD over a single JSON document. Deliberately simple: reads/writes hit
             <code class="inline">fs</code> directly, which is fine for a local single-user tool.
+            It also owns <strong>redirect port assignment</strong>.
           </p>
           <h3>Exported API</h3>
           <div class="table-scroll">
             <table class="doc-table">
               <thead><tr><th>Function</th><th>Returns</th><th>Notes</th></tr></thead>
               <tbody>
-                <tr><td><code>getApplications()</code></td><td>Array</td><td>Self-seeding: creates dir + writes <code>DEFAULT_CONFIG</code> (two sample apps) when the file is missing (<span class="file-ref">configManager.js:65-67</span>). Corrupt JSON yields <code>[]</code> after logging.</td></tr>
+                <tr><td><code>getApplications()</code></td><td>Array</td><td>Self-seeding: creates dir + writes <code>DEFAULT_CONFIG</code> (two sample apps) when the file is missing (<span class="file-ref">configManager.js:140-142</span>). Corrupt JSON yields <code>[]</code> after logging.</td></tr>
                 <tr><td><code>getApplicationById(id)</code></td><td>Object|undefined</td><td>Linear find.</td></tr>
                 <tr><td><code>saveApplications(apps)</code></td><td>void</td><td>Pretty-printed write; ensures directory first.</td></tr>
-                <tr><td><code>createApplication(data)</code></td><td>Object</td><td>Fills defaults, generates ids, normalizes every pathPrefix.</td></tr>
-                <tr><td><code>updateApplication(id, data)</code></td><td>Object|null</td><td>Spread-merge preserving the original id; rebuilds backend/redirect arrays with normalization (<span class="file-ref">configManager.js:113-137</span>).</td></tr>
+                <tr><td><code>createApplication(data)</code></td><td>Object</td><td>Fills defaults, generates ids, normalizes every pathPrefix, assigns redirect ports (<span class="file-ref">configManager.js:164-193</span>).</td></tr>
+                <tr><td><code>updateApplication(id, data)</code></td><td>Object|null</td><td>Spread-merge preserving the original id; rebuilds backend/redirect arrays with normalization &amp; port preservation (<span class="file-ref">configManager.js:195-229</span>).</td></tr>
                 <tr><td><code>deleteApplication(id)</code></td><td>Boolean</td><td>Filter + length comparison detects a real deletion.</td></tr>
-                <tr><td><code>normalizePathPrefix(p)</code></td><td>String</td><td>Guarantees leading slash, no trailing slash; empty &rarr; <code>'/'</code> (<span class="file-ref">configManager.js:19-29</span>).</td></tr>
+                <tr><td><code>normalizePathPrefix(p)</code></td><td>String</td><td>Guarantees leading slash, no trailing slash; empty &rarr; <code>'/'</code> (<span class="file-ref">configManager.js:18-28</span>).</td></tr>
+                <tr><td><code>normalizeTargetUrl(url)</code></td><td>String</td><td>Trims trailing slashes + lowercases for stable port-dedup comparisons (<span class="file-ref">configManager.js:33-36</span>).</td></tr>
+                <tr><td><code>assignRedirectPort(existingPort, targetUrl, allApps, currentAppId, currentRedId)</code></td><td>Number</td><td>Reuses the port of another redirect with the same targetUrl, keeps a non-conflicting existing port, else finds the next free port from <code>4001</code> (<span class="file-ref">configManager.js:59-103</span>).</td></tr>
               </tbody>
             </table>
           </div>
@@ -498,10 +596,15 @@ app.use(proxyMiddleware);</code></pre></div>
             <code class="inline">api/users</code> would never match <code class="inline">/api/users/123</code>.
             Normalizing at write time keeps the runtime matcher dumb and fast.
           </div>
+          <div class="callout">
+            <strong>Shared redirect ports:</strong> <code class="inline">assignRedirectPort</code> returns the
+            <em>same</em> port for two applications that target the identical external URL, so one proxy
+            server serves both &mdash; subscribers are then disambiguated by header / Referer at request time.
+          </div>
         </section>
 
         <section class="doc-section" id="m-log">
-          <h2><span class="h-num">13</span> src/services/logManager.js &mdash; Capture Store</h2>
+          <h2><span class="h-num">14</span> src/services/logManager.js &mdash; Capture Store</h2>
           <p>
             Owns everything under <code class="inline">logs/</code> and <code class="inline">headers/</code>.
             One transaction = one UUID = four files (section 8). All I/O is synchronous.
@@ -511,16 +614,16 @@ app.use(proxyMiddleware);</code></pre></div>
             <table class="doc-table">
               <thead><tr><th>Function</th><th>Purpose</th></tr></thead>
               <tbody>
-                <tr><td><code>saveLogEntry({...})</code></td><td>Detects extensions, writes the two body files, builds reqMeta/resMeta objects, writes the two metadata files, returns both metas (<span class="file-ref">logManager.js:37-86</span>).</td></tr>
-                <tr><td><code>getAllLogs(appId?)</code></td><td>Scans <code>*_request.json</code>, pairs each with its response meta (defaulting to FAILED/500 when absent), applies the optional appId filter, sorts newest-first (<span class="file-ref">logManager.js:88-137</span>).</td></tr>
-                <tr><td><code>getLogDetail(id)</code></td><td>Loads both metas plus both bodies as UTF-8 strings; null when the request meta is missing (<span class="file-ref">logManager.js:139-172</span>).</td></tr>
-                <tr><td><code>clearAllLogs()</code></td><td>Unlinks every file in both directories (<span class="file-ref">logManager.js:174-185</span>).</td></tr>
-                <tr><td><code>exportLog(id, name)</code></td><td>Sanitized-name copies of both bodies into ~/Downloads (<span class="file-ref">logManager.js:197-220</span>).</td></tr>
+                <tr><td><code>saveLogEntry({...})</code></td><td>Detects extensions, writes the two body files, builds reqMeta/resMeta objects, writes the two metadata files, returns both metas (<span class="file-ref">logManager.js:39-91</span>).</td></tr>
+                <tr><td><code>getAllLogs(appId?)</code></td><td>Scans <code>*_request.json</code>, pairs each with its response meta (defaulting to FAILED/500 when absent), applies the optional appId filter, sorts newest-first (<span class="file-ref">logManager.js:93-144</span>).</td></tr>
+                <tr><td><code>getLogDetail(id)</code></td><td>Loads both metas plus both bodies as UTF-8 strings; null when the request meta is missing (<span class="file-ref">logManager.js:146-182</span>).</td></tr>
+                <tr><td><code>clearAllLogs()</code></td><td>Unlinks every file in both directories (<span class="file-ref">logManager.js:184-206</span>).</td></tr>
+                <tr><td><code>exportLog(id, name)</code></td><td>Sanitized-name copies of both bodies into ~/Downloads (<span class="file-ref">logManager.js:216-239</span>).</td></tr>
               </tbody>
             </table>
           </div>
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">logManager.js:68-69,74</span><h4>OK vs FAILED classification</h4></div>
+            <div class="line-note-head"><span class="loc-chip">logManager.js:73-74</span><h4>OK vs FAILED classification</h4></div>
             <div class="code-block"><pre><code>const statusOk = statusCode &gt;= 200 &amp;&amp; statusCode &lt; 400 &amp;&amp; !error;
 ...
 statusText: statusOk ? 'OK' : 'FAILED',</code></pre></div>
@@ -529,54 +632,63 @@ statusText: statusOk ? 'OK' : 'FAILED',</code></pre></div>
         </section>
 
         <section class="doc-section" id="m-proxy">
-          <h2><span class="h-num">14</span> src/services/proxyEngine.js &mdash; Proxy Core</h2>
+          <h2><span class="h-num">15</span> src/services/proxyEngine.js &mdash; Proxy Core</h2>
           <p>
-            The heart of the app (~273 lines): a configured http-proxy instance, an SSE fan-out list,
-            two event handlers, and the routing middleware.
+            The heart of the app (277 lines): a configured http-proxy instance, an SSE fan-out list,
+            two event handlers, and the routing middleware for the main port.
           </p>
 
           <h3>Proxy instance options</h3>
           <div class="code-block">
-            <div class="code-head"><span>proxyEngine.js:9-15</span></div>
+            <div class="code-head"><span>proxyEngine.js:9-17</span></div>
 <pre><code>const proxy = httpProxy.createProxyServer({
-  selfHandleResponse: true,   // we buffer + log the response ourselves
-  changeOrigin: true,         // rewrite Host header to the target
-  secure: false,              // accept self-signed upstream certs
-  cookieDomainRewrite: '*',   // keep cookies working behind localhost
-  cookiePathRewrite: '*'
+  selfHandleResponse: true,      // we buffer + log the response ourselves
+  changeOrigin: true,            // rewrite Host header to the target
+  secure: false,                 // accept self-signed upstream certs
+  cookieDomainRewrite: { '*': '' }  // scope cookies to localhost (see below)
 });</code></pre>
           </div>
+          <p>
+            <code class="inline">cookieDomainRewrite: &#123; '*': '' &#125;</code> removes the
+            <code class="inline">Domain</code> attribute from every <code class="inline">Set-Cookie</code>,
+            so cookies set by proxied backends remain valid on <code class="inline">localhost</code>. A
+            string <code class="inline">'*'</code> would emit <code class="inline">Domain=*</code> which
+            browsers reject, hence the object form.
+          </p>
 
           <h3>Response interception ('proxyRes')</h3>
           <ul class="bullets">
-            <li>Chunks accumulate in an array; nothing is forwarded until <code class="inline">end</code> (<span class="file-ref">proxyEngine.js:53-57</span>).</li>
-            <li>Duration uses the timestamp stashed by the middleware &mdash; i.e. includes body buffering time, not just upstream time (<span class="file-ref">proxyEngine.js:42-43</span>).</li>
-            <li>After logging + broadcasting, upstream headers are copied but hop-by-hop/length headers are skipped since our re-emitted body may differ (<span class="file-ref">proxyEngine.js:96-100</span>).</li>
-            <li><code class="inline">res.end(responseBuffer)</code> finally releases the response to the caller (<span class="file-ref">proxyEngine.js:107</span>).</li>
+            <li>Chunks accumulate in an array; nothing is forwarded until <code class="inline">end</code> (<span class="file-ref">proxyEngine.js:55-59</span>).</li>
+            <li>Duration uses the timestamp stashed by the middleware &mdash; i.e. includes body buffering time, not just upstream time (<span class="file-ref">proxyEngine.js:44-45</span>).</li>
+            <li>After logging + broadcasting, upstream headers are copied but hop-by-hop/length headers are skipped since our re-emitted body may differ (<span class="file-ref">proxyEngine.js:98-103</span>).</li>
+            <li><code class="inline">res.end(responseBuffer)</code> finally releases the response to the caller (<span class="file-ref">proxyEngine.js:109</span>).</li>
           </ul>
 
           <h3>Error handling ('error')</h3>
           <p>
             Logs a FAILED capture with synthetic 502 status and the error text as body, then replies
             <code class="inline">502 &#123;error, details&#125;</code> if headers were not already sent
-            (<span class="file-ref">proxyEngine.js:111-140</span>). A fresh UUID is generated if the
-            failure happened before stamping (<span class="file-ref">proxyEngine.js:115</span>).
+            (<span class="file-ref">proxyEngine.js:113-142</span>). A fresh UUID is generated if the
+            failure happened before stamping (<span class="file-ref">proxyEngine.js:117</span>).
           </p>
 
           <h3>Target selection (middleware)</h3>
           <p>Full cascade documented in section 5. The decisive trick is longest-prefix-wins:</p>
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:215-218</span><h4>Most-specific prefix wins</h4></div>
-            <div class="code-block"><pre><code>// Sort all active routes by pathPrefix length descending (longest/most specific prefix first)
+            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:214-221</span><h4>Most-specific prefix wins</h4></div>
+            <div class="code-block"><pre><code>// Sort all active routes by pathPrefix length descending (longest/most specific prefix first).
 allActiveRoutes.sort((a, b) =&gt; (b.pathPrefix || '').length - (a.pathPrefix || '').length);
 
-// Find matching backend/redirect service by pathPrefix
-const match = allActiveRoutes.find(be =&gt; requestPath.startsWith(be.pathPrefix.trim()));</code></pre></div>
-            <p>Sorting once and taking the first <code class="inline">startsWith</code> hit means <code class="inline">/external/payment/refund</code> correctly lands on a <code class="inline">/external/payment</code> rule rather than a bare <code class="inline">/external</code> backend.</p>
+// Find the first prefix that matches the request path (missing prefix = catch-all '/')
+const match = allActiveRoutes.find(be =&gt; {
+  const prefix = (be.pathPrefix || '/').trim() || '/';
+  return requestPath.startsWith(prefix);
+});</code></pre></div>
+            <p>Sorting once and taking the first <code class="inline">startsWith</code> hit means <code class="inline">/external/payment/refund</code> correctly lands on a <code class="inline">/external/payment</code> rule rather than a bare <code class="inline">/external</code> backend. Backends with an empty prefix sort last and act as catch-alls for any path.</p>
           </div>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:257-265</span><h4>Restreaming the consumed body</h4></div>
+            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:260-268</span><h4>Restreaming the consumed body</h4></div>
             <div class="code-block"><pre><code>// Re-stream buffered body for http-proxy
 const Stream = require('stream');
 const bufferStream = new Stream.PassThrough();
@@ -588,10 +700,59 @@ proxy.web(req, res, {
 });</code></pre></div>
             <p>We already drained the request stream to capture the body, so http-proxy would see an empty stream. Feeding a PassThrough pre-filled with the saved buffer restores the payload without re-reading the socket.</p>
           </div>
+          <p>
+            Redirections are <strong>not</strong> matched here &mdash; the middleware only indexes
+            <code class="inline">backendUrls</code> (see the comment at
+            <span class="file-ref">proxyEngine.js:208-209</span>). Redirect traffic is the responsibility
+            of <span class="file-ref">redirectProxyManager.js</span> (section 16).
+          </p>
+        </section>
+
+        <section class="doc-section" id="m-redirect">
+          <h2><span class="h-num">16</span> src/services/redirectProxyManager.js &mdash; Redirect Proxies</h2>
+          <p>
+            Runs dedicated HTTP proxy servers on separate ports for every configured
+            <code class="inline">redirectUrl</code>. If two applications declare the same external
+            <code class="inline">targetUrl</code>, they <strong>share one server/port</strong> &mdash;
+            the port bookkeeping in <span class="file-ref">configManager.assignRedirectPort</span>
+            guarantees no collision.
+          </p>
+          <h3>State</h3>
+          <p>
+            <code class="inline">runningProxies</code> is a <code class="inline">Map(port -&gt;
+            &#123; server, proxy, targetUrl, subscribers[] &#125;)</code>
+            (<span class="file-ref">redirectProxyManager.js:17-18</span>) where
+            <code class="inline">subscribers</code> grows as more apps reuse the same port.
+            The shared <code class="inline">sseClients</code> array is injected from the main engine so
+            redirect captures appear in the same dashboard feed (<span class="file-ref">redirectProxyManager.js:23-25</span>).
+          </p>
+          <h3>Subscriber resolution</h3>
+          <p>
+            <code class="inline">resolveSubscriber</code> (<span class="file-ref">redirectProxyManager.js:37-65</span>)
+            picks which app a request belongs to on a shared port: explicit
+            <code class="inline">x-proxy-app-id</code>/<code class="inline">x-app-id</code> header, then
+            Referer/Origin against each app's <code class="inline">frontEndUrl</code>, then the first
+            subscriber.
+          </p>
+          <h3>One-time start &amp; reconciliation</h3>
+          <p>
+            <code class="inline">startRedirectProxy</code> builds an Express app configured like the main
+            proxy (self-handled responses, cookie domain rewrite, full buffering + logging + SSE broadcast)
+            and listens on <code class="inline">0.0.0.0</code> (<span class="file-ref">redirectProxyManager.js:73-218</span>).
+            <code class="inline">syncRedirectProxies</code> (<span class="file-ref">redirectProxyManager.js:247-289</span>)
+            is called on boot and after every applications CRUD: it stops ports no longer desired, starts
+            new ones, and restarts a port only when its <code class="inline">targetUrl</code> actually changed.
+          </p>
+          <h3>Status API</h3>
+          <p>
+            <code class="inline">getRunningRedirects</code> (<span class="file-ref">redirectProxyManager.js:294-312</span>)
+            returns the flattened list consumed by <code class="inline">GET /dashboard-api/redirect-proxies</code>
+            and the startup banner: id, name, port, targetUrl, owners, and <code class="inline">localUrl</code>.
+          </p>
         </section>
 
         <section class="doc-section" id="m-replay">
-          <h2><span class="h-num">15</span> src/services/replayService.js &mdash; Replay Engine</h2>
+          <h2><span class="h-num">17</span> src/services/replayService.js &mdash; Replay Engine</h2>
           <p>
             One exported async function. Resolution order per field: explicit override &rarr; stored
             capture &rarr; sensible default (method POST). The URL combines
@@ -599,7 +760,7 @@ proxy.web(req, res, {
             (<span class="file-ref">replayService.js:6</span>).
           </p>
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">replayService.js:15-20</span><h4>Header hygiene before fetch()</h4></div>
+            <div class="line-note-head"><span class="loc-chip">replayService.js:16-20</span><h4>Header hygiene before fetch()</h4></div>
             <div class="code-block"><pre><code>// Clean up system headers that cause fetch errors
 const cleanHeaders = { ...headers };
 delete cleanHeaders['host'];
@@ -611,13 +772,14 @@ delete cleanHeaders['accept-encoding'];</code></pre></div>
         </section>
 
         <section class="doc-section" id="m-api">
-          <h2><span class="h-num">16</span> src/routes/api.js &mdash; Admin Router</h2>
+          <h2><span class="h-num">18</span> src/routes/api.js &mdash; Admin Router</h2>
           <p>
             Thin translation layer: HTTP verbs in, service calls out, consistent JSON errors.
-            Grouped as Applications / Logs / Replay / Events (full table in section 7).
+            Grouped as Settings / Applications / Redirect Proxies / Logs / Replay / Events
+            (full table in section 7).
           </p>
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">api.js:118-121</span><h4>The intentional fallthrough</h4></div>
+            <div class="line-note-head"><span class="loc-chip">api.js:157-159</span><h4>The intentional fallthrough</h4></div>
             <div class="code-block"><pre><code>// Fallback for non-admin /api routes (e.g. /api/users, /api/v1/...) -&gt; pass to proxy
 router.use((req, res, next) =&gt; {
   next();
@@ -631,21 +793,23 @@ router.use((req, res, next) =&gt; {
         ============================================================ -->
 
         <section class="doc-section" id="f-index">
-          <h2><span class="h-num">17</span> public/index.html &mdash; Dashboard Shell</h2>
+          <h2><span class="h-num">19</span> public/index.html &mdash; Dashboard Shell</h2>
           <ul class="bullets">
-            <li>L10-15: inline script applies the saved theme <em>before first paint</em> to avoid a flash of wrong theme (FOUC).</li>
-            <li>L20-42 navbar: brand, app selector dropdown, action buttons (Logs focus, Manage Application, Remove All Logs, theme toggle).</li>
-            <li>L45-67 toolbar: Reload / Export / Replay buttons and the live endpoint search box.</li>
-            <li>L70-134 split workspace: left = intercepted-call list; right = stacked REQUEST and RESPONSE panes, each with Body(Monaco)/Headers tabs and collapse toggles.</li>
-            <li>L137-285 four modals: export naming, replay composer (method/url/headers/body/result), application manager list, application editor with repeatable backend + redirection rows.</li>
-            <li>L288-289 loads <span class="file-ref">monaco-init.js</span> then <span class="file-ref">app.js</span> &mdash; order guarantees <code class="inline">window.monacoManager</code> exists before the controller boots.</li>
+            <li>L11-17: inline script applies the saved theme <em>before first paint</em> to avoid a flash of wrong theme (FOUC).</li>
+            <li>L22-45 navbar: brand, application dropdown, and nav buttons (Logs, Settings, Remove All Logs, Docs, theme toggle).</li>
+            <li>L48-70 toolbar: Reload Logs / Export Request / Replay Request buttons and the live endpoint search box.</li>
+            <li>L76-137 split workspace: left = intercepted-call list; right = stacked REQUEST and RESPONSE panes, each with Body(Monaco)/Headers tabs and collapse toggles.</li>
+            <li>L140-205 export naming modal and replay composer (method/url/headers/body/result).</li>
+            <li>L207-280 settings modal with two tabs: Web Applications (manager list) and Storage &amp; Paths (config/log dirs + migration checkbox).</li>
+            <li>L282-337 application editor modal with repeatable Backend Service and API Redirection (🔀) rows; redirections show their dedicated proxy port.</li>
+            <li>L339-341 loads <span class="file-ref">monaco-init.js</span> then <span class="file-ref">app.js</span> &mdash; order guarantees <code class="inline">window.monacoManager</code> exists before the controller boots.</li>
           </ul>
         </section>
 
         <section class="doc-section" id="f-app">
-          <h2><span class="h-num">18</span> public/js/app.js &mdash; Frontend Controller</h2>
+          <h2><span class="h-num">20</span> public/js/app.js &mdash; Frontend Controller</h2>
           <p>
-            ~880 lines of framework-free controller logic around six module-level state variables
+            994 lines of framework-free controller logic around six module-level state variables
             (<span class="file-ref">app.js:6-11</span>): <code class="inline">applications</code>,
             <code class="inline">currentAppId</code> (persisted in localStorage),
             <code class="inline">logsList</code>, <code class="inline">selectedLogId</code>,
@@ -679,29 +843,35 @@ router.use((req, res, next) =&gt; {
     }
   } catch (e) { ... }
 };</code></pre></div>
-            <p>The server broadcasts every capture to every dashboard; each tab keeps only rows belonging to its selected application, so switching apps never requires reconnecting the stream.</p>
+            <p>The server broadcasts every capture (main proxy <em>and</em> redirect proxies) to every dashboard; each tab keeps only rows belonging to its selected application, so switching apps never requires reconnecting the stream.</p>
           </div>
+
+          <h3>Settings modal &amp; storage paths</h3>
+          <ul class="bullets">
+            <li><strong>loadStorageSettings</strong> (<span class="file-ref">app.js:586-606</span>) reads <code class="inline">GET /settings</code> and shows the effective dirs (or the defaults as placeholders).</li>
+            <li><strong>openSettingsModal</strong> (<span class="file-ref">app.js:608-614</span>) renders the app manager list and defaults to the Web Applications tab. The save handler (<span class="file-ref">app.js:488-520</span>) PUTs <code class="inline">configDir/logsDir/migrateExistingConfig</code> to <code class="inline">/settings</code>.</li>
+          </ul>
 
           <h3>Application editor</h3>
           <ul class="bullets">
-            <li><strong>addBackendRow / addRedirectRow</strong> build repeatable form cards; removal triggers <strong>reindexBackendRows/reindexRedirectRows</strong> which renumber titles and move the "Primary" badge (<span class="file-ref">app.js:677-737</span>, <span class="file-ref">app.js:770-816</span>).</li>
-            <li><strong>readBackendRows/readRedirectRows</strong> harvest inputs and normalize prefixes identically to the server (<span class="file-ref">app.js:743-759</span>).</li>
-            <li><strong>save-app-config-btn</strong> validates: at least one backend, every backend needs URL + real prefix (not <code class="inline">/</code>), every redirection needs target + prefix (<span class="file-ref">app.js:620-641</span>), then PUT vs POST depending on whether an id is present.</li>
+            <li><strong>window.editApp</strong> (<span class="file-ref">app.js:676-697</span>) fills the editor from state; <strong>addBackendRow</strong> (790-830) and <strong>addRedirectRow</strong> (883-925) build repeatable form cards; removal triggers <strong>reindexBackendRows/reindexRedirectRows</strong> which renumber titles and move the "Primary" badge (835-850, 930-935).</li>
+            <li><strong>readBackendRows/readRedirectRows</strong> harvest inputs; backends normalize prefixes identically to the server, redirects carry their read-only proxy port (856-872, 941-952).</li>
+            <li><strong>save-app-config</strong> (<span class="file-ref">app.js:730-779</span>) validates: at least one backend, every backend needs URL, every redirection needs a target URL, then PUT vs POST depending on whether an id is present.</li>
           </ul>
 
           <h3>Small utilities</h3>
           <p>
             <code class="inline">openModal/closeModal</code> toggle an <code class="inline">active</code>
-            class (<span class="file-ref">app.js:841-849</span>);
+            class (<span class="file-ref">app.js:955-963</span>);
             <code class="inline">showToast</code> spawns auto-expiring (3.5 s) notifications
-            (<span class="file-ref">app.js:854-870</span>);
+            (<span class="file-ref">app.js:968-984</span>);
             <code class="inline">escapeHtml</code> guards every interpolated value against XSS
-            (<span class="file-ref">app.js:872-880</span>).
+            (<span class="file-ref">app.js:986-994</span>).
           </p>
         </section>
 
         <section class="doc-section" id="f-monaco">
-          <h2><span class="h-num">19</span> public/js/monaco-init.js &mdash; Editor Layer</h2>
+          <h2><span class="h-num">21</span> public/js/monaco-init.js &mdash; Editor Layer</h2>
           <ul class="bullets">
             <li><strong>initMonacoEditors</strong> lazy-loads the AMD loader from cdnjs (v0.45.0) once, then creates both editors (<span class="file-ref">monaco-init.js:7-33</span>).</li>
             <li><strong>createEditors</strong> clones a shared option bag (read-only, Fira Code 13px, no minimap, automaticLayout) into the request/response containers and registers the format action on each (<span class="file-ref">monaco-init.js:51-85</span>).</li>
@@ -727,12 +897,12 @@ router.use((req, res, next) =&gt; {
         </section>
 
         <section class="doc-section" id="f-css">
-          <h2><span class="h-num">20</span> public/css/styles.css &mdash; Design System</h2>
+          <h2><span class="h-num">22</span> public/css/styles.css &mdash; Design System</h2>
           <ul class="bullets">
             <li>L5 imports Inter (UI) and Fira Code (code) from Google Fonts.</li>
             <li>L7-33 <code class="inline">:root</code> holds dark values as fallback so pre-JS paint is correct.</li>
             <li>L35-66 / L68-99 define the full token sets for <code class="inline">[data-theme="dark"]</code> (Mocha) and light (Latte): backgrounds, text tiers, accent, semantic colors, shadows.</li>
-            <li>L101-107 universal reset also adds a 0.2 s transition on background/border/color, giving the whole app smooth theme-switch animation for free.</li>
+            <li>L101-108 universal reset also adds a 0.2 s transition on background/border/color, giving the whole app smooth theme-switch animation for free.</li>
             <li>The rest styles navbar, toolbar, sidebar list, detail panes, modals, forms, toasts and responsive breakpoints.</li>
           </ul>
           <div class="callout">
@@ -747,22 +917,23 @@ router.use((req, res, next) =&gt; {
              FUNCTION REFERENCE
         ============================================================ -->
         <section class="doc-section" id="sec-functions">
-          <h2><span class="h-num">21</span> Function Reference (every function, with line numbers)</h2>
+          <h2><span class="h-num">23</span> Function Reference (every function, with line numbers)</h2>
           <div class="ref-toolbar">
             <button id="expand-all-btn" type="button">Expand all</button>
             <button id="collapse-all-btn" type="button">Collapse all</button>
-            <span class="match-count" id="fn-match-count">46 functions across 11 files</span>
+            <span class="match-count" id="fn-match-count">106 functions across 12 files</span>
           </div>
 
           <details class="fn-group" open>
-            <summary>server.js <span class="fn-count">route handlers inline</span></summary>
+            <summary>server.js <span class="fn-count">4 handlers</span></summary>
             <div class="fn-body table-scroll">
               <table class="doc-table">
                 <thead><tr><th>Handler</th><th>Lines</th><th>Behavior</th></tr></thead>
                 <tbody>
-                  <tr class="fn-row"><td><code>GET /dashboard(/*)</code></td><td>23-25</td><td>sendFile index.html.</td></tr>
-                  <tr class="fn-row"><td><code>GET /</code></td><td>28-34</td><td>Redirect to /dashboard only for HTML navigations without proxy headers; otherwise next().</td></tr>
-                  <tr class="fn-row"><td><code>listen callback</code></td><td>44-50</td><td>Banner with UI + proxy URLs.</td></tr>
+                  <tr class="fn-row"><td><code>GET /dashboard(/*)</code></td><td>24-26</td><td>sendFile index.html.</td></tr>
+                  <tr class="fn-row"><td><code>GET /doc(/*)</code></td><td>29-31</td><td>sendFile doc.html.</td></tr>
+                  <tr class="fn-row"><td><code>GET /</code></td><td>34-40</td><td>Redirect to /dashboard only for HTML navigations without proxy headers; otherwise next().</td></tr>
+                  <tr class="fn-row"><td><code>listen callback</code></td><td>79-93</td><td>Banner with UI + proxy URLs + running redirect proxy list.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -774,7 +945,7 @@ router.use((req, res, next) =&gt; {
               <table class="doc-table">
                 <thead><tr><th>Function</th><th>Lines</th><th>Behavior</th></tr></thead>
                 <tbody>
-                  <tr class="fn-row"><td><code>(patch fn for util._extend)</code></td><td>9-16</td><td>Object.assign wrapper, null-safe both sides.</td></tr>
+                  <tr class="fn-row"><td><code>(patch fn for util._extend)</code></td><td>8-16</td><td>Object.assign wrapper, null-safe both sides.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -793,38 +964,60 @@ router.use((req, res, next) =&gt; {
           </details>
 
           <details class="fn-group" open>
-            <summary>src/services/configManager.js <span class="fn-count">7</span></summary>
+            <summary>src/services/settingsManager.js <span class="fn-count">9</span></summary>
             <div class="fn-body table-scroll">
               <table class="doc-table">
                 <thead><tr><th>Function</th><th>Lines</th><th>Behavior</th></tr></thead>
                 <tbody>
-                  <tr class="fn-row"><td><code>ensureConfigDir()</code></td><td>9-13</td><td>mkdir recursive when missing.</td></tr>
-                  <tr class="fn-row"><td><code>normalizePathPrefix(prefix)</code></td><td>19-29</td><td>Force leading slash, strip trailing slash, empty &rarr; '/'.</td></tr>
-                  <tr class="fn-row"><td><code>getApplications()</code></td><td>63-76</td><td>Seed-on-first-read, parse with error fallback [] .</td></tr>
-                  <tr class="fn-row"><td><code>saveApplications(apps)</code></td><td>78-81</td><td>Pretty JSON write.</td></tr>
-                  <tr class="fn-row"><td><code>getApplicationById(id)</code></td><td>83-86</td><td>find by id.</td></tr>
-                  <tr class="fn-row"><td><code>createApplication(data)</code></td><td>88-111</td><td>Defaults + uuids + normalized prefixes; push + persist.</td></tr>
-                  <tr class="fn-row"><td><code>updateApplication(id, data)</code></td><td>113-137</td><td>Spread merge, preserve id, rebuild arrays; null when absent.</td></tr>
-                  <tr class="fn-row"><td><code>deleteApplication(id)</code></td><td>139-148</td><td>filter; true only when something was removed.</td></tr>
+                  <tr class="fn-row"><td><code>readSettingsFile()</code></td><td>24-34</td><td>Parse settings.json if present ({} on error).</td></tr>
+                  <tr class="fn-row"><td><code>writeSettingsFile(s)</code></td><td>39-46</td><td>Pretty JSON write; rethrows fs errors.</td></tr>
+                  <tr class="fn-row"><td><code>getConfigDir()</code></td><td>51-63</td><td>Env &gt; settings.json &gt; root/config.</td></tr>
+                  <tr class="fn-row"><td><code>getConfigFile()</code></td><td>68-70</td><td>Path to applications.json.</td></tr>
+                  <tr class="fn-row"><td><code>getLogsDir()</code></td><td>75-89</td><td>Base + '/logs'.</td></tr>
+                  <tr class="fn-row"><td><code>getHeadersDir()</code></td><td>94-108</td><td>Base + '/headers'.</td></tr>
+                  <tr class="fn-row"><td><code>getLogsBaseDir()</code></td><td>113-125</td><td>Env &gt; settings.json &gt; project root.</td></tr>
+                  <tr class="fn-row"><td><code>getSettings()</code></td><td>130-153</td><td>Effective paths + is-default flags + defaults.</td></tr>
+                  <tr class="fn-row"><td><code>updateSettings(&#123;...&#125;)</code></td><td>159-207</td><td>Create dirs, optional config migration, persist settings.json.</td></tr>
                 </tbody>
               </table>
             </div>
           </details>
 
           <details class="fn-group" open>
-            <summary>src/services/logManager.js <span class="fn-count">7</span></summary>
+            <summary>src/services/configManager.js <span class="fn-count">10</span></summary>
             <div class="fn-body table-scroll">
               <table class="doc-table">
                 <thead><tr><th>Function</th><th>Lines</th><th>Behavior</th></tr></thead>
                 <tbody>
-                  <tr class="fn-row"><td><code>ensureDirectories()</code></td><td>7-14</td><td>Creates logs/ and headers/.</td></tr>
-                  <tr class="fn-row"><td><code>getFileExtension(contentType, body)</code></td><td>17-35</td><td>json/xml/html/js/css/txt via type substring + first-char sniff.</td></tr>
-                  <tr class="fn-row"><td><code>saveLogEntry(txn)</code></td><td>37-86</td><td>Writes 2 body files + 2 meta files; returns metas.</td></tr>
-                  <tr class="fn-row"><td><code>getAllLogs(appIdFilter)</code></td><td>88-137</td><td>Pair request+response metas, filter, sort desc.</td></tr>
-                  <tr class="fn-row"><td><code>getLogDetail(id)</code></td><td>139-172</td><td>Metas + both bodies as strings; null when unknown.</td></tr>
-                  <tr class="fn-row"><td><code>clearAllLogs()</code></td><td>174-185</td><td>Unlink all in both dirs.</td></tr>
-                  <tr class="fn-row"><td><code>getDownloadsDir()</code></td><td>189-195</td><td>~/Downloads, created if needed.</td></tr>
-                  <tr class="fn-row"><td><code>exportLog(id, customName)</code></td><td>197-220</td><td>Sanitize prefix, write pair to Downloads, return paths.</td></tr>
+                  <tr class="fn-row"><td><code>ensureConfigDir()</code></td><td>7-12</td><td>mkdir recursive when missing.</td></tr>
+                  <tr class="fn-row"><td><code>normalizePathPrefix(p)</code></td><td>18-28</td><td>Force leading slash, strip trailing slash, empty &rarr; '/'.</td></tr>
+                  <tr class="fn-row"><td><code>normalizeTargetUrl(url)</code></td><td>33-36</td><td>Trim trailing slashes + lowercase (port-dedup key).</td></tr>
+                  <tr class="fn-row"><td><code>assignRedirectPort(...)</code></td><td>59-103</td><td>Reuse matching target port, keep valid existing, else next free &ge; 4001.</td></tr>
+                  <tr class="fn-row"><td><code>getApplications()</code></td><td>137-151</td><td>Seed-on-first-read, parse with error fallback [].</td></tr>
+                  <tr class="fn-row"><td><code>saveApplications(apps)</code></td><td>153-157</td><td>Pretty JSON write.</td></tr>
+                  <tr class="fn-row"><td><code>getApplicationById(id)</code></td><td>159-162</td><td>find by id.</td></tr>
+                  <tr class="fn-row"><td><code>createApplication(data)</code></td><td>164-193</td><td>Defaults + uuids + normalized prefixes + port assignment; persist.</td></tr>
+                  <tr class="fn-row"><td><code>updateApplication(id, data)</code></td><td>195-229</td><td>Spread merge, preserve id, rebuild arrays (ports kept/assigned); null when absent.</td></tr>
+                  <tr class="fn-row"><td><code>deleteApplication(id)</code></td><td>231-240</td><td>filter; true only when something was removed.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+
+          <details class="fn-group" open>
+            <summary>src/services/logManager.js <span class="fn-count">8</span></summary>
+            <div class="fn-body table-scroll">
+              <table class="doc-table">
+                <thead><tr><th>Function</th><th>Lines</th><th>Behavior</th></tr></thead>
+                <tbody>
+                  <tr class="fn-row"><td><code>ensureDirectories()</code></td><td>6-16</td><td>Creates logs/ and headers/.</td></tr>
+                  <tr class="fn-row"><td><code>getFileExtension(contentType, body)</code></td><td>19-37</td><td>json/xml/html/js/css/txt via type substring + first-char sniff.</td></tr>
+                  <tr class="fn-row"><td><code>saveLogEntry(txn)</code></td><td>39-91</td><td>Writes 2 body files + 2 meta files; returns metas.</td></tr>
+                  <tr class="fn-row"><td><code>getAllLogs(appIdFilter)</code></td><td>93-144</td><td>Pair request+response metas, filter, sort desc.</td></tr>
+                  <tr class="fn-row"><td><code>getLogDetail(id)</code></td><td>146-182</td><td>Metas + both bodies as strings; null when unknown.</td></tr>
+                  <tr class="fn-row"><td><code>clearAllLogs()</code></td><td>184-206</td><td>Unlink all in both dirs.</td></tr>
+                  <tr class="fn-row"><td><code>getDownloadsDir()</code></td><td>208-214</td><td>~/Downloads, created if needed.</td></tr>
+                  <tr class="fn-row"><td><code>exportLog(id, customName)</code></td><td>216-239</td><td>Sanitize prefix, write pair to Downloads, return paths.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -836,12 +1029,31 @@ router.use((req, res, next) =&gt; {
               <table class="doc-table">
                 <thead><tr><th>Function</th><th>Lines</th><th>Behavior</th></tr></thead>
                 <tbody>
-                  <tr class="fn-row"><td><code>registerSseClient(res)</code></td><td>20-22</td><td>Push connection onto fan-out list.</td></tr>
-                  <tr class="fn-row"><td><code>unregisterSseClient(res)</code></td><td>24-27</td><td>Splice by identity.</td></tr>
-                  <tr class="fn-row"><td><code>broadcastLogEvent(summary)</code></td><td>29-38</td><td>Write `data: {...}` frame to all; ignore dead sockets.</td></tr>
-                  <tr class="fn-row"><td><code>on('proxyRes')</code></td><td>41-109</td><td>Buffer, log, broadcast, forward status/headers/body.</td></tr>
-                  <tr class="fn-row"><td><code>on('error')</code></td><td>111-140</td><td>FAILED capture + 502 JSON reply.</td></tr>
-                  <tr class="fn-row"><td><code>proxyMiddleware(req,res,next)</code></td><td>143-267</td><td>Buffer body &rarr; resolve path &rarr; pick target &rarr; stamp state &rarr; proxy.web.</td></tr>
+                  <tr class="fn-row"><td><code>registerSseClient(res)</code></td><td>22-24</td><td>Push connection onto fan-out list.</td></tr>
+                  <tr class="fn-row"><td><code>unregisterSseClient(res)</code></td><td>26-29</td><td>Splice by identity.</td></tr>
+                  <tr class="fn-row"><td><code>broadcastLogEvent(summary)</code></td><td>31-40</td><td>Write `data: {...}` frame to all; ignore dead sockets.</td></tr>
+                  <tr class="fn-row"><td><code>on('proxyRes')</code></td><td>43-111</td><td>Buffer, log, broadcast, forward status/headers/body.</td></tr>
+                  <tr class="fn-row"><td><code>on('error')</code></td><td>113-142</td><td>FAILED capture + 502 JSON reply.</td></tr>
+                  <tr class="fn-row"><td><code>proxyMiddleware(req,res,next)</code></td><td>145-269</td><td>Buffer body &rarr; resolve path &rarr; pick target &rarr; stamp state &rarr; proxy.web.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+
+          <details class="fn-group" open>
+            <summary>src/services/redirectProxyManager.js <span class="fn-count">8</span></summary>
+            <div class="fn-body table-scroll">
+              <table class="doc-table">
+                <thead><tr><th>Function</th><th>Lines</th><th>Behavior</th></tr></thead>
+                <tbody>
+                  <tr class="fn-row"><td><code>setSseClients(clients)</code></td><td>23-25</td><td>Adopt the shared SSE fan-out list from the main engine.</td></tr>
+                  <tr class="fn-row"><td><code>broadcastLogEvent(summary)</code></td><td>27-32</td><td>Write SSE frame to shared clients.</td></tr>
+                  <tr class="fn-row"><td><code>resolveSubscriber(subs, req)</code></td><td>37-65</td><td>Header &gt; Referer/Origin &gt; first subscriber.</td></tr>
+                  <tr class="fn-row"><td><code>startRedirectProxy(port, targetUrl, subs)</code></td><td>73-218</td><td>Express+http-proxy server; buffer, log, broadcast, forward; 502 on error.</td></tr>
+                  <tr class="fn-row"><td><code>stopRedirectProxy(port)</code></td><td>224-232</td><td>Close server, delete map entry.</td></tr>
+                  <tr class="fn-row"><td><code>normalizeTargetUrl(url)</code></td><td>237-240</td><td>Comparison key for restart detection.</td></tr>
+                  <tr class="fn-row"><td><code>syncRedirectProxies(allApps)</code></td><td>247-289</td><td>Reconcile running servers against active redirects.</td></tr>
+                  <tr class="fn-row"><td><code>getRunningRedirects()</code></td><td>294-312</td><td>Status list for API + startup banner.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -860,29 +1072,32 @@ router.use((req, res, next) =&gt; {
           </details>
 
           <details class="fn-group" open>
-            <summary>src/routes/api.js <span class="fn-count">12 handlers</span></summary>
+            <summary>src/routes/api.js <span class="fn-count">14 handlers</span></summary>
             <div class="fn-body table-scroll">
               <table class="doc-table">
                 <thead><tr><th>Handler</th><th>Lines</th><th>Behavior</th></tr></thead>
                 <tbody>
-                  <tr class="fn-row"><td><code>GET /applications</code></td><td>14-17</td><td>List.</td></tr>
-                  <tr class="fn-row"><td><code>POST /applications</code></td><td>20-27</td><td>Create; 400 on throw.</td></tr>
-                  <tr class="fn-row"><td><code>PUT /applications/:id</code></td><td>30-38</td><td>Update; 404/400 mapping.</td></tr>
-                  <tr class="fn-row"><td><code>DELETE /applications/:id</code></td><td>41-45</td><td>Delete; 404 when absent.</td></tr>
-                  <tr class="fn-row"><td><code>GET /logs</code></td><td>50-54</td><td>List with optional ?appId=.</td></tr>
-                  <tr class="fn-row"><td><code>GET /logs/:id</code></td><td>57-61</td><td>Detail incl. bodies.</td></tr>
-                  <tr class="fn-row"><td><code>DELETE /logs</code></td><td>64-71</td><td>Wipe all; 500 on fs error.</td></tr>
-                  <tr class="fn-row"><td><code>POST /logs/:id/export</code></td><td>74-86</td><td>Requires fileName; returns written paths.</td></tr>
-                  <tr class="fn-row"><td><code>POST /logs/:id/replay</code></td><td>89-103</td><td>Delegates with overrides; 500 on throw.</td></tr>
-                  <tr class="fn-row"><td><code>GET /events</code></td><td>106-116</td><td>SSE handshake + register/unregister on close.</td></tr>
-                  <tr class="fn-row"><td><code>fallback use()</code></td><td>119-121</td><td>next() so unknown paths reach the proxy.</td></tr>
+                  <tr class="fn-row"><td><code>GET /settings</code></td><td>16-22</td><td>Effective storage paths + defaults.</td></tr>
+                  <tr class="fn-row"><td><code>PUT /settings</code></td><td>25-39</td><td>Update paths, optional migration; re-sync redirect proxies.</td></tr>
+                  <tr class="fn-row"><td><code>GET /applications</code></td><td>44-47</td><td>List.</td></tr>
+                  <tr class="fn-row"><td><code>POST /applications</code></td><td>50-58</td><td>Create; 400 on throw.</td></tr>
+                  <tr class="fn-row"><td><code>PUT /applications/:id</code></td><td>61-70</td><td>Update; 404/400 mapping.</td></tr>
+                  <tr class="fn-row"><td><code>DELETE /applications/:id</code></td><td>73-78</td><td>Delete; 404 when absent.</td></tr>
+                  <tr class="fn-row"><td><code>GET /redirect-proxies</code></td><td>81-83</td><td>Running redirect server statuses.</td></tr>
+                  <tr class="fn-row"><td><code>GET /logs</code></td><td>88-92</td><td>List with optional ?appId=.</td></tr>
+                  <tr class="fn-row"><td><code>GET /logs/:id</code></td><td>95-99</td><td>Detail incl. bodies.</td></tr>
+                  <tr class="fn-row"><td><code>DELETE /logs</code></td><td>102-109</td><td>Wipe all; 500 on fs error.</td></tr>
+                  <tr class="fn-row"><td><code>POST /logs/:id/export</code></td><td>112-124</td><td>Requires fileName; returns written paths.</td></tr>
+                  <tr class="fn-row"><td><code>POST /logs/:id/replay</code></td><td>127-141</td><td>Delegates with overrides; 500 on throw.</td></tr>
+                  <tr class="fn-row"><td><code>GET /events</code></td><td>144-154</td><td>SSE handshake + register/unregister on close.</td></tr>
+                  <tr class="fn-row"><td><code>fallback use()</code></td><td>157-159</td><td>next() so unknown paths reach the proxy.</td></tr>
                 </tbody>
               </table>
             </div>
           </details>
 
           <details class="fn-group" open>
-            <summary>public/js/app.js <span class="fn-count">25</span></summary>
+            <summary>public/js/app.js <span class="fn-count">33</span></summary>
             <div class="fn-body table-scroll">
               <table class="doc-table">
                 <thead><tr><th>Function</th><th>Lines</th><th>Behavior</th></tr></thead>
@@ -897,23 +1112,29 @@ router.use((req, res, next) =&gt; {
                   <tr class="fn-row"><td><code>renderHeadersView(id, obj)</code></td><td>208-270</td><td>Rows; arrays expanded; cookies split/highlighted.</td></tr>
                   <tr class="fn-row"><td><code>clearLogDetailsView()</code></td><td>272-282</td><td>Reset selection + panes.</td></tr>
                   <tr class="fn-row"><td><code>initSseFeed()</code></td><td>285-302</td><td>EventSource wiring with app filter + auto-select.</td></tr>
-                  <tr class="fn-row"><td><code>attachEventListeners()</code></td><td>305-494</td><td>All toolbar/nav/modal/tab bindings.</td></tr>
-                  <tr class="fn-row"><td><code>togglePane(pane, btn)</code></td><td>475-493</td><td>Collapse/expand pane + relayout editors after 260 ms.</td></tr>
-                  <tr class="fn-row"><td><code>openAppManagerModal()</code></td><td>497-500</td><td>Render list then show modal.</td></tr>
-                  <tr class="fn-row"><td><code>renderAppManagerList()</code></td><td>502-555</td><td>Per-app card with backends/redirects summary + Edit/Delete.</td></tr>
-                  <tr class="fn-row"><td><code>window.editApp(id)</code></td><td>557-578</td><td>Populate editor modal from state.</td></tr>
-                  <tr class="fn-row"><td><code>window.deleteApp(id)</code></td><td>580-591</td><td>Confirm + DELETE + refresh.</td></tr>
-                  <tr class="fn-row"><td><code>add-new-app onclick</code></td><td>593-609</td><td>Blank editor with one starter backend row.</td></tr>
-                  <tr class="fn-row"><td><code>save-app-config onclick</code></td><td>611-666</td><td>Validate then POST/PUT + refresh.</td></tr>
-                  <tr class="fn-row"><td><code>addBackendRow(be)</code></td><td>677-717</td><td>Build backend form card; Primary badge for idx 0.</td></tr>
-                  <tr class="fn-row"><td><code>reindexBackendRows()</code></td><td>722-737</td><td>Renumber + relocate badge after removal.</td></tr>
-                  <tr class="fn-row"><td><code>readBackendRows()</code></td><td>743-759</td><td>Harvest + normalize prefixes.</td></tr>
-                  <tr class="fn-row"><td><code>addRedirectRow(red)</code></td><td>770-806</td><td>Build redirection form card.</td></tr>
-                  <tr class="fn-row"><td><code>reindexRedirectRows()</code></td><td>811-816</td><td>Renumber redirection titles.</td></tr>
-                  <tr class="fn-row"><td><code>readRedirectRows()</code></td><td>822-838</td><td>Harvest + normalize prefixes.</td></tr>
-                  <tr class="fn-row"><td><code>openModal / closeModal</code></td><td>841-851</td><td>Class toggle; closeModal exported globally.</td></tr>
-                  <tr class="fn-row"><td><code>showToast(msg,type)</code></td><td>854-870</td><td>Transient notification, 3500 ms lifetime.</td></tr>
-                  <tr class="fn-row"><td><code>escapeHtml(str)</code></td><td>872-880</td><td>&amp; &lt; &gt; " ' entity encoding.</td></tr>
+                  <tr class="fn-row"><td><code>attachEventListeners()</code></td><td>305-583</td><td>All toolbar/nav/modal/tab bindings (incl. nested togglePane, switchSettingsTab).</td></tr>
+                  <tr class="fn-row"><td><code>togglePane(pane, btn)</code></td><td>564-582</td><td>Collapse/expand pane + relayout editors after 260 ms.</td></tr>
+                  <tr class="fn-row"><td><code>switchSettingsTab(tab)</code></td><td>447-468</td><td>Toggle apps vs storage-paths tab; loads settings on paths tab.</td></tr>
+                  <tr class="fn-row"><td><code>loadStorageSettings()</code></td><td>586-606</td><td>GET /settings, prefill (or default placeholder) inputs.</td></tr>
+                  <tr class="fn-row"><td><code>openSettingsModal()</code></td><td>608-614</td><td>Render manager list + load settings + open modal.</td></tr>
+                  <tr class="fn-row"><td><code>openAppManagerModal()</code></td><td>616-618</td><td>Alias of openSettingsModal.</td></tr>
+                  <tr class="fn-row"><td><code>renderAppManagerList()</code></td><td>620-674</td><td>Per-app card with backends/redirects summary + Edit/Delete.</td></tr>
+                  <tr class="fn-row"><td><code>window.editApp(id)</code></td><td>676-697</td><td>Populate editor modal from state.</td></tr>
+                  <tr class="fn-row"><td><code>window.deleteApp(id)</code></td><td>699-710</td><td>Confirm + DELETE + refresh.</td></tr>
+                  <tr class="fn-row"><td><code>add-new-app onclick</code></td><td>712-728</td><td>Blank editor with one starter backend row.</td></tr>
+                  <tr class="fn-row"><td><code>save-app-config onclick</code></td><td>730-779</td><td>Validate then POST/PUT + refresh.</td></tr>
+                  <tr class="fn-row"><td><code>add-backend-btn onclick</code></td><td>782-784</td><td>Append a default backend card.</td></tr>
+                  <tr class="fn-row"><td><code>addBackendRow(be)</code></td><td>790-830</td><td>Build backend form card; Primary badge for idx 0.</td></tr>
+                  <tr class="fn-row"><td><code>reindexBackendRows()</code></td><td>835-850</td><td>Renumber + relocate badge after removal.</td></tr>
+                  <tr class="fn-row"><td><code>readBackendRows()</code></td><td>856-872</td><td>Harvest + normalize prefixes.</td></tr>
+                  <tr class="fn-row"><td><code>add-redirect-btn onclick</code></td><td>875-877</td><td>Append a default redirection card.</td></tr>
+                  <tr class="fn-row"><td><code>addRedirectRow(red)</code></td><td>883-925</td><td>Build redirection card with read-only proxy port.</td></tr>
+                  <tr class="fn-row"><td><code>reindexRedirectRows()</code></td><td>930-935</td><td>Renumber redirection titles.</td></tr>
+                  <tr class="fn-row"><td><code>readRedirectRows()</code></td><td>941-952</td><td>Harvest id/name/targetUrl + existing port.</td></tr>
+                  <tr class="fn-row"><td><code>openModal(id)</code></td><td>955-958</td><td>Adds the <code>active</code> class to show a modal overlay.</td></tr>
+                  <tr class="fn-row"><td><code>closeModal(id)</code></td><td>960-963</td><td>Removes the class; exported globally for inline <code>onclick</code> buttons.</td></tr>
+                  <tr class="fn-row"><td><code>showToast(msg,type)</code></td><td>968-984</td><td>Transient notification, 3500 ms lifetime.</td></tr>
+                  <tr class="fn-row"><td><code>escapeHtml(str)</code></td><td>986-994</td><td>&amp; &lt; &gt; " ' entity encoding.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -952,11 +1173,11 @@ router.use((req, res, next) =&gt; {
              LINE LEVEL NOTES
         ============================================================ -->
         <section class="doc-section" id="sec-lines">
-          <h2><span class="h-num">22</span> Line-Level Code Notes</h2>
-          <p>The fifteen most instructive individual lines/regions in the codebase, quoted verbatim.</p>
+          <h2><span class="h-num">24</span> Line-Level Code Notes</h2>
+          <p>The most instructive individual lines/regions in the codebase, quoted verbatim.</p>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">server.js:29-31</span><h4>Negotiating "browser navigation" vs proxied API call on the same URL</h4></div>
+            <div class="line-note-head"><span class="loc-chip">server.js:35-38</span><h4>Negotiating "browser navigation" vs proxied API call on the same URL</h4></div>
             <div class="code-block"><pre><code>const accept = req.headers['accept'] || '';
 if (accept.includes('text/html') &amp;&amp; !req.headers['x-proxy-app-id'] &amp;&amp; !req.headers['x-app-id']) {
   return res.redirect('/dashboard');
@@ -971,7 +1192,13 @@ if (accept.includes('text/html') &amp;&amp; !req.headers['x-proxy-app-id'] &amp;
           </div>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:97-99</span><h4>Dropping framing headers before re-emitting</h4></div>
+            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:16</span><h4>Cookie scope without an invalid Domain</h4></div>
+            <div class="code-block"><pre><code>cookieDomainRewrite: { '*': '' },</code></pre></div>
+            <p>Removing the <code class="inline">Domain</code> attribute makes the browser scope each cookie to <code class="inline">localhost</code>. A plain string <code class="inline">'*'</code> would emit <code class="inline">Domain=*</code>, which browsers reject as malformed &mdash; the object form maps every domain to an empty (removed) one.</p>
+          </div>
+
+          <div class="line-note">
+            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:100-102</span><h4>Dropping framing headers before re-emitting</h4></div>
             <div class="code-block"><pre><code>if (lowerKey === 'content-length' || lowerKey === 'transfer-encoding') {
   return;
 }</code></pre></div>
@@ -979,19 +1206,19 @@ if (accept.includes('text/html') &amp;&amp; !req.headers['x-proxy-app-id'] &amp;
           </div>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:181</span><h4>Four ways to pin an application</h4></div>
+            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:183</span><h4>Four ways to pin an application</h4></div>
             <div class="code-block"><pre><code>const explicitAppId = (req.params &amp;&amp; req.params.appId) || req.headers['x-proxy-app-id'] || req.headers['x-app-id'] || (req.query &amp;&amp; req.query._appId);</code></pre></div>
             <p>Route param wins, then two dedicated headers, then a query flag &mdash; covering CLI tools (query), browsers (header) and direct <code class="inline">/proxy/:appId/...</code> links alike.</p>
           </div>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:190</span><h4>Guaranteed fallback inside an app</h4></div>
+            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:192</span><h4>Guaranteed fallback inside an app</h4></div>
             <div class="code-block"><pre><code>selectedBackend = routes.find(be =&gt; (be.pathPrefix || '').trim() &amp;&amp; requestPath.startsWith(be.pathPrefix.trim())) || routes[0];</code></pre></div>
             <p>When an app is pinned explicitly, any unmatched path still routes somewhere &mdash; the first listed backend &mdash; so pinned apps behave like a classic catch-all vhost rather than 404ing.</p>
           </div>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:226-236</span><h4>Referer/Origin heuristic</h4></div>
+            <div class="line-note-head"><span class="loc-chip">proxyEngine.js:229-241</span><h4>Referer/Origin heuristic</h4></div>
             <div class="code-block"><pre><code>const referer = (req.headers['referer'] || req.headers['origin'] || '').toLowerCase();
 ...
 const cleanFront = app.frontEndUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -1000,7 +1227,7 @@ return referer.includes(cleanFront);</code></pre></div>
           </div>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">logManager.js:19</span><h4>Sniffing format when Content-Type lies (or is absent)</h4></div>
+            <div class="line-note-head"><span class="loc-chip">logManager.js:21</span><h4>Sniffing format when Content-Type lies (or is absent)</h4></div>
             <div class="code-block"><pre><code>if (contentType.includes('json') || (bodyStr &amp;&amp; bodyStr.trim().startsWith('{') || bodyStr &amp;&amp; bodyStr.trim().startsWith('['))) {
   return 'json';
 }</code></pre></div>
@@ -1008,28 +1235,51 @@ return referer.includes(cleanFront);</code></pre></div>
           </div>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">logManager.js:104</span><h4>Tolerating half-written transactions</h4></div>
+            <div class="line-note-head"><span class="loc-chip">logManager.js:111</span><h4>Tolerating half-written transactions</h4></div>
             <div class="code-block"><pre><code>let resMeta = { statusCode: 500, statusText: 'FAILED', durationMs: 0, headers: {} };</code></pre></div>
             <p>If a crash happened between writing request and response metadata, listings still render the transaction &mdash; as a red FAILED row instead of disappearing.</p>
           </div>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">configManager.js:65-67</span><h4>Seed-on-read initialization</h4></div>
-            <div class="code-block"><pre><code>if (!fs.existsSync(CONFIG_FILE)) {
+            <div class="line-note-head"><span class="loc-chip">configManager.js:140-142</span><h4>Seed-on-read initialization</h4></div>
+            <div class="code-block"><pre><code>if (!fs.existsSync(configFile)) {
   saveApplications(DEFAULT_CONFIG);
   return DEFAULT_CONFIG;
 }</code></pre></div>
-            <p>No migration script or setup step: the first reader materializes the store, which is why <span class="file-ref">server.js:42</span> calls <code class="inline">getApplications()</code> purely for its side effect at boot.</p>
+            <p>No migration script or setup step: the first reader materializes the store, which is why <span class="file-ref">server.js:50</span> calls <code class="inline">getApplications()</code> purely for its side effect at boot.</p>
           </div>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">configManager.js:121</span><h4>Immutable identity during merge</h4></div>
+            <div class="line-note-head"><span class="loc-chip">configManager.js:59-103</span><h4>One port, many subscribers</h4></div>
+            <div class="code-block"><pre><code>for (const app of allApps) {
+  for (const red of (app.redirectUrls || [])) {
+    if (currentAppId &amp;&amp; currentRedId &amp;&amp; app.id === currentAppId &amp;&amp; red.id === currentRedId) continue;
+    if (red.port &amp;&amp; normalizeTargetUrl(red.targetUrl || red.url) === normTarget) {
+      return red.port;   // share the existing port for this exact target
+    }
+  }
+}</code></pre></div>
+            <p>Two apps pointing at the same external URL get the same redirect port by construction. The request-time subscriber resolution (<span class="file-ref">redirectProxyManager.js:37-65</span>) then attributes each call to the right app's log row.</p>
+          </div>
+
+          <div class="line-note">
+            <div class="line-note-head"><span class="loc-chip">configManager.js:215-219</span><h4>Immutable identity during merge</h4></div>
             <div class="code-block"><pre><code>apps[index] = {
   ...apps[index],
   ...appData,
   id, // preserve id
   ...</code></pre></div>
             <p>Spreads run left-to-right, and the explicit <code class="inline">id</code> comes last among identifiers, so even if a client posts a different/malformed id the stored identity cannot be hijacked.</p>
+          </div>
+
+          <div class="line-note">
+            <div class="line-note-head"><span class="loc-chip">settingsManager.js:51-63</span><h4>Precedence chain for every directory</h4></div>
+            <div class="code-block"><pre><code>const envPath = process.env.PROXY_CONFIG_DIR;
+if (envPath &amp;&amp; envPath.trim()) return path.resolve(envPath.trim());
+const saved = readSettingsFile();
+if (saved.configDir &amp;&amp; saved.configDir.trim()) return path.resolve(saved.configDir.trim());
+return DEFAULT_CONFIG_DIR;</code></pre></div>
+            <p>Every path getter follows the same rule: env var first (CI / deployment), then the user's <code class="inline">settings.json</code> (dashboard), then the project default. Empty string is never stored &mdash; it means "default".</p>
           </div>
 
           <div class="line-note">
@@ -1045,7 +1295,7 @@ return referer.includes(cleanFront);</code></pre></div>
           </div>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">api.js:111-115 + proxyEngine.js:24-27</span><h4>SSE lifecycle pairing</h4></div>
+            <div class="line-note-head"><span class="loc-chip">api.js:149-153 + proxyEngine.js:22-28</span><h4>SSE lifecycle pairing</h4></div>
             <div class="code-block"><pre><code>proxyEngine.registerSseClient(res);
 
 req.on('close', () =&gt; {
@@ -1062,7 +1312,7 @@ const dotClass = isOk ? 'green' : 'red';</code></pre></div>
           </div>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">styles.css:101-107</span><h4>Free theme transition everywhere</h4></div>
+            <div class="line-note-head"><span class="loc-chip">styles.css:101-108</span><h4>Free theme transition everywhere</h4></div>
             <div class="code-block"><pre><code>* {
   box-sizing: border-box;
   margin: 0;

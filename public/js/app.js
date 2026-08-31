@@ -88,7 +88,9 @@ async function loadApplications() {
 // --- Logs Management ---
 async function loadLogsForApp(appId) {
   try {
-    const res = await fetch(`/dashboard-api/logs?appId=${appId}`);
+    const search = document.getElementById('search-input')?.value.trim();
+    const url = `/dashboard-api/logs?appId=${encodeURIComponent(appId)}${search ? `&q=${encodeURIComponent(search)}` : ''}`;
+    const res = await fetch(url);
     logsList = await res.json();
     renderLogs(logsList);
 
@@ -102,17 +104,19 @@ async function loadLogsForApp(appId) {
   }
 }
 
+let searchTimer = null;
+function onSearchInput() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    if (currentAppId) loadLogsForApp(currentAppId);
+  }, 300);
+}
+
 function renderLogs(logs) {
   const container = document.getElementById('logs-list-container');
   container.innerHTML = '';
 
-  const filterText = (document.getElementById('search-input')?.value || '').toLowerCase();
-
-  const filteredLogs = logs.filter(log => {
-    const endpoint = (log.endpoint || '').toLowerCase();
-    const method = (log.method || '').toLowerCase();
-    return endpoint.includes(filterText) || method.includes(filterText);
-  });
+  const filteredLogs = logs || [];
 
   if (filteredLogs.length === 0) {
     container.innerHTML = `
@@ -314,12 +318,16 @@ function attachEventListeners() {
     currentAppId = e.target.value;
     document.getElementById('remove-logs-btn').disabled = !currentAppId;
     localStorage.setItem('proxy_selected_app_id', currentAppId);
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+      searchInput.value = '';
+    }
     loadLogsForApp(currentAppId);
   };
 
   // Search Filter
   document.getElementById('search-input').oninput = () => {
-    renderLogs(logsList);
+    onSearchInput();
   };
 
   // Reload Logs Button

@@ -87,7 +87,8 @@ router.get('/redirect-proxies', (req, res) => {
 // Get logs list
 router.get('/logs', (req, res) => {
   const appId = req.query.appId || null;
-  const logs = logManager.getAllLogs(appId);
+  const q = req.query.q || null;
+  const logs = logManager.getAllLogs(appId, q);
   res.json(logs);
 });
 

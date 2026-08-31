@@ -684,7 +684,7 @@ function renderAppManagerList() {
           <div style="font-size:0.78rem; font-weight:600; color:var(--text-color); margin-top:6px;">Backend Services:</div>
           <ul style="margin: 2px 0 6px 4px; padding: 0; list-style: none;">${beLines || '<li style="color:var(--text-muted); font-size:0.78rem;">No backends configured</li>'}</ul>
           ${redirects.length > 0 ? `
-            <div style="font-size:0.78rem; font-weight:600; color:#eab308; margin-top:4px;">API Redirections / Forwarding:</div>
+            <div style="font-size:0.78rem; font-weight:600; color:#eab308; margin-top:4px;">External APIs:</div>
             <ul style="margin: 2px 0 0 4px; padding: 0; list-style: none;">${redLines}</ul>
           ` : ''}
         </div>

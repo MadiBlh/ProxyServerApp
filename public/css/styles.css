@@ -719,6 +719,11 @@ select.app-dropdown option {
   box-shadow: var(--shadow-lg);
 }
 
+.settings-modal-card {
+  width: 95%;
+  max-height: 92vh;
+}
+
 .modal-header {
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-color);

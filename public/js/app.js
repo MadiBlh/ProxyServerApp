@@ -672,7 +672,11 @@ function renderAppManagerList() {
             <ul style="margin: 2px 0 0 4px; padding: 0; list-style: none;">${redLines}</ul>
           ` : ''}
         </div>
-        <div style="display:flex; gap:6px; flex-shrink:0;">
+        <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-color); cursor:pointer;" title="Listen and proxy requests for this application">
+            <input type="checkbox" ${app.isActive ? 'checked' : ''} onchange="setAppActive('${app.id}', this.checked)" style="cursor:pointer;">
+            Active
+          </label>
           <button class="btn btn-primary" style="padding:5px 12px;" onclick="editApp('${app.id}')">Edit</button>
           <button class="btn btn-danger" style="padding:5px 12px;" onclick="deleteApp('${app.id}')">Delete</button>
         </div>
@@ -703,6 +707,24 @@ window.editApp = (id) => {
   redirects.forEach(red => addRedirectRow(red));
 
   openModal('edit-app-modal');
+};
+
+window.setAppActive = async (id, isActive) => {
+  try {
+    const res = await fetch(`/dashboard-api/applications/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive })
+    });
+    if (!res.ok) throw new Error((await res.json()).error || 'Failed to update');
+    await loadApplications();
+    renderAppManagerList();
+    if (currentAppId === id) loadLogsForApp(id);
+    showToast(`${isActive ? 'Activated' : 'Deactivated'} application`, isActive ? 'success' : 'info');
+  } catch (err) {
+    showToast(err.message, 'error');
+    renderAppManagerList();
+  }
 };
 
 window.deleteApp = async (id) => {

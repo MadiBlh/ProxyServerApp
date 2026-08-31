@@ -35,19 +35,19 @@
     "frontEndUrl": "http://localhost:5173",
     "backendUrls": [
       {
-        "id": "1d9bea89-f5d9-4bd7-89c4-2b39c630d316",
+        "id": "65d8cd5b-1139-44c1-8593-0c2f86020c34",
         "name": "Cookie Test Backend",
         "url": "http://localhost:9008",
         "pathPrefix": "/cookie-test"
       },
       {
-        "id": "6acb3ff1-a771-47d9-bb88-1013bd206fa2",
+        "id": "fc5eaea2-4b88-4015-b738-68eb9439c2ea",
         "name": "Backend API Service",
         "url": "http://localhost:5000",
-        "pathPrefix": "/api"
+        "pathPrefix": "/todo/api"
       },
       {
-        "id": "34814b3b-71db-4325-a766-ad87deb98e5a",
+        "id": "32352768-13fd-4ab5-bd5b-fe2c8a8a568d",
         "name": "SOAP API",
         "url": "http://localhost:9006",
         "pathPrefix": "/soap"

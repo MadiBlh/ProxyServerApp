@@ -410,9 +410,9 @@ select.app-dropdown option {
 
 /* Left Section: Calls List */
 .log-sidebar {
-  width: 440px;
-  min-width: 340px;
-  max-width: 560px;
+  width: 480px;
+  min-width: 380px;
+  max-width: 620px;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   display: flex;

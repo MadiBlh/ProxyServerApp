@@ -90,14 +90,17 @@ function saveLogEntry({ id, appId, appName, backendName, routeType, targetUrl, m
   return { id, reqMeta, resMeta };
 }
 
-function getAllLogs(appIdFilter = null) {
+function getAllLogs(appIdFilter = null, searchText = null) {
   ensureDirectories();
   const headersDir = settingsManager.getHeadersDir();
+  const logsDir = settingsManager.getLogsDir();
 
   if (!fs.existsSync(headersDir)) return [];
 
   const files = fs.readdirSync(headersDir);
   const reqHeaderFiles = files.filter(f => f.endsWith('_request.json'));
+
+  const q = searchText ? searchText.toLowerCase().trim() : '';
 
   const logEntries = [];
 
@@ -118,6 +121,12 @@ function getAllLogs(appIdFilter = null) {
         continue;
       }
 
+      const endpoint = reqMeta.endpoint || reqMeta.targetUrl || '';
+
+      if (q && !matchesSearch(q, reqMeta, resMeta, endpoint, logsDir, uuid)) {
+        continue;
+      }
+
       logEntries.push({
         id: uuid,
         appId: reqMeta.appId,
@@ -126,7 +135,7 @@ function getAllLogs(appIdFilter = null) {
         routeType: reqMeta.routeType || 'backend',
         timestamp: reqMeta.timestamp,
         method: reqMeta.method,
-        endpoint: reqMeta.endpoint,
+        endpoint,
         targetUrl: reqMeta.targetUrl,
         statusCode: resMeta.statusCode,
         status: resMeta.statusText || (resMeta.statusCode >= 200 && resMeta.statusCode < 400 ? 'OK' : 'FAILED'),
@@ -141,6 +150,29 @@ function getAllLogs(appIdFilter = null) {
 
   // Sort by timestamp descending
   return logEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}
+
+function matchesSearch(q, reqMeta, resMeta, endpoint, logsDir, uuid) {
+  if ((endpoint || '').toLowerCase().includes(q)) return true;
+  if ((reqMeta.method || '').toLowerCase().includes(q)) return true;
+
+  const reqBody = readBodyFile(logsDir, uuid, 'request', reqMeta.fileExtension);
+  if (reqBody && reqBody.toLowerCase().includes(q)) return true;
+
+  const resBody = readBodyFile(logsDir, uuid, 'response', resMeta.fileExtension);
+  if (resBody && resBody.toLowerCase().includes(q)) return true;
+
+  return false;
+}
+
+function readBodyFile(logsDir, uuid, kind, extension) {
+  try {
+    const bodyPath = path.join(logsDir, `${uuid}_${kind}.${extension || 'txt'}`);
+    if (!fs.existsSync(bodyPath)) return null;
+    return fs.readFileSync(bodyPath, 'utf8');
+  } catch (err) {
+    return null;
+  }
 }
 
 function getLogDetail(id) {

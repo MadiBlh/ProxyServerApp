@@ -12,7 +12,7 @@
       }
     ],
     "redirectUrls": [],
-    "isActive": true
+    "isActive": false
   },
   {
     "id": "app-default-2",
@@ -35,19 +35,19 @@
     "frontEndUrl": "http://localhost:5173",
     "backendUrls": [
       {
-        "id": "be-cookie-test",
+        "id": "65d8cd5b-1139-44c1-8593-0c2f86020c34",
         "name": "Cookie Test Backend",
         "url": "http://localhost:9008",
         "pathPrefix": "/cookie-test"
       },
       {
-        "id": "c06bb168-4ee1-458c-9794-cf764cfd501a",
+        "id": "fc5eaea2-4b88-4015-b738-68eb9439c2ea",
         "name": "Backend API Service",
         "url": "http://localhost:5000",
-        "pathPrefix": "/api"
+        "pathPrefix": "/todo/api"
       },
       {
-        "id": "0a372283-a95c-4328-a35d-ba1a980633ec",
+        "id": "32352768-13fd-4ab5-bd5b-fe2c8a8a568d",
         "name": "SOAP API",
         "url": "http://localhost:9006",
         "pathPrefix": "/soap"

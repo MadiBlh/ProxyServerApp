@@ -210,9 +210,7 @@ function startRedirectProxy(port, targetUrl, subscribers) {
     }
   });
 
-  server.listen(port, '0.0.0.0', () => {
-    console.log(`  Redirect proxy  "${primaryName}"  :${port}  ->  ${targetUrl}`);
-  });
+  server.listen(port, '0.0.0.0', () => {});
 
   runningProxies.set(port, { server, proxy, port, targetUrl, subscribers });
 }
@@ -224,10 +222,7 @@ function startRedirectProxy(port, targetUrl, subscribers) {
 function stopRedirectProxy(port) {
   const entry = runningProxies.get(port);
   if (!entry) return;
-  const name = entry.subscribers.map(s => s.redirect.name).join(' / ') || 'Redirect Proxy';
-  entry.server.close(() => {
-    console.log(`  Redirect proxy stopped  "${name}"  :${entry.port}`);
-  });
+  entry.server.close(() => {});
   runningProxies.delete(port);
 }
 

@@ -250,14 +250,14 @@
 |-- logs/                         Captured request/response BODIES: {uuid}_request.{ext}
 |-- headers/                      Captured METADATA: {uuid}_request.json / _response.json
 |-- public/
-|   |-- index.html                Dashboard SPA shell (navbar, split panes, settings + app editor)
+|   |-- index.html                Dashboard SPA shell (navbar, collapsible sidebar, split panes, settings + app editor)
 |   |-- doc.html                  This documentation page (served at /doc)
 |   |-- css/
-|   |   |-- styles.css            Catppuccin design system (890 lines) for the dashboard
+|   |   |-- styles.css            Catppuccin design system (922 lines) for the dashboard
 |   |   '-- doc.css               Styles for this documentation page
 |   '-- js/
-|       |-- app.js                Dashboard controller: state, fetching, SSE, modals (994 lines)
-|       |-- monaco-init.js        Monaco loading, Catppuccin themes, formatting helpers
+|       |-- app.js                Dashboard controller: state, fetching, SSE, modals, search, formatting (1049 lines)
+|       |-- monaco-init.js        Monaco loading, Catppuccin themes, 4-space tab + JSON/XML formatting helpers
 |       '-- doc.js                Interactivity for this page (scroll-spy, search, copy)
 '-- src/
     |-- routes/
@@ -297,7 +297,7 @@
             <li>Upstream responds. Because <code class="inline">selfHandleResponse: true</code> (<span class="file-ref">proxyEngine.js:10</span>), the <code class="inline">proxyRes</code> handler collects chunks, computes duration, and calls <strong>logManager.saveLogEntry</strong> which writes four files (<span class="file-ref">proxyEngine.js:53-79</span>, details in section 14).</li>
             <li>A compact summary is broadcast to every SSE subscriber (<span class="file-ref">proxyEngine.js:82-94</span>).</li>
             <li>Status code plus upstream headers are copied to the client &mdash; except <code class="inline">content-length</code> / <code class="inline">transfer-encoding</code> &mdash; and the buffered body is flushed with <code class="inline">res.end(buffer)</code> (<span class="file-ref">proxyEngine.js:96-109</span>).</li>
-            <li>The dashboard's <code class="inline">EventSource</code> receives the summary, filters by the currently selected app, and prepends it to the list (<span class="file-ref">app.js:285-302</span>). Clicking a row fetches <code class="inline">/dashboard-api/logs/:id</code> and renders bodies into the Monaco panes.</li>
+            <li>The dashboard's <code class="inline">EventSource</code> receives the summary, filters by the currently selected app, and prepends it to the list (<span class="file-ref">app.js:289-307</span>). Clicking a row fetches <code class="inline">/dashboard-api/logs/:id</code> and renders bodies into the Monaco panes.</li>
             <li>If upstream is unreachable, the <code class="inline">error</code> handler records a FAILED capture with status 502 and answers the client with a JSON error (<span class="file-ref">proxyEngine.js:113-142</span>).</li>
           </ol>
 
@@ -324,7 +324,7 @@
             <li><code class="inline">router.use(express.json())</code> parses bodies only for these administrative endpoints (<span class="file-ref">api.js:11</span>) &mdash; proxied traffic never goes through here because the proxy middleware consumes it first.</li>
             <li>All CRUD delegates to <span class="file-ref">configManager</span> / <span class="file-ref">settingsManager</span>; validation errors surface as HTTP 400, missing resources as 404.</li>
             <li>Every application create/update/delete re-runs <span class="file-ref">redirectProxyManager</span> so redirect servers mirror the stored config immediately (<span class="file-ref">api.js:53</span>).</li>
-            <li>The trailing catch-all inside the router just calls <code class="inline">next()</code> (<span class="file-ref">api.js:157-159</span>): unknown paths such as <code class="inline">/api/users</code> intentionally fall out of <code class="inline">/dashboard-api</code> and continue toward the proxy.</li>
+            <li>The trailing catch-all inside the router just calls <code class="inline">next()</code> (<span class="file-ref">api.js:163-165</span>): unknown paths such as <code class="inline">/api/users</code> intentionally fall out of <code class="inline">/dashboard-api</code> and continue toward the proxy.</li>
           </ul>
 
           <h3>Settings API</h3>
@@ -335,7 +335,7 @@
 
           <h3>SSE channel mechanics</h3>
           <ul class="bullets">
-            <li><code class="inline">GET /dashboard-api/events</code> sets the three canonical SSE headers and registers the <code class="inline">res</code> object in <code class="inline">sseClients[]</code> (<span class="file-ref">api.js:144-154</span>, <span class="file-ref">proxyEngine.js:22-24</span>).</li>
+            <li><code class="inline">GET /dashboard-api/events</code> sets the three canonical SSE headers and registers the <code class="inline">res</code> object in <code class="inline">sseClients[]</code> (<span class="file-ref">api.js:150-160</span>, <span class="file-ref">proxyEngine.js:22-24</span>).</li>
             <li>On socket close the client is removed (<span class="file-ref">proxyEngine.js:26-29</span>), preventing leaks.</li>
             <li><code class="inline">broadcastLogEvent</code> writes <code class="inline">data: &#123;JSON&#125;\n\n</code> to each subscriber, swallowing per-client write errors (<span class="file-ref">proxyEngine.js:31-40</span>).</li>
             <li><span class="file-ref">server.js:74</span> hands the same <code class="inline">sseClients</code> array to <code class="inline">redirectProxyManager</code>, so redirect-port captures appear in the same unified live feed.</li>
@@ -371,12 +371,12 @@
                 <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/applications</code></td><td><span class="file-ref">api.js:50</span></td><td>Create application (201; 400 on validation error).</td></tr>
                 <tr><td><span class="pill PUT">PUT</span></td><td class="nowrap"><code>/dashboard-api/applications/:id</code></td><td><span class="file-ref">api.js:61</span></td><td>Update application (404 if id unknown).</td></tr>
                 <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/applications/:id</code></td><td><span class="file-ref">api.js:73</span></td><td>Delete application.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs?appId=</code></td><td><span class="file-ref">api.js:88</span></td><td>List log summaries, newest first, optionally filtered by app.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs/:id</code></td><td><span class="file-ref">api.js:95</span></td><td>Full detail: both metadata objects plus request/response bodies as text.</td></tr>
-                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/logs</code></td><td><span class="file-ref">api.js:102</span></td><td>Delete every file in <code>logs/</code> and <code>headers/</code>.</td></tr>
-                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/export</code></td><td><span class="file-ref">api.js:112</span></td><td>Copy the pair into <code>~/Downloads</code> under a sanitized prefix.</td></tr>
-                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/replay</code></td><td><span class="file-ref">api.js:127</span></td><td>Execute the stored (or overridden) request; returns status, duration, headers, body.</td></tr>
-                <tr><td><span class="pill SSE">SSE</span></td><td class="nowrap"><code>/dashboard-api/events</code></td><td><span class="file-ref">api.js:144</span></td><td>Server-Sent Events stream of new capture summaries.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs?appId=&q=</code></td><td><span class="file-ref">api.js:88</span></td><td>List log summaries, newest first. Optional <code>appId</code> filters to one app; optional <code>q</code> runs a full-text search over endpoint, method, request body and response body (case-insensitive, 300 ms debounced on the client).</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs/:id</code></td><td><span class="file-ref">api.js:96</span></td><td>Full detail: both metadata objects plus request/response bodies as text.</td></tr>
+                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/logs</code></td><td><span class="file-ref">api.js:103</span></td><td>Accepts <code>&#123; appId &#125;</code> in body to clear only that app's logs; omit to delete every file in <code>logs/</code> and <code>headers/</code>.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/export</code></td><td><span class="file-ref">api.js:118</span></td><td>Copy the pair into <code>~/Downloads</code> under a sanitized prefix.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/replay</code></td><td><span class="file-ref">api.js:133</span></td><td>Execute the stored (or overridden) request; returns status, duration, headers, body.</td></tr>
+                <tr><td><span class="pill SSE">SSE</span></td><td class="nowrap"><code>/dashboard-api/events</code></td><td><span class="file-ref">api.js:150</span></td><td>Server-Sent Events stream of new capture summaries.</td></tr>
                 <tr><td><span class="pill ANY">ANY</span></td><td class="nowrap">anything else</td><td><span class="file-ref">server.js:45</span></td><td>Falls through to <code>proxyMiddleware</code>: routed by pathPrefix to a backend and fully logged.</td></tr>
               </tbody>
             </table>
@@ -453,7 +453,7 @@
           <p>
             Export sanitizes the user-supplied prefix with <code class="inline">[^a-zA-Z0-9_-] &rarr; _</code>
             (<span class="file-ref">logManager.js:222</span>) and writes two files into
-            <code class="inline">os.homedir()/Downloads</code> (<span class="file-ref">logManager.js:208-214</span>).
+            <code class="inline">os.homedir()/Downloads</code> (<span class="file-ref">logManager.js:285-291</span>).
           </p>
         </section>
 
@@ -615,19 +615,24 @@ app.use(proxyMiddleware);</code></pre></div>
               <thead><tr><th>Function</th><th>Purpose</th></tr></thead>
               <tbody>
                 <tr><td><code>saveLogEntry({...})</code></td><td>Detects extensions, writes the two body files, builds reqMeta/resMeta objects, writes the two metadata files, returns both metas (<span class="file-ref">logManager.js:39-91</span>).</td></tr>
-                <tr><td><code>getAllLogs(appId?)</code></td><td>Scans <code>*_request.json</code>, pairs each with its response meta (defaulting to FAILED/500 when absent), applies the optional appId filter, sorts newest-first (<span class="file-ref">logManager.js:93-144</span>).</td></tr>
-                <tr><td><code>getLogDetail(id)</code></td><td>Loads both metas plus both bodies as UTF-8 strings; null when the request meta is missing (<span class="file-ref">logManager.js:146-182</span>).</td></tr>
-                <tr><td><code>clearAllLogs()</code></td><td>Unlinks every file in both directories (<span class="file-ref">logManager.js:184-206</span>).</td></tr>
-                <tr><td><code>exportLog(id, name)</code></td><td>Sanitized-name copies of both bodies into ~/Downloads (<span class="file-ref">logManager.js:216-239</span>).</td></tr>
+                <tr><td><code>getAllLogs(appId?, searchText?)</code></td><td>Scans <code>*_request.json</code>, pairs each with its response meta (defaulting to FAILED/500 when absent), applies the optional appId filter, then the optional full-text query over endpoint/method/request&nbsp;body/response&nbsp;body, sorts newest-first (<span class="file-ref">logManager.js:93-153</span>).</td></tr>
+                <tr><td><code>getLogDetail(id)</code></td><td>Loads both metas plus both bodies as UTF-8 strings; null when the request meta is missing (<span class="file-ref">logManager.js:178-214</span>).</td></tr>
+                <tr><td><code>clearAllLogs()</code></td><td>Unlinks every file in both directories (<span class="file-ref">logManager.js:216-238</span>).</td></tr>
+                <tr><td><code>clearLogsForApp(appId)</code></td><td>Deletes only the header + body files whose metadata matches an appId (used by the dashboard's "Remove All Logs" button) (<span class="file-ref">logManager.js:240-283</span>).</td></tr>
+                <tr><td><code>exportLog(id, name)</code></td><td>Sanitized-name copies of both bodies into ~/Downloads (<span class="file-ref">logManager.js:293-317</span>).</td></tr>
               </tbody>
             </table>
           </div>
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">logManager.js:73-74</span><h4>OK vs FAILED classification</h4></div>
+            <div class="line-note-head"><span class="loc-chip">logManager.js:79-80</span><h4>OK vs FAILED classification</h4></div>
             <div class="code-block"><pre><code>const statusOk = statusCode &gt;= 200 &amp;&amp; statusCode &lt; 400 &amp;&amp; !error;
 ...
 statusText: statusOk ? 'OK' : 'FAILED',</code></pre></div>
             <p>The dashboard's green/red dot derives entirely from this single stored word &mdash; recomputing it from the numeric status is only a defensive fallback in <span class="file-ref">app.js</span>. Note 3xx counts as OK and any captured exception forces FAILED regardless of status.</p>
+          </div>
+          <div class="line-note">
+            <div class="line-note-head"><span class="loc-chip">logManager.js:155-176</span><h4>Full-text search across bodies</h4></div>
+            <p><code class="inline">getAllLogs</code> accepts an optional <code class="inline">searchText</code>; <code class="inline">matchesSearch</code> then case-insensitively tests the endpoint, method, request body and response body (via <code class="inline">readBodyFile</code>), so the dashboard can find text that appears anywhere inside a captured message &mdash; not just in the URL.</p>
           </div>
         </section>
 
@@ -779,7 +784,7 @@ delete cleanHeaders['accept-encoding'];</code></pre></div>
             (full table in section 7).
           </p>
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">api.js:157-159</span><h4>The intentional fallthrough</h4></div>
+            <div class="line-note-head"><span class="loc-chip">api.js:163-165</span><h4>The intentional fallthrough</h4></div>
             <div class="code-block"><pre><code>// Fallback for non-admin /api routes (e.g. /api/users, /api/v1/...) -&gt; pass to proxy
 router.use((req, res, next) =&gt; {
   next();
@@ -796,20 +801,20 @@ router.use((req, res, next) =&gt; {
           <h2><span class="h-num">19</span> public/index.html &mdash; Dashboard Shell</h2>
           <ul class="bullets">
             <li>L11-17: inline script applies the saved theme <em>before first paint</em> to avoid a flash of wrong theme (FOUC).</li>
-            <li>L22-45 navbar: brand, application dropdown, and nav buttons (Logs, Settings, Remove All Logs, Docs, theme toggle).</li>
-            <li>L48-70 toolbar: Reload Logs / Export Request / Replay Request buttons and the live endpoint search box.</li>
-            <li>L76-137 split workspace: left = intercepted-call list; right = stacked REQUEST and RESPONSE panes, each with Body(Monaco)/Headers tabs and collapse toggles.</li>
-            <li>L140-205 export naming modal and replay composer (method/url/headers/body/result).</li>
-            <li>L207-280 settings modal with two tabs: Web Applications (manager list) and Storage &amp; Paths (config/log dirs + migration checkbox).</li>
-            <li>L282-337 application editor modal with repeatable Backend Service and API Redirection (🔀) rows; redirections show their dedicated proxy port.</li>
-            <li>L339-341 loads <span class="file-ref">monaco-init.js</span> then <span class="file-ref">app.js</span> &mdash; order guarantees <code class="inline">window.monacoManager</code> exists before the controller boots.</li>
+            <li>L22-46 navbar: brand, application dropdown, and nav buttons (Logs, Settings, Docs, theme toggle).</li>
+            <li>L48-72 toolbar: Reload Logs / Export Request / Replay Request / Remove All Logs buttons and the live endpoint search box.</li>
+            <li>L78-143 split workspace: left = collapsible intercepted-call sidebar (◀ toggle); right = stacked REQUEST and RESPONSE panes, each with Body(Monaco)/Headers tabs and collapse toggles.</li>
+            <li>L144-209 export naming modal and replay composer (method/url/headers/body/result).</li>
+            <li>L214-285 settings modal with two tabs: Web Applications (manager list with inline Active checkbox) and Storage &amp; Paths (config/log dirs + migration checkbox).</li>
+            <li>L288-342 application editor modal with repeatable Backend Service and External APIs (🔀) rows; redirections show their dedicated proxy port.</li>
+            <li>L343-345 loads <span class="file-ref">monaco-init.js</span> then <span class="file-ref">app.js</span> &mdash; order guarantees <code class="inline">window.monacoManager</code> exists before the controller boots.</li>
           </ul>
         </section>
 
         <section class="doc-section" id="f-app">
           <h2><span class="h-num">20</span> public/js/app.js &mdash; Frontend Controller</h2>
           <p>
-            994 lines of framework-free controller logic around six module-level state variables
+            1049 lines of framework-free controller logic around six module-level state variables
             (<span class="file-ref">app.js:6-11</span>): <code class="inline">applications</code>,
             <code class="inline">currentAppId</code> (persisted in localStorage),
             <code class="inline">logsList</code>, <code class="inline">selectedLogId</code>,
@@ -822,14 +827,14 @@ router.use((req, res, next) =&gt; {
 
           <h3>Rendering pipeline</h3>
           <ul class="bullets">
-            <li><strong>renderLogs</strong> (<span class="file-ref">app.js:105-162</span>): filters by search text, builds each row with a green/red status dot, method badge, status code, time, duration and a backend pill (yellow style for <code class="inline">routeType === 'redirect'</code>).</li>
-            <li><strong>selectLog</strong> (<span class="file-ref">app.js:164-181</span>): marks selection, refetches detail, renders panes.</li>
-            <li><strong>renderLogDetail</strong> (<span class="file-ref">app.js:183-206</span>): updates badges/status chips and pushes bodies into Monaco via <code class="inline">setRequestBodyContent/setResponseBodyContent</code>.</li>
-            <li><strong>renderHeadersView</strong> (<span class="file-ref">app.js:208-270</span>): key/value rows; array values expand to multiple rows; string Cookie headers are split on <code class="inline">;</code> into individually highlighted rows.</li>
+            <li><strong>renderLogs</strong> (<span class="file-ref">app.js:115-166</span>): renders the server-filtered array &mdash; each row with a green/red status dot, method badge, status code, time, duration and a backend pill (yellow style for <code class="inline">routeType === 'redirect'</code>).</li>
+            <li><strong>selectLog</strong> (<span class="file-ref">app.js:168-185</span>): marks selection, refetches detail, renders panes.</li>
+            <li><strong>renderLogDetail</strong> (<span class="file-ref">app.js:187-210</span>): updates badges/status chips and pushes bodies into Monaco via <code class="inline">setRequestBodyContent/setResponseBodyContent</code>.</li>
+            <li><strong>renderHeadersView</strong> (<span class="file-ref">app.js:212-274</span>): key/value rows; array values expand to multiple rows; string Cookie headers are split on <code class="inline">;</code> into individually highlighted rows.</li>
           </ul>
 
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">app.js:285-302</span><h4>SSE ingestion with client-side filtering</h4></div>
+            <div class="line-note-head"><span class="loc-chip">app.js:289-307</span><h4>SSE ingestion with client-side filtering</h4></div>
             <div class="code-block"><pre><code>evtSource.onmessage = (event) =&gt; {
   try {
     const logSummary = JSON.parse(event.data);
@@ -848,25 +853,37 @@ router.use((req, res, next) =&gt; {
 
           <h3>Settings modal &amp; storage paths</h3>
           <ul class="bullets">
-            <li><strong>loadStorageSettings</strong> (<span class="file-ref">app.js:586-606</span>) reads <code class="inline">GET /settings</code> and shows the effective dirs (or the defaults as placeholders).</li>
-            <li><strong>openSettingsModal</strong> (<span class="file-ref">app.js:608-614</span>) renders the app manager list and defaults to the Web Applications tab. The save handler (<span class="file-ref">app.js:488-520</span>) PUTs <code class="inline">configDir/logsDir/migrateExistingConfig</code> to <code class="inline">/settings</code>.</li>
+            <li><strong>loadStorageSettings</strong> (<span class="file-ref">app.js:619-639</span>) reads <code class="inline">GET /settings</code> and shows the effective dirs (or the defaults as placeholders).</li>
+            <li><strong>openSettingsModal</strong> (<span class="file-ref">app.js:641-647</span>) renders the app manager list and defaults to the Web Applications tab. The save handler (<span class="file-ref">app.js:507-536</span>) PUTs <code class="inline">configDir/logsDir/migrateExistingConfig</code> to <code class="inline">/settings</code>.</li>
           </ul>
 
-          <h3>Application editor</h3>
+          <h3>Application manager &amp; editor</h3>
           <ul class="bullets">
-            <li><strong>window.editApp</strong> (<span class="file-ref">app.js:676-697</span>) fills the editor from state; <strong>addBackendRow</strong> (790-830) and <strong>addRedirectRow</strong> (883-925) build repeatable form cards; removal triggers <strong>reindexBackendRows/reindexRedirectRows</strong> which renumber titles and move the "Primary" badge (835-850, 930-935).</li>
-            <li><strong>readBackendRows/readRedirectRows</strong> harvest inputs; backends normalize prefixes identically to the server, redirects carry their read-only proxy port (856-872, 941-952).</li>
-            <li><strong>save-app-config</strong> (<span class="file-ref">app.js:730-779</span>) validates: at least one backend, every backend needs URL, every redirection needs a target URL, then PUT vs POST depending on whether an id is present.</li>
+            <li><strong>renderAppManagerList</strong> (<span class="file-ref">app.js:653-711</span>) draws one card per app: name + active/inactive badge, frontend URL, backend and External-API summaries, plus an inline <strong>Active</strong> checkbox alongside the <strong>Edit/Delete</strong> buttons.</li>
+            <li><strong>window.setAppActive</strong> (<span class="file-ref">app.js:736-752</span>) toggles <code class="inline">isActive</code> via a PUT and refreshes the list &mdash; no need to open the editor.</li>
+            <li><strong>window.editApp</strong> (<span class="file-ref">app.js:713-734</span>) fills the editor from state; <strong>addBackendRow</strong> (845-885) and <strong>addRedirectRow</strong> (938-980) build repeatable form cards; removal triggers <strong>reindexBackendRows/reindexRedirectRows</strong> which renumber titles and move the "Primary" badge (890-905, 985-990).</li>
+            <li><strong>readBackendRows/readRedirectRows</strong> harvest inputs; backends normalize prefixes identically to the server, redirects carry their read-only proxy port (911-927, 996-1007).</li>
+            <li><strong>save-app-config</strong> (<span class="file-ref">app.js:785-834</span>) validates: at least one backend, every backend needs URL, every redirection needs a target URL, then PUT vs POST depending on whether an id is present.</li>
           </ul>
+
+          <h3>Search</h3>
+          <p>
+            The toolbar search box now performs a <strong>server-side, debounced (300 ms) full-text query</strong>
+            (<span class="file-ref">app.js:108-113</span>) against the selected app's logs, matching the endpoint,
+            method, request body and response body (see <code class="inline">logManager.matchesSearch</code>).
+            Because bodies aren't held in the in-memory list, searching always re-fetches from
+            <code class="inline">GET /logs?appId=&amp;q=</code>; switching app clears the box so a stale term
+            can't silently filter the new app.
+          </p>
 
           <h3>Small utilities</h3>
           <p>
             <code class="inline">openModal/closeModal</code> toggle an <code class="inline">active</code>
-            class (<span class="file-ref">app.js:955-963</span>);
+            class (<span class="file-ref">app.js:1010-1018</span>);
             <code class="inline">showToast</code> spawns auto-expiring (3.5 s) notifications
-            (<span class="file-ref">app.js:968-984</span>);
+            (<span class="file-ref">app.js:1023-1039</span>);
             <code class="inline">escapeHtml</code> guards every interpolated value against XSS
-            (<span class="file-ref">app.js:986-994</span>).
+            (<span class="file-ref">app.js:1041-1049</span>).
           </p>
         </section>
 
@@ -874,14 +891,14 @@ router.use((req, res, next) =&gt; {
           <h2><span class="h-num">21</span> public/js/monaco-init.js &mdash; Editor Layer</h2>
           <ul class="bullets">
             <li><strong>initMonacoEditors</strong> lazy-loads the AMD loader from cdnjs (v0.45.0) once, then creates both editors (<span class="file-ref">monaco-init.js:7-33</span>).</li>
-            <li><strong>createEditors</strong> clones a shared option bag (read-only, Fira Code 13px, no minimap, automaticLayout) into the request/response containers and registers the format action on each (<span class="file-ref">monaco-init.js:51-85</span>).</li>
+            <li><strong>createEditors</strong> clones a shared option bag (read-only, Fira Code 13px, no minimap, automaticLayout, <strong>4-space tabs</strong>) into the request/response containers and registers the format action on each (<span class="file-ref">monaco-init.js:51-88</span>).</li>
             <li><strong>attachFormatAction</strong> binds Shift+Alt+F plus a context-menu entry (<span class="file-ref">monaco-init.js:35-49</span>).</li>
-            <li><strong>formatEditor</strong> pretty-prints JSON via parse/stringify and XML via the hand-rolled <strong>formatXml</strong> indenting algorithm (<span class="file-ref">monaco-init.js:87-123</span>, <span class="file-ref">monaco-init.js:205-234</span>).</li>
-            <li><strong>defineCatppuccinThemes</strong> declares latte/mocha token + UI colors matching the CSS palette (<span class="file-ref">monaco-init.js:125-181</span>).</li>
-            <li><strong>detectLanguage</strong> prefers the stored extension, else sniffs first characters (<span class="file-ref">monaco-init.js:191-203</span>).</li>
+            <li><strong>formatEditor</strong> pretty-prints JSON via parse/stringify (4-space indent) and XML via the token-based recursive <strong>formatXml</strong> algorithm (<span class="file-ref">monaco-init.js:90-126</span>, <span class="file-ref">monaco-init.js:208-258</span>).</li>
+            <li><strong>defineCatppuccinThemes</strong> declares latte/mocha token + UI colors matching the CSS palette (<span class="file-ref">monaco-init.js:128-184</span>).</li>
+            <li><strong>detectLanguage</strong> prefers the stored extension, else sniffs first characters (<span class="file-ref">monaco-init.js:194-206</span>).</li>
           </ul>
           <div class="line-note">
-            <div class="line-note-head"><span class="loc-chip">monaco-init.js:113-122</span><h4>Writing into a read-only editor</h4></div>
+            <div class="line-note-head"><span class="loc-chip">monaco-init.js:116-125</span><h4>Writing into a read-only editor</h4></div>
             <div class="code-block"><pre><code>if (formatted !== content) {
   const isReadOnly = editor.getOption(monaco.editor.EditorOption.readOnly);
   if (isReadOnly) {
@@ -903,6 +920,8 @@ router.use((req, res, next) =&gt; {
             <li>L7-33 <code class="inline">:root</code> holds dark values as fallback so pre-JS paint is correct.</li>
             <li>L35-66 / L68-99 define the full token sets for <code class="inline">[data-theme="dark"]</code> (Mocha) and light (Latte): backgrounds, text tiers, accent, semantic colors, shadows.</li>
             <li>L101-108 universal reset also adds a 0.2 s transition on background/border/color, giving the whole app smooth theme-switch animation for free.</li>
+            <li>L412-470 the log sidebar: 480 px wide, with a <code class="inline">.collapsed</code> 46 px rail that hides the header text/badge/list and leaves only the expand button.</li>
+            <li>L748-755 the <code class="inline">.settings-modal-card</code> grows the settings modal to <code class="inline">max-height: 92vh</code> / 95% width, apart from the 85vh default for other modals.</li>
             <li>The rest styles navbar, toolbar, sidebar list, detail panes, modals, forms, toasts and responsive breakpoints.</li>
           </ul>
           <div class="callout">
@@ -921,7 +940,7 @@ router.use((req, res, next) =&gt; {
           <div class="ref-toolbar">
             <button id="expand-all-btn" type="button">Expand all</button>
             <button id="collapse-all-btn" type="button">Collapse all</button>
-            <span class="match-count" id="fn-match-count">106 functions across 12 files</span>
+            <span class="match-count" id="fn-match-count">110 functions across 12 files</span>
           </div>
 
           <details class="fn-group" open>
@@ -1005,7 +1024,7 @@ router.use((req, res, next) =&gt; {
           </details>
 
           <details class="fn-group" open>
-            <summary>src/services/logManager.js <span class="fn-count">8</span></summary>
+            <summary>src/services/logManager.js <span class="fn-count">11</span></summary>
             <div class="fn-body table-scroll">
               <table class="doc-table">
                 <thead><tr><th>Function</th><th>Lines</th><th>Behavior</th></tr></thead>
@@ -1013,11 +1032,14 @@ router.use((req, res, next) =&gt; {
                   <tr class="fn-row"><td><code>ensureDirectories()</code></td><td>6-16</td><td>Creates logs/ and headers/.</td></tr>
                   <tr class="fn-row"><td><code>getFileExtension(contentType, body)</code></td><td>19-37</td><td>json/xml/html/js/css/txt via type substring + first-char sniff.</td></tr>
                   <tr class="fn-row"><td><code>saveLogEntry(txn)</code></td><td>39-91</td><td>Writes 2 body files + 2 meta files; returns metas.</td></tr>
-                  <tr class="fn-row"><td><code>getAllLogs(appIdFilter)</code></td><td>93-144</td><td>Pair request+response metas, filter, sort desc.</td></tr>
-                  <tr class="fn-row"><td><code>getLogDetail(id)</code></td><td>146-182</td><td>Metas + both bodies as strings; null when unknown.</td></tr>
-                  <tr class="fn-row"><td><code>clearAllLogs()</code></td><td>184-206</td><td>Unlink all in both dirs.</td></tr>
-                  <tr class="fn-row"><td><code>getDownloadsDir()</code></td><td>208-214</td><td>~/Downloads, created if needed.</td></tr>
-                  <tr class="fn-row"><td><code>exportLog(id, customName)</code></td><td>216-239</td><td>Sanitize prefix, write pair to Downloads, return paths.</td></tr>
+                  <tr class="fn-row"><td><code>getAllLogs(appId?, searchText?)</code></td><td>93-153</td><td>Pair request+response metas, filter, full-text search, sort desc.</td></tr>
+                  <tr class="fn-row"><td><code>matchesSearch(q, req, res, ...)</code></td><td>155-166</td><td>Case-insensitive substring test: endpoint, method, req body, res body.</td></tr>
+                  <tr class="fn-row"><td><code>readBodyFile(logsDir, uuid, kind, ext)</code></td><td>168-176</td><td>Read one body file; null when absent.</td></tr>
+                  <tr class="fn-row"><td><code>getLogDetail(id)</code></td><td>178-214</td><td>Metas + both bodies as strings; null when unknown.</td></tr>
+                  <tr class="fn-row"><td><code>clearAllLogs()</code></td><td>216-238</td><td>Unlink all in both dirs.</td></tr>
+                  <tr class="fn-row"><td><code>clearLogsForApp(appId)</code></td><td>240-283</td><td>Delete only that app's header + body files.</td></tr>
+                  <tr class="fn-row"><td><code>getDownloadsDir()</code></td><td>285-291</td><td>~/Downloads, created if needed.</td></tr>
+                  <tr class="fn-row"><td><code>exportLog(id, customName)</code></td><td>293-317</td><td>Sanitize prefix, write pair to Downloads, return paths.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1084,20 +1106,20 @@ router.use((req, res, next) =&gt; {
                   <tr class="fn-row"><td><code>PUT /applications/:id</code></td><td>61-70</td><td>Update; 404/400 mapping.</td></tr>
                   <tr class="fn-row"><td><code>DELETE /applications/:id</code></td><td>73-78</td><td>Delete; 404 when absent.</td></tr>
                   <tr class="fn-row"><td><code>GET /redirect-proxies</code></td><td>81-83</td><td>Running redirect server statuses.</td></tr>
-                  <tr class="fn-row"><td><code>GET /logs</code></td><td>88-92</td><td>List with optional ?appId=.</td></tr>
-                  <tr class="fn-row"><td><code>GET /logs/:id</code></td><td>95-99</td><td>Detail incl. bodies.</td></tr>
-                  <tr class="fn-row"><td><code>DELETE /logs</code></td><td>102-109</td><td>Wipe all; 500 on fs error.</td></tr>
-                  <tr class="fn-row"><td><code>POST /logs/:id/export</code></td><td>112-124</td><td>Requires fileName; returns written paths.</td></tr>
-                  <tr class="fn-row"><td><code>POST /logs/:id/replay</code></td><td>127-141</td><td>Delegates with overrides; 500 on throw.</td></tr>
-                  <tr class="fn-row"><td><code>GET /events</code></td><td>144-154</td><td>SSE handshake + register/unregister on close.</td></tr>
-                  <tr class="fn-row"><td><code>fallback use()</code></td><td>157-159</td><td>next() so unknown paths reach the proxy.</td></tr>
+                  <tr class="fn-row"><td><code>GET /logs</code></td><td>88-95</td><td>List with optional ?appId= and full-text ?q=.</td></tr>
+                  <tr class="fn-row"><td><code>GET /logs/:id</code></td><td>96-99</td><td>Detail incl. bodies.</td></tr>
+                  <tr class="fn-row"><td><code>DELETE /logs</code></td><td>103-114</td><td>Body { appId } clears that app only; empty wipes all.</td></tr>
+                  <tr class="fn-row"><td><code>POST /logs/:id/export</code></td><td>118-130</td><td>Requires fileName; returns written paths.</td></tr>
+                  <tr class="fn-row"><td><code>POST /logs/:id/replay</code></td><td>133-148</td><td>Delegates with overrides; 500 on throw.</td></tr>
+                  <tr class="fn-row"><td><code>GET /events</code></td><td>150-160</td><td>SSE handshake + register/unregister on close.</td></tr>
+                  <tr class="fn-row"><td><code>fallback use()</code></td><td>163-165</td><td>next() so unknown paths reach the proxy.</td></tr>
                 </tbody>
               </table>
             </div>
           </details>
 
           <details class="fn-group" open>
-            <summary>public/js/app.js <span class="fn-count">33</span></summary>
+            <summary>public/js/app.js <span class="fn-count">34</span></summary>
             <div class="fn-body table-scroll">
               <table class="doc-table">
                 <thead><tr><th>Function</th><th>Lines</th><th>Behavior</th></tr></thead>
@@ -1107,34 +1129,35 @@ router.use((req, res, next) =&gt; {
                   <tr class="fn-row"><td><code>loadApplications()</code></td><td>48-86</td><td>Fetch, fill dropdown, restore selection, load logs.</td></tr>
                   <tr class="fn-row"><td><code>loadLogsForApp(appId)</code></td><td>89-103</td><td>Fetch summaries, render, auto-select first or clear view.</td></tr>
                   <tr class="fn-row"><td><code>renderLogs(logs)</code></td><td>105-162</td><td>Filtered list rendering with badges/pills.</td></tr>
-                  <tr class="fn-row"><td><code>selectLog(logId)</code></td><td>164-181</td><td>Select + fetch detail + render.</td></tr>
-                  <tr class="fn-row"><td><code>renderLogDetail(detail)</code></td><td>183-206</td><td>Badges, headers views, Monaco contents.</td></tr>
-                  <tr class="fn-row"><td><code>renderHeadersView(id, obj)</code></td><td>208-270</td><td>Rows; arrays expanded; cookies split/highlighted.</td></tr>
-                  <tr class="fn-row"><td><code>clearLogDetailsView()</code></td><td>272-282</td><td>Reset selection + panes.</td></tr>
-                  <tr class="fn-row"><td><code>initSseFeed()</code></td><td>285-302</td><td>EventSource wiring with app filter + auto-select.</td></tr>
-                  <tr class="fn-row"><td><code>attachEventListeners()</code></td><td>305-583</td><td>All toolbar/nav/modal/tab bindings (incl. nested togglePane, switchSettingsTab).</td></tr>
-                  <tr class="fn-row"><td><code>togglePane(pane, btn)</code></td><td>564-582</td><td>Collapse/expand pane + relayout editors after 260 ms.</td></tr>
-                  <tr class="fn-row"><td><code>switchSettingsTab(tab)</code></td><td>447-468</td><td>Toggle apps vs storage-paths tab; loads settings on paths tab.</td></tr>
-                  <tr class="fn-row"><td><code>loadStorageSettings()</code></td><td>586-606</td><td>GET /settings, prefill (or default placeholder) inputs.</td></tr>
-                  <tr class="fn-row"><td><code>openSettingsModal()</code></td><td>608-614</td><td>Render manager list + load settings + open modal.</td></tr>
-                  <tr class="fn-row"><td><code>openAppManagerModal()</code></td><td>616-618</td><td>Alias of openSettingsModal.</td></tr>
-                  <tr class="fn-row"><td><code>renderAppManagerList()</code></td><td>620-674</td><td>Per-app card with backends/redirects summary + Edit/Delete.</td></tr>
-                  <tr class="fn-row"><td><code>window.editApp(id)</code></td><td>676-697</td><td>Populate editor modal from state.</td></tr>
-                  <tr class="fn-row"><td><code>window.deleteApp(id)</code></td><td>699-710</td><td>Confirm + DELETE + refresh.</td></tr>
-                  <tr class="fn-row"><td><code>add-new-app onclick</code></td><td>712-728</td><td>Blank editor with one starter backend row.</td></tr>
-                  <tr class="fn-row"><td><code>save-app-config onclick</code></td><td>730-779</td><td>Validate then POST/PUT + refresh.</td></tr>
-                  <tr class="fn-row"><td><code>add-backend-btn onclick</code></td><td>782-784</td><td>Append a default backend card.</td></tr>
-                  <tr class="fn-row"><td><code>addBackendRow(be)</code></td><td>790-830</td><td>Build backend form card; Primary badge for idx 0.</td></tr>
-                  <tr class="fn-row"><td><code>reindexBackendRows()</code></td><td>835-850</td><td>Renumber + relocate badge after removal.</td></tr>
-                  <tr class="fn-row"><td><code>readBackendRows()</code></td><td>856-872</td><td>Harvest + normalize prefixes.</td></tr>
-                  <tr class="fn-row"><td><code>add-redirect-btn onclick</code></td><td>875-877</td><td>Append a default redirection card.</td></tr>
-                  <tr class="fn-row"><td><code>addRedirectRow(red)</code></td><td>883-925</td><td>Build redirection card with read-only proxy port.</td></tr>
-                  <tr class="fn-row"><td><code>reindexRedirectRows()</code></td><td>930-935</td><td>Renumber redirection titles.</td></tr>
-                  <tr class="fn-row"><td><code>readRedirectRows()</code></td><td>941-952</td><td>Harvest id/name/targetUrl + existing port.</td></tr>
-                  <tr class="fn-row"><td><code>openModal(id)</code></td><td>955-958</td><td>Adds the <code>active</code> class to show a modal overlay.</td></tr>
-                  <tr class="fn-row"><td><code>closeModal(id)</code></td><td>960-963</td><td>Removes the class; exported globally for inline <code>onclick</code> buttons.</td></tr>
-                  <tr class="fn-row"><td><code>showToast(msg,type)</code></td><td>968-984</td><td>Transient notification, 3500 ms lifetime.</td></tr>
-                  <tr class="fn-row"><td><code>escapeHtml(str)</code></td><td>986-994</td><td>&amp; &lt; &gt; " ' entity encoding.</td></tr>
+                  <tr class="fn-row"><td><code>selectLog(logId)</code></td><td>168-185</td><td>Select + fetch detail + render.</td></tr>
+                  <tr class="fn-row"><td><code>renderLogDetail(detail)</code></td><td>187-210</td><td>Badges, headers views, Monaco contents.</td></tr>
+                  <tr class="fn-row"><td><code>renderHeadersView(id, obj)</code></td><td>212-274</td><td>Rows; arrays expanded; cookies split/highlighted.</td></tr>
+                  <tr class="fn-row"><td><code>clearLogDetailsView()</code></td><td>276-287</td><td>Reset selection + panes.</td></tr>
+                  <tr class="fn-row"><td><code>initSseFeed()</code></td><td>289-307</td><td>EventSource wiring with app filter + auto-select.</td></tr>
+                  <tr class="fn-row"><td><code>attachEventListeners()</code></td><td>309-395</td><td>All toolbar/nav/modal/tab bindings (incl. nested togglePane, switchSettingsTab, onSearchInput).</td></tr>
+                  <tr class="fn-row"><td><code>togglePane(pane, btn)</code></td><td>597-615</td><td>Collapse/expand pane + relayout editors after 260 ms.</td></tr>
+                  <tr class="fn-row"><td><code>switchSettingsTab(tab)</code></td><td>464-485</td><td>Toggle apps vs storage-paths tab; loads settings on paths tab.</td></tr>
+                  <tr class="fn-row"><td><code>loadStorageSettings()</code></td><td>619-639</td><td>GET /settings, prefill (or default placeholder) inputs.</td></tr>
+                  <tr class="fn-row"><td><code>openSettingsModal()</code></td><td>641-647</td><td>Render manager list + load settings + open modal.</td></tr>
+                  <tr class="fn-row"><td><code>openAppManagerModal()</code></td><td>649-651</td><td>Alias of openSettingsModal.</td></tr>
+                  <tr class="fn-row"><td><code>renderAppManagerList()</code></td><td>653-711</td><td>Per-app card with backends/redirects summary + Active checkbox + Edit/Delete.</td></tr>
+                  <tr class="fn-row"><td><code>window.editApp(id)</code></td><td>713-734</td><td>Populate editor modal from state.</td></tr>
+                  <tr class="fn-row"><td><code>window.setAppActive(id, val)</code></td><td>736-752</td><td>PUT isActive toggle + refresh list without opening editor.</td></tr>
+                  <tr class="fn-row"><td><code>window.deleteApp(id)</code></td><td>754-765</td><td>Confirm + DELETE + refresh.</td></tr>
+                  <tr class="fn-row"><td><code>add-new-app onclick</code></td><td>767-783</td><td>Blank editor with one starter backend row.</td></tr>
+                  <tr class="fn-row"><td><code>save-app-config onclick</code></td><td>785-834</td><td>Validate then POST/PUT + refresh.</td></tr>
+                  <tr class="fn-row"><td><code>add-backend-btn onclick</code></td><td>837-839</td><td>Append a default backend card.</td></tr>
+                  <tr class="fn-row"><td><code>addBackendRow(be)</code></td><td>845-885</td><td>Build backend form card; Primary badge for idx 0.</td></tr>
+                  <tr class="fn-row"><td><code>reindexBackendRows()</code></td><td>890-905</td><td>Renumber + relocate badge after removal.</td></tr>
+                  <tr class="fn-row"><td><code>readBackendRows()</code></td><td>911-927</td><td>Harvest + normalize prefixes.</td></tr>
+                  <tr class="fn-row"><td><code>add-redirect-btn onclick</code></td><td>930-932</td><td>Append a default redirection card.</td></tr>
+                  <tr class="fn-row"><td><code>addRedirectRow(red)</code></td><td>938-980</td><td>Build redirection card with read-only proxy port.</td></tr>
+                  <tr class="fn-row"><td><code>reindexRedirectRows()</code></td><td>985-990</td><td>Renumber redirection titles.</td></tr>
+                  <tr class="fn-row"><td><code>readRedirectRows()</code></td><td>996-1007</td><td>Harvest id/name/targetUrl + existing port.</td></tr>
+                  <tr class="fn-row"><td><code>openModal(id)</code></td><td>1010-1013</td><td>Adds the <code>active</code> class to show a modal overlay.</td></tr>
+                  <tr class="fn-row"><td><code>closeModal(id)</code></td><td>1015-1018</td><td>Removes the class; exported globally for inline <code>onclick</code> buttons.</td></tr>
+                  <tr class="fn-row"><td><code>showToast(msg,type)</code></td><td>1023-1039</td><td>Transient notification, 3500 ms lifetime.</td></tr>
+                  <tr class="fn-row"><td><code>escapeHtml(str)</code></td><td>1041-1049</td><td>&amp; &lt; &gt; " ' entity encoding.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1148,15 +1171,15 @@ router.use((req, res, next) =&gt; {
                 <tbody>
                   <tr class="fn-row"><td><code>initMonacoEditors(theme)</code></td><td>7-33</td><td>Promise; inject CDN loader once, then createEditors.</td></tr>
                   <tr class="fn-row"><td><code>attachFormatAction(ed)</code></td><td>35-49</td><td>Shift+Alt+F + context menu Format Document.</td></tr>
-                  <tr class="fn-row"><td><code>createEditors(theme)</code></td><td>51-85</td><td>Two read-only editors with cloned options.</td></tr>
-                  <tr class="fn-row"><td><code>formatEditor(ed)</code></td><td>87-123</td><td>Detect language, pretty-print JSON/XML.</td></tr>
-                  <tr class="fn-row"><td><code>defineCatppuccinThemes()</code></td><td>125-181</td><td>latte + mocha token/color maps.</td></tr>
-                  <tr class="fn-row"><td><code>setMonacoTheme(theme)</code></td><td>183-189</td><td>Switch global Monaco theme.</td></tr>
-                  <tr class="fn-row"><td><code>detectLanguage(content, ext)</code></td><td>191-203</td><td>Extension first, content sniff second.</td></tr>
-                  <tr class="fn-row"><td><code>formatXml(str)</code></td><td>205-234</td><td>Regex newline injection + pad-based indenter.</td></tr>
-                  <tr class="fn-row"><td><code>setRequestBodyContent(c, ext)</code></td><td>236-258</td><td>Auto-format + set language + setValue.</td></tr>
-                  <tr class="fn-row"><td><code>setResponseBodyContent(c, ext)</code></td><td>260-282</td><td>Same for response editor.</td></tr>
-                  <tr class="fn-row"><td><code>layoutEditors()</code></td><td>284-287</td><td>Manual relayout after pane animations.</td></tr>
+                  <tr class="fn-row"><td><code>createEditors(theme)</code></td><td>51-88</td><td>Two read-only editors; 4-space tabs, <code>detectIndentation:false</code>.</td></tr>
+                  <tr class="fn-row"><td><code>formatEditor(ed)</code></td><td>90-126</td><td>Detect language, pretty-print JSON (4-space) / XML.</td></tr>
+                  <tr class="fn-row"><td><code>defineCatppuccinThemes()</code></td><td>128-184</td><td>latte + mocha token/color maps.</td></tr>
+                  <tr class="fn-row"><td><code>setMonacoTheme(theme)</code></td><td>186-192</td><td>Switch global Monaco theme.</td></tr>
+                  <tr class="fn-row"><td><code>detectLanguage(content, ext)</code></td><td>194-206</td><td>Extension first, content sniff second.</td></tr>
+                  <tr class="fn-row"><td><code>formatXml(str)</code></td><td>208-258</td><td>Token-based recursive XML pretty-printer; 4-space indent.</td></tr>
+                  <tr class="fn-row"><td><code>setRequestBodyContent(c, ext)</code></td><td>260-282</td><td>Auto-format + set language + setValue.</td></tr>
+                  <tr class="fn-row"><td><code>setResponseBodyContent(c, ext)</code></td><td>284-306</td><td>Same for response editor.</td></tr>
+                  <tr class="fn-row"><td><code>layoutEditors()</code></td><td>308-311</td><td>Manual relayout after pane animations.</td></tr>
                 </tbody>
               </table>
             </div>

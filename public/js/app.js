@@ -57,6 +57,7 @@ async function loadApplications() {
       dropdown.innerHTML = '<option value="">No apps configured</option>';
       currentAppId = null;
       renderLogs([]);
+      document.getElementById('remove-logs-btn').disabled = true;
       return;
     }
 
@@ -75,10 +76,9 @@ async function loadApplications() {
       dropdown.value = currentAppId;
     }
 
-    localStorage.setItem('proxy_selected_app_id', currentAppId);
-
-    // Load logs for current app
-    await loadLogsForApp(currentAppId);
+        document.getElementById('remove-logs-btn').disabled = false;
+        localStorage.setItem('proxy_selected_app_id', currentAppId);
+        await loadLogsForApp(currentAppId);
 
   } catch (err) {
     showToast('Failed to load web applications', 'error');
@@ -312,6 +312,7 @@ function attachEventListeners() {
   // App Selector Change
   document.getElementById('app-dropdown').onchange = (e) => {
     currentAppId = e.target.value;
+    document.getElementById('remove-logs-btn').disabled = !currentAppId;
     localStorage.setItem('proxy_selected_app_id', currentAppId);
     loadLogsForApp(currentAppId);
   };
@@ -329,13 +330,21 @@ function attachEventListeners() {
 
   // Clear All Logs Button
   document.getElementById('remove-logs-btn').onclick = async () => {
-    if (confirm('Are you sure you want to remove all log files from the server?')) {
+    if (!currentAppId) {
+      showToast('Select an application first', 'error');
+      return;
+    }
+    if (confirm('Remove all logs for the selected application?')) {
       try {
-        await fetch('/dashboard-api/logs', { method: 'DELETE' });
+        await fetch('/dashboard-api/logs', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appId: currentAppId })
+        });
         logsList = [];
         renderLogs([]);
         clearLogDetailsView();
-        showToast('All logs cleared successfully', 'success');
+        showToast('Logs cleared for selected application', 'success');
       } catch (err) {
         showToast('Failed to clear logs', 'error');
       }

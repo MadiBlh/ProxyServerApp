@@ -101,6 +101,11 @@ router.get('/logs/:id', (req, res) => {
 // Clear all logs
 router.delete('/logs', (req, res) => {
   try {
+    const { appId } = req.body || {};
+    if (appId) {
+      const deleted = logManager.clearLogsForApp(appId);
+      return res.json({ success: true, appId, deleted, message: `Logs cleared for application` });
+    }
     logManager.clearAllLogs();
     res.json({ success: true, message: 'All log files removed successfully' });
   } catch (err) {

@@ -570,6 +570,22 @@ function attachEventListeners() {
     };
   }
 
+  // Collapse / Expand Sidebar
+  const sidebar = document.getElementById('log-sidebar');
+  const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+  if (toggleSidebarBtn && sidebar) {
+    toggleSidebarBtn.onclick = (e) => {
+      e.stopPropagation();
+      sidebar.classList.toggle('collapsed');
+      const icon = toggleSidebarBtn.querySelector('.collapse-icon');
+      if (sidebar.classList.contains('collapsed')) {
+        if (icon) icon.textContent = '▶';
+      } else {
+        if (icon) icon.textContent = '◀';
+      }
+    };
+  }
+
   function togglePane(pane, btn) {
     const isCollapsed = pane.classList.toggle('collapsed');
     const icon = btn.querySelector('.collapse-icon');

@@ -75,10 +75,15 @@
   <main class="main-content">
     
     <!-- FIRST SECTION (LEFT): LIST OF CALLS -->
-    <aside class="log-sidebar">
+    <aside id="log-sidebar" class="log-sidebar">
       <div class="sidebar-header">
         <span>Intercepted Calls</span>
-        <span id="log-count-badge" class="method-badge">LOGS</span>
+        <span style="display:flex; align-items:center; gap:8px;">
+          <span id="log-count-badge" class="method-badge">LOGS</span>
+          <button type="button" class="btn-collapse-pane" id="toggle-sidebar-btn" title="Collapse / Expand Sidebar">
+            <span class="collapse-icon">◀</span>
+          </button>
+        </span>
       </div>
       <ul id="logs-list-container" class="logs-list">
         <div class="empty-state">

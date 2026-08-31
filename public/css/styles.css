@@ -410,13 +410,39 @@ select.app-dropdown option {
 
 /* Left Section: Calls List */
 .log-sidebar {
-  width: 380px;
-  min-width: 320px;
-  max-width: 500px;
+  width: 440px;
+  min-width: 340px;
+  max-width: 560px;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.log-sidebar.collapsed {
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
+}
+
+.log-sidebar.collapsed .sidebar-header {
+  padding: 12px 10px;
+  justify-content: center;
+}
+
+.log-sidebar.collapsed .sidebar-header > span:first-child,
+.log-sidebar.collapsed #log-count-badge,
+.log-sidebar.collapsed .logs-list {
+  display: none !important;
+}
+
+.log-sidebar.collapsed .btn-collapse-pane {
+  margin-left: 0;
+}
+
+.log-sidebar.collapsed .collapse-icon {
+  font-size: 0.7rem;
 }
 
 .sidebar-header {

@@ -205,6 +205,51 @@ function clearAllLogs() {
   return true;
 }
 
+function clearLogsForApp(appId) {
+  if (!appId) return 0;
+
+  ensureDirectories();
+  const logsDir = settingsManager.getLogsDir();
+  const headersDir = settingsManager.getHeadersDir();
+  let deleted = 0;
+
+  for (const dir of [headersDir, logsDir]) {
+    if (!fs.existsSync(dir)) continue;
+    const fnames = fs.readdirSync(dir);
+    for (const f of fnames) {
+      let fullPath = path.join(dir, f);
+      if (!fs.statSync(fullPath).isFile()) continue;
+      if (f.endsWith('_request.json') || f.endsWith('_response.json')) {
+        try {
+          const meta = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+          if (meta.appId === appId) {
+            fs.unlinkSync(fullPath);
+            deleted++;
+          }
+        } catch {
+          // skip unparseable header
+        }
+      } else {
+        // match body files by stripping the _request/_response suffix and comparing id
+        const base = f.replace(/_(request|response)\..+$/, '');
+        if (base === f) continue;
+        const reqPath = path.join(headersDir, `${base}_request.json`);
+        try {
+          const meta = JSON.parse(fs.readFileSync(reqPath, 'utf8'));
+          if (meta.appId === appId) {
+            fs.unlinkSync(fullPath);
+            deleted++;
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+  }
+
+  return deleted;
+}
+
 function getDownloadsDir() {
   const dir = path.join(os.homedir(), 'Downloads');
   if (!fs.existsSync(dir)) {
@@ -243,5 +288,6 @@ module.exports = {
   getAllLogs,
   getLogDetail,
   clearAllLogs,
+  clearLogsForApp,
   exportLog
 };

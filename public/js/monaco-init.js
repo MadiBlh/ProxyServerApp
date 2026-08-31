@@ -64,7 +64,10 @@ function createEditors(theme) {
     scrollBeyondLastLine: false,
     fontSize: 13,
     fontFamily: "'Fira Code', monospace",
-    contextmenu: true
+    contextmenu: true,
+    insertSpaces: true,
+    tabSize: 4,
+    detectIndentation: false
   };
 
   if (reqContainer && !requestEditor) {
@@ -98,7 +101,7 @@ function formatEditor(editor) {
   if (lang === 'json') {
     try {
       const parsed = JSON.parse(content);
-      formatted = JSON.stringify(parsed, null, 2);
+      formatted = JSON.stringify(parsed, null, 4);
     } catch (e) {
       console.warn('Cannot format invalid JSON:', e);
     }
@@ -203,34 +206,55 @@ function detectLanguage(content, extension) {
 }
 
 function formatXml(xmlStr) {
-  let formatted = '';
-  let reg = /(>)(<)(\/*)/g;
-  xmlStr = xmlStr.replace(reg, '$1\r\n$2$3');
+  if (!xmlStr || typeof xmlStr !== 'string') return xmlStr;
+
   let pad = 0;
-  xmlStr.split('\r\n').forEach(function (node) {
-    let indent = 0;
-    if (node.match(/.+<\/\w[^>]*>$/)) {
-      indent = 0;
-    } else if (node.match(/^<\/\w/)) {
-      if (pad !== 0) {
-        pad -= 1;
+  const INDENT = '    ';
+  const parts = [];
+
+  xmlStr = xmlStr.replace(/^\uFEFF/, '').trim();
+
+  const tokenRe = /<!--[\s\S]*?-->|<![^>]*>|<\?[\s\S]*?\?>|<\/?[^>]*>|[^<]+/g;
+  let m;
+  while ((m = tokenRe.exec(xmlStr)) !== null) {
+    const token = m[0];
+    const trimmed = token.trim();
+
+    if (!trimmed) continue;
+
+    if (trimmed.startsWith('<!--') || trimmed.startsWith('<?') || trimmed.startsWith('<!')) {
+      parts.push(getPad(pad) + trimmed);
+      continue;
+    }
+
+    if (trimmed.startsWith('</')) {
+      pad = Math.max(pad - 1, 0);
+      parts.push(getPad(pad) + trimmed);
+      continue;
+    }
+
+    if (trimmed.startsWith('<')) {
+      const selfClosing = /\/>$/.test(trimmed);
+      parts.push(getPad(pad) + trimmed);
+      if (!selfClosing) {
+        pad += 1;
       }
-    } else if (node.match(/^<\w[^>]*[^\/]>.*$/)) {
-      indent = 1;
-    } else {
-      indent = 0;
+      continue;
     }
 
-    let padding = '';
-    for (let i = 0; i < pad; i++) {
-      padding += '  ';
+    const text = trimmed.replace(/\s+/g, ' ').trim();
+    if (text) {
+      parts.push(getPad(pad) + text);
     }
+  }
 
-    formatted += padding + node + '\r\n';
-    pad += indent;
-  });
+  return parts.join('\r\n');
 
-  return formatted.trim();
+  function getPad(n) {
+    let out = '';
+    for (let i = 0; i < n; i++) out += INDENT;
+    return out;
+  }
 }
 
 function setRequestBodyContent(content, ext = 'txt') {
@@ -241,7 +265,7 @@ function setRequestBodyContent(content, ext = 'txt') {
   if (lang === 'json' && content) {
     try {
       const parsed = JSON.parse(content);
-      formattedContent = JSON.stringify(parsed, null, 2);
+      formattedContent = JSON.stringify(parsed, null, 4);
     } catch (e) {
       formattedContent = content;
     }
@@ -265,7 +289,7 @@ function setResponseBodyContent(content, ext = 'txt') {
   if (lang === 'json' && content) {
     try {
       const parsed = JSON.parse(content);
-      formattedContent = JSON.stringify(parsed, null, 2);
+      formattedContent = JSON.stringify(parsed, null, 4);
     } catch (e) {
       formattedContent = content;
     }

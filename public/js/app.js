@@ -57,6 +57,7 @@ async function loadApplications() {
       dropdown.innerHTML = '<option value="">No apps configured</option>';
       currentAppId = null;
       renderLogs([]);
+      document.getElementById('remove-logs-btn').disabled = true;
       return;
     }
 
@@ -75,10 +76,9 @@ async function loadApplications() {
       dropdown.value = currentAppId;
     }
 
-    localStorage.setItem('proxy_selected_app_id', currentAppId);
-
-    // Load logs for current app
-    await loadLogsForApp(currentAppId);
+        document.getElementById('remove-logs-btn').disabled = false;
+        localStorage.setItem('proxy_selected_app_id', currentAppId);
+        await loadLogsForApp(currentAppId);
 
   } catch (err) {
     showToast('Failed to load web applications', 'error');
@@ -312,6 +312,7 @@ function attachEventListeners() {
   // App Selector Change
   document.getElementById('app-dropdown').onchange = (e) => {
     currentAppId = e.target.value;
+    document.getElementById('remove-logs-btn').disabled = !currentAppId;
     localStorage.setItem('proxy_selected_app_id', currentAppId);
     loadLogsForApp(currentAppId);
   };
@@ -329,13 +330,21 @@ function attachEventListeners() {
 
   // Clear All Logs Button
   document.getElementById('remove-logs-btn').onclick = async () => {
-    if (confirm('Are you sure you want to remove all log files from the server?')) {
+    if (!currentAppId) {
+      showToast('Select an application first', 'error');
+      return;
+    }
+    if (confirm('Remove all logs for the selected application?')) {
       try {
-        await fetch('/dashboard-api/logs', { method: 'DELETE' });
+        await fetch('/dashboard-api/logs', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appId: currentAppId })
+        });
         logsList = [];
         renderLogs([]);
         clearLogDetailsView();
-        showToast('All logs cleared successfully', 'success');
+        showToast('Logs cleared for selected application', 'success');
       } catch (err) {
         showToast('Failed to clear logs', 'error');
       }
@@ -561,6 +570,22 @@ function attachEventListeners() {
     };
   }
 
+  // Collapse / Expand Sidebar
+  const sidebar = document.getElementById('log-sidebar');
+  const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+  if (toggleSidebarBtn && sidebar) {
+    toggleSidebarBtn.onclick = (e) => {
+      e.stopPropagation();
+      sidebar.classList.toggle('collapsed');
+      const icon = toggleSidebarBtn.querySelector('.collapse-icon');
+      if (sidebar.classList.contains('collapsed')) {
+        if (icon) icon.textContent = '▶';
+      } else {
+        if (icon) icon.textContent = '◀';
+      }
+    };
+  }
+
   function togglePane(pane, btn) {
     const isCollapsed = pane.classList.toggle('collapsed');
     const icon = btn.querySelector('.collapse-icon');
@@ -663,7 +688,11 @@ function renderAppManagerList() {
             <ul style="margin: 2px 0 0 4px; padding: 0; list-style: none;">${redLines}</ul>
           ` : ''}
         </div>
-        <div style="display:flex; gap:6px; flex-shrink:0;">
+        <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-color); cursor:pointer;" title="Listen and proxy requests for this application">
+            <input type="checkbox" ${app.isActive ? 'checked' : ''} onchange="setAppActive('${app.id}', this.checked)" style="cursor:pointer;">
+            Active
+          </label>
           <button class="btn btn-primary" style="padding:5px 12px;" onclick="editApp('${app.id}')">Edit</button>
           <button class="btn btn-danger" style="padding:5px 12px;" onclick="deleteApp('${app.id}')">Delete</button>
         </div>
@@ -694,6 +723,24 @@ window.editApp = (id) => {
   redirects.forEach(red => addRedirectRow(red));
 
   openModal('edit-app-modal');
+};
+
+window.setAppActive = async (id, isActive) => {
+  try {
+    const res = await fetch(`/dashboard-api/applications/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive })
+    });
+    if (!res.ok) throw new Error((await res.json()).error || 'Failed to update');
+    await loadApplications();
+    renderAppManagerList();
+    if (currentAppId === id) loadLogsForApp(id);
+    showToast(`${isActive ? 'Activated' : 'Deactivated'} application`, isActive ? 'success' : 'info');
+  } catch (err) {
+    showToast(err.message, 'error');
+    renderAppManagerList();
+  }
 };
 
 window.deleteApp = async (id) => {

@@ -136,7 +136,13 @@ function renderLogs(logs) {
     const isOk = log.status === 'OK' || (log.statusCode >= 200 && log.statusCode < 400);
     const dotClass = isOk ? 'green' : 'red';
 
-    const formattedTime = new Date(log.timestamp).toLocaleTimeString();
+    const logDate = new Date(log.timestamp);
+    const formattedTime = logDate.getFullYear() + '-' +
+      String(logDate.getMonth() + 1).padStart(2, '0') + '-' +
+      String(logDate.getDate()).padStart(2, '0') + ' ' +
+      String(logDate.getHours()).padStart(2, '0') + ':' +
+      String(logDate.getMinutes()).padStart(2, '0') + ':' +
+      String(logDate.getSeconds()).padStart(2, '0');
     const isRedirect = log.routeType === 'redirect';
     const badgeStyle = isRedirect
       ? 'background:rgba(234, 179, 8, 0.15); color:#eab308; border: 1px solid rgba(234, 179, 8, 0.3);'

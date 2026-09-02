@@ -8,6 +8,8 @@ let currentAppId = localStorage.getItem('proxy_selected_app_id') || null;
 let logsList = [];
 let selectedLogId = null;
 let selectedLogDetail = null;
+let selectedIds = new Set();
+let selectMode = false;
 let currentTheme = localStorage.getItem('proxy_theme') || 'dark';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -88,8 +90,17 @@ async function loadApplications() {
 // --- Logs Management ---
 async function loadLogsForApp(appId) {
   try {
-    const search = document.getElementById('search-input')?.value.trim();
-    const url = `/dashboard-api/logs?appId=${encodeURIComponent(appId)}${search ? `&q=${encodeURIComponent(search)}` : ''}`;
+    selectedIds.clear();
+    if (selectMode) {
+      selectMode = false;
+    }
+    updateSelectionUi();
+    const endpointSearch = document.getElementById('search-input')?.value.trim();
+    const bodySearch = document.getElementById('advanced-search-input')?.value.trim();
+    const params = new URLSearchParams({ appId });
+    if (endpointSearch) params.set('endpoint', endpointSearch);
+    if (bodySearch) params.set('body', bodySearch);
+    const url = `/dashboard-api/logs?${params.toString()}`;
     const res = await fetch(url);
     logsList = await res.json();
     renderLogs(logsList);
@@ -112,6 +123,79 @@ function onSearchInput() {
   }, 300);
 }
 
+// --- Multi-selection helpers ---
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  if (!selectMode) {
+    selectedIds.clear();
+  }
+  updateSelectionUi();
+  renderLogs(logsList);
+}
+
+function toggleLogSelection(logId) {
+  if (selectedIds.has(logId)) {
+    selectedIds.delete(logId);
+  } else {
+    selectedIds.add(logId);
+  }
+  updateSelectionToolbar();
+}
+
+function clearLogSelection() {
+  selectedIds.clear();
+  updateSelectionToolbar();
+  renderLogs(logsList);
+}
+
+function updateSelectionUi() {
+  const toolbar = document.getElementById('selection-toolbar');
+  const selectBtn = document.getElementById('select-logs-btn');
+  if (!toolbar) return;
+
+  toolbar.style.display = selectMode ? 'flex' : 'none';
+  if (selectBtn) {
+    selectBtn.classList.toggle('active', selectMode);
+  }
+  updateSelectionToolbar();
+}
+
+function updateSelectionToolbar() {
+  const toolbar = document.getElementById('selection-toolbar');
+  const countEl = document.getElementById('selection-count');
+  if (!toolbar || !countEl) return;
+
+  const count = selectedIds.size;
+  countEl.textContent = `${count} selected`;
+}
+
+async function removeSelectedLogs() {
+  if (selectedIds.size === 0) return;
+  if (!confirm(`Remove ${selectedIds.size} selected log(s)?`)) return;
+
+  const ids = Array.from(selectedIds);
+  try {
+    const res = await fetch('/dashboard-api/logs', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to remove logs');
+
+    selectedIds.clear();
+    updateSelectionToolbar();
+    renderLogs(logsList.filter(log => !ids.includes(log.id)));
+    if (ids.includes(selectedLogId)) {
+      selectedLogId = null;
+      clearLogDetailsView();
+    }
+    showToast(data.message || 'Logs removed', 'success');
+  } catch (err) {
+    showToast(err.message || 'Failed to remove logs', 'error');
+  }
+}
+
 function renderLogs(logs) {
   const container = document.getElementById('logs-list-container');
   container.innerHTML = '';
@@ -130,13 +214,20 @@ function renderLogs(logs) {
 
   filteredLogs.forEach(log => {
     const li = document.createElement('li');
+    const isSelected = selectedIds.has(log.id);
     li.className = `log-item ${log.id === selectedLogId ? 'active' : ''}`;
     li.onclick = () => selectLog(log.id);
 
     const isOk = log.status === 'OK' || (log.statusCode >= 200 && log.statusCode < 400);
     const dotClass = isOk ? 'green' : 'red';
 
-    const formattedTime = new Date(log.timestamp).toLocaleTimeString();
+    const logDate = new Date(log.timestamp);
+    const formattedTime = logDate.getFullYear() + '-' +
+      String(logDate.getMonth() + 1).padStart(2, '0') + '-' +
+      String(logDate.getDate()).padStart(2, '0') + ' ' +
+      String(logDate.getHours()).padStart(2, '0') + ':' +
+      String(logDate.getMinutes()).padStart(2, '0') + ':' +
+      String(logDate.getSeconds()).padStart(2, '0');
     const isRedirect = log.routeType === 'redirect';
     const badgeStyle = isRedirect
       ? 'background:rgba(234, 179, 8, 0.15); color:#eab308; border: 1px solid rgba(234, 179, 8, 0.3);'
@@ -161,6 +252,22 @@ function renderLogs(logs) {
         </div>
       </div>
     `;
+
+    if (selectMode) {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'log-select-checkbox';
+      checkbox.checked = isSelected;
+      checkbox.onclick = (e) => {
+        e.stopPropagation();
+        toggleLogSelection(log.id);
+      };
+      if (isSelected) {
+        li.classList.add('selected');
+      }
+      li.prepend(checkbox);
+    }
+
     container.appendChild(li);
   });
 }
@@ -322,11 +429,18 @@ function attachEventListeners() {
     if (searchInput) {
       searchInput.value = '';
     }
+    const advancedSearchInput = document.getElementById('advanced-search-input');
+    if (advancedSearchInput) {
+      advancedSearchInput.value = '';
+    }
     loadLogsForApp(currentAppId);
   };
 
   // Search Filter
   document.getElementById('search-input').oninput = () => {
+    onSearchInput();
+  };
+  document.getElementById('advanced-search-input').oninput = () => {
     onSearchInput();
   };
 
@@ -336,7 +450,7 @@ function attachEventListeners() {
     showToast('Logs reloaded', 'success');
   };
 
-  // Clear All Logs Button
+  // Clear All Logs for selected app
   document.getElementById('remove-logs-btn').onclick = async () => {
     if (!currentAppId) {
       showToast('Select an application first', 'error');
@@ -350,6 +464,8 @@ function attachEventListeners() {
           body: JSON.stringify({ appId: currentAppId })
         });
         logsList = [];
+        selectedIds.clear();
+        updateSelectionToolbar();
         renderLogs([]);
         clearLogDetailsView();
         showToast('Logs cleared for selected application', 'success');
@@ -357,6 +473,26 @@ function attachEventListeners() {
         showToast('Failed to clear logs', 'error');
       }
     }
+  };
+
+  // Toggle select mode (show/hide checkboxes)
+  document.getElementById('select-logs-btn').onclick = () => {
+    toggleSelectMode();
+  };
+
+  // Exit select mode
+  document.getElementById('done-selection-btn').onclick = () => {
+    if (selectMode) toggleSelectMode();
+  };
+
+  // Remove selected logs (multi-select)
+  document.getElementById('remove-selected-logs-btn').onclick = () => {
+    removeSelectedLogs();
+  };
+
+  // Clear selection
+  document.getElementById('clear-selection-btn').onclick = () => {
+    clearLogSelection();
   };
 
   // Export Request Button

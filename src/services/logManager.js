@@ -90,7 +90,7 @@ function saveLogEntry({ id, appId, appName, backendName, routeType, targetUrl, m
   return { id, reqMeta, resMeta };
 }
 
-function getAllLogs(appIdFilter = null, searchText = null) {
+function getAllLogs(appIdFilter = null, searchText = null, options = {}) {
   ensureDirectories();
   const headersDir = settingsManager.getHeadersDir();
   const logsDir = settingsManager.getLogsDir();
@@ -100,7 +100,8 @@ function getAllLogs(appIdFilter = null, searchText = null) {
   const files = fs.readdirSync(headersDir);
   const reqHeaderFiles = files.filter(f => f.endsWith('_request.json'));
 
-  const q = searchText ? searchText.toLowerCase().trim() : '';
+  const endpointSearch = (options.endpoint || '').toLowerCase().trim();
+  const bodySearch = (options.body || searchText || '').toLowerCase().trim();
 
   const logEntries = [];
 
@@ -123,8 +124,10 @@ function getAllLogs(appIdFilter = null, searchText = null) {
 
       const endpoint = reqMeta.endpoint || reqMeta.targetUrl || '';
 
-      if (q && !matchesSearch(q, reqMeta, resMeta, endpoint, logsDir, uuid)) {
-        continue;
+      if (endpointSearch || bodySearch) {
+        if (!matchesSearch(endpointSearch, bodySearch, reqMeta, resMeta, endpoint, logsDir, uuid)) {
+          continue;
+        }
       }
 
       logEntries.push({
@@ -152,17 +155,24 @@ function getAllLogs(appIdFilter = null, searchText = null) {
   return logEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 }
 
-function matchesSearch(q, reqMeta, resMeta, endpoint, logsDir, uuid) {
-  if ((endpoint || '').toLowerCase().includes(q)) return true;
-  if ((reqMeta.method || '').toLowerCase().includes(q)) return true;
+function matchesSearch(endpointSearch, bodySearch, reqMeta, resMeta, endpoint, logsDir, uuid) {
+  if (endpointSearch) {
+    if (!(endpoint || '').toLowerCase().includes(endpointSearch)) {
+      return false;
+    }
+  }
 
-  const reqBody = readBodyFile(logsDir, uuid, 'request', reqMeta.fileExtension);
-  if (reqBody && reqBody.toLowerCase().includes(q)) return true;
+  if (bodySearch) {
+    const reqBody = readBodyFile(logsDir, uuid, 'request', reqMeta.fileExtension);
+    const resBody = readBodyFile(logsDir, uuid, 'response', resMeta.fileExtension);
+    const bodyMatch = (reqBody && reqBody.toLowerCase().includes(bodySearch)) ||
+                      (resBody && resBody.toLowerCase().includes(bodySearch));
+    if (!bodyMatch) {
+      return false;
+    }
+  }
 
-  const resBody = readBodyFile(logsDir, uuid, 'response', resMeta.fileExtension);
-  if (resBody && resBody.toLowerCase().includes(q)) return true;
-
-  return false;
+  return true;
 }
 
 function readBodyFile(logsDir, uuid, kind, extension) {
@@ -282,6 +292,44 @@ function clearLogsForApp(appId) {
   return deleted;
 }
 
+function deleteLogsByIds(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return 0;
+
+  ensureDirectories();
+  const logsDir = settingsManager.getLogsDir();
+  const headersDir = settingsManager.getHeadersDir();
+  const idSet = new Set(ids);
+  let deleted = 0;
+
+  for (const dir of [headersDir, logsDir]) {
+    if (!fs.existsSync(dir)) continue;
+    const fnames = fs.readdirSync(dir);
+    for (const f of fnames) {
+      let fullPath = path.join(dir, f);
+      if (!fs.statSync(fullPath).isFile()) continue;
+
+      let baseId = null;
+      if (f.endsWith('_request.json') || f.endsWith('_response.json')) {
+        baseId = f.replace(/_(request|response)\.json$/, '');
+      } else {
+        const m = f.match(/^(.*?)_(request|response)\..+$/);
+        if (m) baseId = m[1];
+      }
+
+      if (baseId && idSet.has(baseId)) {
+        try {
+          fs.unlinkSync(fullPath);
+          deleted++;
+        } catch (err) {
+          console.error(`Failed to delete ${fullPath}:`, err.message);
+        }
+      }
+    }
+  }
+
+  return deleted;
+}
+
 function getDownloadsDir() {
   const dir = path.join(os.homedir(), 'Downloads');
   if (!fs.existsSync(dir)) {
@@ -321,5 +369,6 @@ module.exports = {
   getLogDetail,
   clearAllLogs,
   clearLogsForApp,
+  deleteLogsByIds,
   exportLog
 };

@@ -88,7 +88,10 @@ router.get('/redirect-proxies', (req, res) => {
 router.get('/logs', (req, res) => {
   const appId = req.query.appId || null;
   const q = req.query.q || null;
-  const logs = logManager.getAllLogs(appId, q);
+  const logs = logManager.getAllLogs(appId, q, {
+    endpoint: req.query.endpoint || '',
+    body: req.query.body || ''
+  });
   res.json(logs);
 });
 
@@ -99,16 +102,33 @@ router.get('/logs/:id', (req, res) => {
   res.json(detail);
 });
 
-// Clear all logs
+// Clear all logs, logs for an app, or specific log IDs
 router.delete('/logs', (req, res) => {
   try {
-    const { appId } = req.body || {};
+    const { appId, ids } = req.body || {};
+
+    if (Array.isArray(ids) && ids.length > 0) {
+      const deleted = logManager.deleteLogsByIds(ids);
+      return res.json({ success: true, deleted, message: `${deleted} log(s) removed` });
+    }
+
     if (appId) {
       const deleted = logManager.clearLogsForApp(appId);
       return res.json({ success: true, appId, deleted, message: `Logs cleared for application` });
     }
     logManager.clearAllLogs();
     res.json({ success: true, message: 'All log files removed successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete a single log by id
+router.delete('/logs/:id', (req, res) => {
+  try {
+    const deleted = logManager.deleteLogsByIds([req.params.id]);
+    if (deleted === 0) return res.status(404).json({ error: 'Log not found' });
+    res.json({ success: true, deleted, message: 'Log removed' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

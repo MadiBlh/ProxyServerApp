@@ -88,8 +88,12 @@ async function loadApplications() {
 // --- Logs Management ---
 async function loadLogsForApp(appId) {
   try {
-    const search = document.getElementById('search-input')?.value.trim();
-    const url = `/dashboard-api/logs?appId=${encodeURIComponent(appId)}${search ? `&q=${encodeURIComponent(search)}` : ''}`;
+    const endpointSearch = document.getElementById('search-input')?.value.trim();
+    const bodySearch = document.getElementById('advanced-search-input')?.value.trim();
+    const params = new URLSearchParams({ appId });
+    if (endpointSearch) params.set('endpoint', endpointSearch);
+    if (bodySearch) params.set('body', bodySearch);
+    const url = `/dashboard-api/logs?${params.toString()}`;
     const res = await fetch(url);
     logsList = await res.json();
     renderLogs(logsList);
@@ -328,11 +332,18 @@ function attachEventListeners() {
     if (searchInput) {
       searchInput.value = '';
     }
+    const advancedSearchInput = document.getElementById('advanced-search-input');
+    if (advancedSearchInput) {
+      advancedSearchInput.value = '';
+    }
     loadLogsForApp(currentAppId);
   };
 
   // Search Filter
   document.getElementById('search-input').oninput = () => {
+    onSearchInput();
+  };
+  document.getElementById('advanced-search-input').oninput = () => {
     onSearchInput();
   };
 

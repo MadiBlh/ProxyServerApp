@@ -370,7 +370,7 @@ select.app-dropdown option {
 .search-box {
   position: relative;
   flex: 1;
-  max-width: 380px;
+  max-width: 300px;
 }
 
 .search-input {

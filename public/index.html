@@ -60,8 +60,8 @@
         Replay Request
       </button>
 
-      <!-- Remove all logs -->
-      <button id="remove-logs-btn" class="btn btn-danger">Remove All Logs</button>
+      <!-- Remove all logs for selected app -->
+      <button id="remove-logs-btn" class="btn btn-danger">Remove App Logs</button>
     </div>
 
     <!-- Search fields -->
@@ -83,11 +83,20 @@
       <div class="sidebar-header">
         <span>Intercepted Calls</span>
         <span style="display:flex; align-items:center; gap:8px;">
+          <button id="select-logs-btn" class="btn btn-sm" title="Select multiple logs">Select</button>
           <span id="log-count-badge" class="method-badge">LOGS</span>
           <button type="button" class="btn-collapse-pane" id="toggle-sidebar-btn" title="Collapse / Expand Sidebar">
             <span class="collapse-icon">◀</span>
           </button>
         </span>
+      </div>
+      <div id="selection-toolbar" class="selection-toolbar" style="display:none;">
+        <span id="selection-count" class="selection-count">0 selected</span>
+        <div style="display:flex; gap:8px;">
+          <button id="remove-selected-logs-btn" class="btn btn-danger btn-sm">Remove selected logs</button>
+          <button id="clear-selection-btn" class="btn btn-sm">Clear</button>
+          <button id="done-selection-btn" class="btn btn-sm">Done</button>
+        </div>
       </div>
       <ul id="logs-list-container" class="logs-list">
         <div class="empty-state">

@@ -292,6 +292,44 @@ function clearLogsForApp(appId) {
   return deleted;
 }
 
+function deleteLogsByIds(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return 0;
+
+  ensureDirectories();
+  const logsDir = settingsManager.getLogsDir();
+  const headersDir = settingsManager.getHeadersDir();
+  const idSet = new Set(ids);
+  let deleted = 0;
+
+  for (const dir of [headersDir, logsDir]) {
+    if (!fs.existsSync(dir)) continue;
+    const fnames = fs.readdirSync(dir);
+    for (const f of fnames) {
+      let fullPath = path.join(dir, f);
+      if (!fs.statSync(fullPath).isFile()) continue;
+
+      let baseId = null;
+      if (f.endsWith('_request.json') || f.endsWith('_response.json')) {
+        baseId = f.replace(/_(request|response)\.json$/, '');
+      } else {
+        const m = f.match(/^(.*?)_(request|response)\..+$/);
+        if (m) baseId = m[1];
+      }
+
+      if (baseId && idSet.has(baseId)) {
+        try {
+          fs.unlinkSync(fullPath);
+          deleted++;
+        } catch (err) {
+          console.error(`Failed to delete ${fullPath}:`, err.message);
+        }
+      }
+    }
+  }
+
+  return deleted;
+}
+
 function getDownloadsDir() {
   const dir = path.join(os.homedir(), 'Downloads');
   if (!fs.existsSync(dir)) {
@@ -331,5 +369,6 @@ module.exports = {
   getLogDetail,
   clearAllLogs,
   clearLogsForApp,
+  deleteLogsByIds,
   exportLog
 };

@@ -433,6 +433,8 @@ select.app-dropdown option {
 
 .log-sidebar.collapsed .sidebar-header > span:first-child,
 .log-sidebar.collapsed #log-count-badge,
+.log-sidebar.collapsed #select-logs-btn,
+.log-sidebar.collapsed .selection-toolbar,
 .log-sidebar.collapsed .logs-list {
   display: none !important;
 }
@@ -455,6 +457,23 @@ select.app-dropdown option {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-hover);
+  flex-wrap: wrap;
+}
+
+.selection-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-color);
+  margin-right: auto;
 }
 
 .logs-list {
@@ -480,6 +499,10 @@ select.app-dropdown option {
 .log-item.active {
   background: var(--accent-light);
   border-left: 4px solid var(--accent-color);
+}
+
+.log-item.selected {
+  background: var(--accent-light);
 }
 
 /* Dot status indicator */
@@ -522,6 +545,25 @@ select.app-dropdown option {
   margin-top: 4px;
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.log-select-checkbox {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent-color);
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+}
+
+.btn-sm.active {
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  border-color: var(--accent-color);
 }
 
 .method-badge {

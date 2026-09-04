@@ -2,6 +2,90 @@
    PROXY SERVER LOG - MAIN FRONTEND APPLICATION CONTROLLER
    ========================================================================== */
 
+// --- Loading State Manager ---
+const LoadingManager = {
+  _requestCount: 0,
+  _globalBar: null,
+
+  /** Increment in-flight request count and show global loading bar */
+  start() {
+    this._requestCount++;
+    this._showGlobalBar();
+  },
+
+  /** Decrement in-flight request count; hide bar when all complete */
+  end() {
+    this._requestCount = Math.max(0, this._requestCount - 1);
+    if (this._requestCount === 0) {
+      this._hideGlobalBar();
+    }
+  },
+
+  _showGlobalBar() {
+    if (!this._globalBar) {
+      this._globalBar = document.getElementById('global-loading-bar');
+    }
+    if (this._globalBar) {
+      this._globalBar.classList.add('visible');
+    }
+  },
+
+  _hideGlobalBar() {
+    if (this._globalBar) {
+      this._globalBar.classList.remove('visible');
+    }
+  },
+
+  /** Show a section-level loading overlay by element ID */
+  showSection(sectionId) {
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('visible');
+  },
+
+  /** Hide a section-level loading overlay by element ID */
+  hideSection(sectionId) {
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.remove('visible');
+  },
+
+  /** Put a button into loading state (add spinner, disable) */
+  setButtonLoading(btn, loading) {
+    if (!btn) return;
+    if (loading) {
+      btn.classList.add('loading');
+      btn.disabled = true;
+      // Preserve original text, insert spinner before it
+      if (!btn.querySelector('.btn-spinner')) {
+        const spinner = document.createElement('span');
+        spinner.className = 'btn-spinner';
+        btn.insertBefore(spinner, btn.firstChild);
+      }
+    } else {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      const spinner = btn.querySelector('.btn-spinner');
+      if (spinner) spinner.remove();
+    }
+  }
+};
+
+/**
+ * Tracked fetch wrapper that manages the global loading indicator
+ * and handles error toasts automatically.
+ */
+async function trackedFetch(url, options = {}) {
+  LoadingManager.start();
+  try {
+    const res = await fetch(url, options);
+    return res;
+  } catch (err) {
+    showToast('Network request failed', 'error');
+    throw err;
+  } finally {
+    LoadingManager.end();
+  }
+}
+
 // --- Module-level state (accessible by all functions) ---
 let applications = [];
 let currentAppId = localStorage.getItem('proxy_selected_app_id') || null;
@@ -49,7 +133,8 @@ function applyTheme(theme) {
 // --- Applications API Management ---
 async function loadApplications() {
   try {
-    const res = await fetch('/dashboard-api/applications');
+    LoadingManager.showSection('apps-loading-overlay');
+    const res = await trackedFetch('/dashboard-api/applications');
     applications = await res.json();
 
     const dropdown = document.getElementById('app-dropdown');
@@ -84,6 +169,8 @@ async function loadApplications() {
 
   } catch (err) {
     showToast('Failed to load web applications', 'error');
+  } finally {
+    LoadingManager.hideSection('apps-loading-overlay');
   }
 }
 
@@ -101,7 +188,8 @@ async function loadLogsForApp(appId) {
     if (endpointSearch) params.set('endpoint', endpointSearch);
     if (bodySearch) params.set('body', bodySearch);
     const url = `/dashboard-api/logs?${params.toString()}`;
-    const res = await fetch(url);
+    LoadingManager.showSection('logs-loading-overlay');
+    const res = await trackedFetch(url);
     logsList = await res.json();
     renderLogs(logsList);
 
@@ -112,6 +200,8 @@ async function loadLogsForApp(appId) {
     }
   } catch (err) {
     showToast('Failed to load logs', 'error');
+  } finally {
+    LoadingManager.hideSection('logs-loading-overlay');
   }
 }
 
@@ -175,7 +265,7 @@ async function removeSelectedLogs() {
 
   const ids = Array.from(selectedIds);
   try {
-    const res = await fetch('/dashboard-api/logs', {
+    const res = await trackedFetch('/dashboard-api/logs', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids })
@@ -283,11 +373,14 @@ async function selectLog(logId) {
   renderLogs(logsList);
 
   try {
-    const res = await fetch(`/dashboard-api/logs/${logId}`);
+    LoadingManager.showSection('detail-loading-overlay');
+    const res = await trackedFetch(`/dashboard-api/logs/${logId}`);
     selectedLogDetail = await res.json();
     renderLogDetail(selectedLogDetail);
   } catch (err) {
     showToast('Failed to load log detail', 'error');
+  } finally {
+    LoadingManager.hideSection('detail-loading-overlay');
   }
 }
 
@@ -458,7 +551,7 @@ function attachEventListeners() {
     }
     if (confirm('Remove all logs for the selected application?')) {
       try {
-        await fetch('/dashboard-api/logs', {
+        await trackedFetch('/dashboard-api/logs', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ appId: currentAppId })
@@ -512,8 +605,10 @@ function attachEventListeners() {
       return;
     }
 
+    const exportBtn = document.getElementById('confirm-export-btn');
     try {
-      const res = await fetch(`/dashboard-api/logs/${selectedLogId}/export`, {
+      LoadingManager.setButtonLoading(exportBtn, true);
+      const res = await trackedFetch(`/dashboard-api/logs/${selectedLogId}/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName })
@@ -527,6 +622,8 @@ function attachEventListeners() {
       }
     } catch (err) {
       showToast('Export error', 'error');
+    } finally {
+      LoadingManager.setButtonLoading(exportBtn, false);
     }
   };
 
@@ -558,10 +655,13 @@ function attachEventListeners() {
     const body = document.getElementById('replay-body-input').value;
 
     const out = document.getElementById('replay-response-output');
+    const replayBtn = document.getElementById('execute-replay-btn');
     out.textContent = 'Executing replay request...';
 
     try {
-      const res = await fetch(`/dashboard-api/logs/${selectedLogId}/replay`, {
+      LoadingManager.showSection('replay-loading-overlay');
+      LoadingManager.setButtonLoading(replayBtn, true);
+      const res = await trackedFetch(`/dashboard-api/logs/${selectedLogId}/replay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -577,6 +677,9 @@ function attachEventListeners() {
     } catch (err) {
       out.textContent = `Replay Error: ${err.message}`;
       showToast('Replay execution failed', 'error');
+    } finally {
+      LoadingManager.hideSection('replay-loading-overlay');
+      LoadingManager.setButtonLoading(replayBtn, false);
     }
   };
 
@@ -649,7 +752,7 @@ function attachEventListeners() {
         saveStorageBtn.disabled = true;
         saveStorageBtn.textContent = 'Saving...';
 
-        const res = await fetch('/dashboard-api/settings', {
+        const res = await trackedFetch('/dashboard-api/settings', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ configDir, logsDir, migrateExistingConfig })
@@ -754,7 +857,7 @@ function attachEventListeners() {
 // --- Settings Modal & Storage Settings Logic ---
 async function loadStorageSettings() {
   try {
-    const res = await fetch('/dashboard-api/settings');
+    const res = await trackedFetch('/dashboard-api/settings');
     const data = await res.json();
 
     const configInput = document.getElementById('setting-config-dir');
@@ -871,7 +974,7 @@ window.editApp = (id) => {
 
 window.setAppActive = async (id, isActive) => {
   try {
-    const res = await fetch(`/dashboard-api/applications/${id}`, {
+    const res = await trackedFetch(`/dashboard-api/applications/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive })
@@ -890,7 +993,7 @@ window.setAppActive = async (id, isActive) => {
 window.deleteApp = async (id) => {
   if (confirm('Delete this web application config?')) {
     try {
-      await fetch(`/dashboard-api/applications/${id}`, { method: 'DELETE' });
+      await trackedFetch(`/dashboard-api/applications/${id}`, { method: 'DELETE' });
       await loadApplications();
       renderAppManagerList();
       showToast('Application deleted', 'success');
@@ -945,16 +1048,18 @@ document.getElementById('save-app-config-btn').onclick = async () => {
   }
 
   const payload = { name, frontEndUrl, backendUrls, redirectUrls, isActive };
+  const saveBtn = document.getElementById('save-app-config-btn');
 
   try {
+    LoadingManager.setButtonLoading(saveBtn, true);
     if (id) {
-      await fetch(`/dashboard-api/applications/${id}`, {
+      await trackedFetch(`/dashboard-api/applications/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
     } else {
-      await fetch('/dashboard-api/applications', {
+      await trackedFetch('/dashboard-api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -966,6 +1071,8 @@ document.getElementById('save-app-config-btn').onclick = async () => {
     showToast('Application configuration saved', 'success');
   } catch (err) {
     showToast('Failed to save application config', 'error');
+  } finally {
+    LoadingManager.setButtonLoading(saveBtn, false);
   }
 };
 

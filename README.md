@@ -30,6 +30,10 @@ with a web UI instead of a desktop app."
 - **Configurable storage paths** — override where `config/`, `logs/` and `headers/`
   live via `settings.json`, the dashboard Settings API, or environment variables
   (`src/services/settingsManager.js`).
+- **Loading indicator system** — comprehensive visual feedback for all dashboard API
+  operations: a global shimmer bar, section-level blur overlays, button spinners, and
+  error toasts, all driven by a `LoadingManager` singleton and `trackedFetch()` wrapper
+  (`public/js/app.js`).
 
 ---
 

@@ -23,13 +23,16 @@ with a web UI instead of a desktop app."
 - **Replay** — re-fire any captured call with edited URL, method, headers and body
   (`src/services/replayService.js`).
 - **Export** — save a request/response pair straight into your Downloads folder.
+- **Archive** — move captured logs for an application into an `archives/` directory
+  organized by app name, preserving them without deletion
+  (`src/services/logManager.js`).
 - **Redirect proxy servers** — apps can declare external API forwarding rules (e.g.
   a payment gateway). Each external target gets its own dedicated proxy server on an
   auto-assigned port, fully logged and streamed to the same dashboard feed
   (`src/services/redirectProxyManager.js`).
-- **Configurable storage paths** — override where `config/`, `logs/` and `headers/`
-  live via `settings.json`, the dashboard Settings API, or environment variables
-  (`src/services/settingsManager.js`).
+- **Configurable storage paths** — override where `config/`, `logs/`, `headers/` and
+  `archives/` live via `settings.json`, the dashboard Settings API, or environment
+  variables (`src/services/settingsManager.js`).
 - **Loading indicator system** — comprehensive visual feedback for all dashboard API
   operations: a global shimmer bar, section-level blur overlays, button spinners, and
   error toasts, all driven by a `LoadingManager` singleton and `trackedFetch()` wrapper
@@ -122,6 +125,7 @@ Shape of an application entry:
 
 If no env var is set, the values stored in `settings.json` (editable via
 `PUT /dashboard-api/settings`) are used; otherwise the project-root defaults apply.
+Archives are stored in `archives/` under the same base directory as `logs/` and `headers/`.
 
 ---
 
@@ -143,6 +147,7 @@ All endpoints are JSON, mounted under `/dashboard-api`, and CORS-enabled.
 | DELETE | `/logs` | Clear all log files |
 | POST | `/logs/:id/export` | Export request/response pair to `~/Downloads` (body: `{ "fileName": "prefix" }`) |
 | POST | `/logs/:id/replay` | Re-play a request with optional overrides |
+| POST | `/logs/archive` | Archive all logs for an app to `archives/<appName>/` (body: `{ "appId", "appName" }`) |
 | GET | `/events` | Server-Sent Events stream of new captures |
 
 ---
@@ -175,6 +180,7 @@ ProxyServerApp/
 |   '-- applications.json         Persisted app config (auto-created with samples on first run)
 |-- logs/                         Captured request/response BODIES: {uuid}_request.{ext}
 |-- headers/                      Captured METADATA: {uuid}_request.json / _response.json
+|-- archives/                     Archived logs organized by app name ({appName}/logs/ + headers/)
 |-- public/
 |   |-- index.html                Dashboard SPA shell
 |   |-- doc.html                  Full code documentation (served at /doc)
@@ -185,11 +191,11 @@ ProxyServerApp/
     |   '-- api.js                All /dashboard-api endpoints (REST + SSE)
     |-- services/
     |   |-- configManager.js      Applications CRUD + redirect port assignment
-    |   |-- logManager.js         Write/read/clear/export capture files
+    |   |-- logManager.js         Write/read/clear/archive/export capture files
     |   |-- proxyEngine.js        Main http-proxy wiring, route matching, SSE broadcaster
     |   |-- redirectProxyManager.js  Dedicated proxy servers per redirect port
     |   |-- replayService.js      Re-fires a captured request via fetch()
-    |   '-- settingsManager.js    Configurable storage paths (env / settings.json)
+    |   '-- settingsManager.js    Configurable storage paths including archives (env / settings.json)
     '-- utils/
         |-- bootstrap.js          util._extend polyfill (silences DEP0060 warning)
         '-- uuid.js               Dependency-free UUID v4 generator

@@ -17,6 +17,7 @@ const SETTINGS_FILE = path.join(PROJECT_ROOT, 'settings.json');
 const DEFAULT_CONFIG_DIR = path.join(PROJECT_ROOT, 'config');
 const DEFAULT_LOGS_DIR = path.join(PROJECT_ROOT, 'logs');
 const DEFAULT_HEADERS_DIR = path.join(PROJECT_ROOT, 'headers');
+const DEFAULT_ARCHIVES_DIR = path.join(PROJECT_ROOT, 'archives');
 
 /**
  * Reads local settings from settings.json if present.
@@ -108,6 +109,25 @@ function getHeadersDir() {
 }
 
 /**
+ * Returns the effective archives directory path (where archived logs are stored).
+ */
+function getArchivesDir() {
+  const envPath = process.env.PROXY_LOGS_DIR;
+  if (envPath && envPath.trim()) {
+    const base = path.resolve(envPath.trim());
+    return path.join(base, 'archives');
+  }
+
+  const saved = readSettingsFile();
+  if (saved.logsDir && saved.logsDir.trim()) {
+    const base = path.resolve(saved.logsDir.trim());
+    return path.join(base, 'archives');
+  }
+
+  return DEFAULT_ARCHIVES_DIR;
+}
+
+/**
  * Returns the base logs storage directory (parent of logs/ and headers/).
  */
 function getLogsBaseDir() {
@@ -132,6 +152,7 @@ function getSettings() {
   const logsBaseDir = getLogsBaseDir();
   const logsDir = getLogsDir();
   const headersDir = getHeadersDir();
+  const archivesDir = getArchivesDir();
 
   const isDefaultConfig = path.resolve(configDir) === path.resolve(DEFAULT_CONFIG_DIR);
   const isDefaultLogs = path.resolve(logsBaseDir) === path.resolve(PROJECT_ROOT);
@@ -141,13 +162,15 @@ function getSettings() {
     logsBaseDir,
     logsDir,
     headersDir,
+    archivesDir,
     isDefaultConfig,
     isDefaultLogs,
     defaults: {
       configDir: DEFAULT_CONFIG_DIR,
       logsBaseDir: PROJECT_ROOT,
       logsDir: DEFAULT_LOGS_DIR,
-      headersDir: DEFAULT_HEADERS_DIR
+      headersDir: DEFAULT_HEADERS_DIR,
+      archivesDir: DEFAULT_ARCHIVES_DIR
     }
   };
 }
@@ -175,8 +198,10 @@ function updateSettings({ configDir, logsDir, migrateExistingConfig = false }) {
   try {
     const targetLogs = newLogsBase === PROJECT_ROOT ? DEFAULT_LOGS_DIR : path.join(newLogsBase, 'logs');
     const targetHeaders = newLogsBase === PROJECT_ROOT ? DEFAULT_HEADERS_DIR : path.join(newLogsBase, 'headers');
+    const targetArchives = newLogsBase === PROJECT_ROOT ? DEFAULT_ARCHIVES_DIR : path.join(newLogsBase, 'archives');
     if (!fs.existsSync(targetLogs)) fs.mkdirSync(targetLogs, { recursive: true });
     if (!fs.existsSync(targetHeaders)) fs.mkdirSync(targetHeaders, { recursive: true });
+    if (!fs.existsSync(targetArchives)) fs.mkdirSync(targetArchives, { recursive: true });
   } catch (err) {
     throw new Error(`Cannot create logs directory "${newLogsBase}": ${err.message}`);
   }
@@ -211,10 +236,12 @@ module.exports = {
   getConfigFile,
   getLogsDir,
   getHeadersDir,
+  getArchivesDir,
   getLogsBaseDir,
   getSettings,
   updateSettings,
   DEFAULT_CONFIG_DIR,
   DEFAULT_LOGS_DIR,
-  DEFAULT_HEADERS_DIR
+  DEFAULT_HEADERS_DIR,
+  DEFAULT_ARCHIVES_DIR
 };

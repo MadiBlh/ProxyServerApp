@@ -145,6 +145,7 @@ async function loadApplications() {
       currentAppId = null;
       renderLogs([]);
       document.getElementById('remove-logs-btn').disabled = true;
+      document.getElementById('archive-logs-btn').disabled = true;
       return;
     }
 
@@ -164,6 +165,7 @@ async function loadApplications() {
     }
 
         document.getElementById('remove-logs-btn').disabled = false;
+        document.getElementById('archive-logs-btn').disabled = false;
         localStorage.setItem('proxy_selected_app_id', currentAppId);
         await loadLogsForApp(currentAppId);
 
@@ -517,6 +519,7 @@ function attachEventListeners() {
   document.getElementById('app-dropdown').onchange = (e) => {
     currentAppId = e.target.value;
     document.getElementById('remove-logs-btn').disabled = !currentAppId;
+    document.getElementById('archive-logs-btn').disabled = !currentAppId;
     localStorage.setItem('proxy_selected_app_id', currentAppId);
     const searchInput = document.getElementById('search-input');
     if (searchInput) {
@@ -565,6 +568,37 @@ function attachEventListeners() {
       } catch (err) {
         showToast('Failed to clear logs', 'error');
       }
+    }
+  };
+
+  // Archive All Logs for selected app
+  document.getElementById('archive-logs-btn').onclick = async () => {
+    if (!currentAppId) {
+      showToast('Select an application first', 'error');
+      return;
+    }
+    const app = applications.find(a => a.id === currentAppId);
+    const appName = app ? app.name : 'unknown';
+    if (!confirm(`Archive all logs for "${appName}"?\n\nLogs will be moved to the archives folder and removed from the active logs.`)) {
+      return;
+    }
+    try {
+      const res = await trackedFetch('/dashboard-api/logs/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appId: currentAppId, appName })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to archive logs');
+
+      logsList = [];
+      selectedIds.clear();
+      updateSelectionToolbar();
+      renderLogs([]);
+      clearLogDetailsView();
+      showToast(data.message || 'Logs archived', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to archive logs', 'error');
     }
   };
 

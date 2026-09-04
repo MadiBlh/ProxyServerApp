@@ -123,6 +123,26 @@ router.delete('/logs', (req, res) => {
   }
 });
 
+// Archive all logs for an application
+router.post('/logs/archive', (req, res) => {
+  try {
+    const { appId, appName } = req.body || {};
+    if (!appId) return res.status(400).json({ error: 'appId is required' });
+
+    const result = logManager.archiveLogsForApp(appId, appName);
+    res.json({
+      success: true,
+      archived: result.archived,
+      archivePath: result.archivePath,
+      message: result.archived > 0
+        ? `${result.archived} log(s) archived successfully`
+        : 'No logs found to archive'
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Delete a single log by id
 router.delete('/logs/:id', (req, res) => {
   try {

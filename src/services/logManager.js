@@ -292,6 +292,82 @@ function clearLogsForApp(appId) {
   return deleted;
 }
 
+function archiveLogsForApp(appId, appName) {
+  if (!appId) return { archived: 0 };
+
+  ensureDirectories();
+  const logsDir = settingsManager.getLogsDir();
+  const headersDir = settingsManager.getHeadersDir();
+  const archivesDir = settingsManager.getArchivesDir();
+
+  // Create archive subdirectories: archives/<appName>/logs/ and archives/<appName>/headers/
+  const sanitizeName = (appName || 'unknown').replace(/[^a-zA-Z0-9_\- ]/g, '_').trim() || 'unknown';
+  const archiveLogsDir = path.join(archivesDir, sanitizeName, 'logs');
+  const archiveHeadersDir = path.join(archivesDir, sanitizeName, 'headers');
+
+  if (!fs.existsSync(archiveLogsDir)) fs.mkdirSync(archiveLogsDir, { recursive: true });
+  if (!fs.existsSync(archiveHeadersDir)) fs.mkdirSync(archiveHeadersDir, { recursive: true });
+
+  let archived = 0;
+  const filesToMove = [];
+
+  // First pass: identify all files belonging to this appId
+  for (const dir of [headersDir, logsDir]) {
+    if (!fs.existsSync(dir)) continue;
+    const fnames = fs.readdirSync(dir);
+    for (const f of fnames) {
+      const fullPath = path.join(dir, f);
+      if (!fs.statSync(fullPath).isFile()) continue;
+
+      let belongsToApp = false;
+
+      if (f.endsWith('_request.json') || f.endsWith('_response.json')) {
+        try {
+          const meta = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+          if (meta.appId === appId) belongsToApp = true;
+        } catch {
+          // skip unparseable header
+        }
+      } else {
+        // Match body files by stripping the _request/_response suffix to get the UUID
+        const base = f.replace(/_(request|response)\..+$/, '');
+        if (base === f) continue;
+        const reqPath = path.join(headersDir, `${base}_request.json`);
+        try {
+          const meta = JSON.parse(fs.readFileSync(reqPath, 'utf8'));
+          if (meta.appId === appId) belongsToApp = true;
+        } catch {
+          continue;
+        }
+      }
+
+      if (belongsToApp) {
+        const targetDir = dir === logsDir ? archiveLogsDir : archiveHeadersDir;
+        filesToMove.push({ src: fullPath, dest: path.join(targetDir, f) });
+      }
+    }
+  }
+
+  // Second pass: move files (using rename for atomicity where possible)
+  for (const { src, dest } of filesToMove) {
+    try {
+      fs.renameSync(src, dest);
+      archived++;
+    } catch (err) {
+      // If rename fails across devices, fall back to copy + delete
+      try {
+        fs.copyFileSync(src, dest);
+        fs.unlinkSync(src);
+        archived++;
+      } catch (copyErr) {
+        console.error(`Failed to archive ${src}:`, copyErr.message);
+      }
+    }
+  }
+
+  return { archived, archivePath: path.join(archivesDir, sanitizeName) };
+}
+
 function deleteLogsByIds(ids) {
   if (!Array.isArray(ids) || ids.length === 0) return 0;
 
@@ -369,6 +445,7 @@ module.exports = {
   getLogDetail,
   clearAllLogs,
   clearLogsForApp,
+  archiveLogsForApp,
   deleteLogsByIds,
   exportLog
 };

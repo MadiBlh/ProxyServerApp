@@ -237,6 +237,9 @@ npm run build
 # Start TypeScript development server
 npm run start:ts
 
+# Start TypeScript development server with auto-reload on file changes
+npm run dev:ts
+
 # Start production build
 npm run start:dist
 ```

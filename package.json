@@ -7,7 +7,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "start:ts": "ts-node server.ts",
-    "dev:ts": "ts-node --watch server.ts",
+    "dev:ts": "node --watch -r ts-node/register server.ts",
     "build": "tsc",
     "start:dist": "node dist/server.js",
     "test": "jest",

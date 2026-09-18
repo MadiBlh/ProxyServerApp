@@ -1,11 +1,11 @@
 {
   "name": "proxy-server-log",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "Local proxy server tool to intercept, log, and inspect web application requests and responses.",
-  "main": "server.js",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
+    "start": "node dist/server.js",
+    "dev": "node --watch -r ts-node/register server.ts",
     "start:ts": "ts-node server.ts",
     "dev:ts": "node --watch -r ts-node/register server.ts",
     "build": "tsc",

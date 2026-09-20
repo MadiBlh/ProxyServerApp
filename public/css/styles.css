@@ -195,6 +195,12 @@ select.app-dropdown option {
   color: var(--text-primary);
 }
 
+select.app-dropdown optgroup {
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
 .nav-links {
   display: flex;
   align-items: center;
@@ -213,6 +219,8 @@ select.app-dropdown option {
   display: flex;
   align-items: center;
   gap: 6px;
+  text-decoration: none;
+  line-height: 1;
 }
 
 .danger {
@@ -368,18 +376,19 @@ select.app-dropdown option {
 .search-box {
   position: relative;
   flex: 1;
-  max-width: 380px;
+  max-width: 320px;
 }
 
 .search-input {
   width: 100%;
   background: var(--bg-input);
   border: 1px solid var(--border-color);
-  padding: 8px 14px 8px 36px;
+  padding: 8px 30px 8px 36px;
   border-radius: 8px;
   color: var(--text-primary);
   font-size: 0.88rem;
   outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .search-input:focus {
@@ -394,6 +403,33 @@ select.app-dropdown option {
   transform: translateY(-50%);
   color: var(--text-muted);
   font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.search-clear-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.search-clear-btn.visible {
+  display: flex;
 }
 
 /* ==========================================================================
@@ -408,13 +444,41 @@ select.app-dropdown option {
 
 /* Left Section: Calls List */
 .log-sidebar {
-  width: 380px;
-  min-width: 320px;
-  max-width: 500px;
+  width: 480px;
+  min-width: 380px;
+  max-width: 620px;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.log-sidebar.collapsed {
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
+}
+
+.log-sidebar.collapsed .sidebar-header {
+  padding: 12px 10px;
+  justify-content: center;
+}
+
+.log-sidebar.collapsed .sidebar-header > span:first-child,
+.log-sidebar.collapsed #log-count-badge,
+.log-sidebar.collapsed #select-logs-btn,
+.log-sidebar.collapsed .selection-toolbar,
+.log-sidebar.collapsed .logs-list {
+  display: none !important;
+}
+
+.log-sidebar.collapsed .btn-collapse-pane {
+  margin-left: 0;
+}
+
+.log-sidebar.collapsed .collapse-icon {
+  font-size: 0.7rem;
 }
 
 .sidebar-header {
@@ -427,6 +491,23 @@ select.app-dropdown option {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-hover);
+  flex-wrap: wrap;
+}
+
+.selection-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-color);
+  margin-right: auto;
 }
 
 .logs-list {
@@ -452,6 +533,10 @@ select.app-dropdown option {
 .log-item.active {
   background: var(--accent-light);
   border-left: 4px solid var(--accent-color);
+}
+
+.log-item.selected {
+  background: var(--accent-light);
 }
 
 /* Dot status indicator */
@@ -494,6 +579,25 @@ select.app-dropdown option {
   margin-top: 4px;
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.log-select-checkbox {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent-color);
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+}
+
+.btn-sm.active {
+  background: var(--accent-color);
+  color: var(--bg-primary);
+  border-color: var(--accent-color);
 }
 
 .method-badge {
@@ -676,7 +780,42 @@ select.app-dropdown option {
 
 .empty-state-icon {
   font-size: 3rem;
-  opacity: 0.5;
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   SVG ICONS
+   ========================================================================== */
+
+.svg-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.svg-icon-sm {
+  width: 13px;
+  height: 13px;
+}
+
+.search-icon svg {
+  color: var(--text-muted);
+}
+
+.modal-close svg {
+  stroke: var(--text-secondary);
+  transition: stroke 0.15s ease;
+}
+
+.modal-close:hover svg {
+  stroke: var(--text-primary);
+}
+
+.theme-toggle svg {
+  display: block;
 }
 
 /* ==========================================================================
@@ -715,6 +854,11 @@ select.app-dropdown option {
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-lg);
+}
+
+.settings-modal-card {
+  width: 95%;
+  max-height: 92vh;
 }
 
 .modal-header {
@@ -807,10 +951,136 @@ select.app-dropdown option {
 
 .toast.success { border-left-color: var(--success-color); }
 .toast.error { border-left-color: var(--error-color); }
+.toast.info { border-left-color: var(--info-color); }
 
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
+}
+
+/* ==========================================================================
+   GLOBAL LOADING BAR (top of page, thin animated progress indicator)
+   ========================================================================== */
+
+.loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 9999;
+  background: linear-gradient(90deg, var(--accent-color), var(--info-color), var(--accent-color));
+  background-size: 200% 100%;
+  animation: loadingBarShimmer 1.4s ease-in-out infinite;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.loading-bar.visible {
+  opacity: 1;
+}
+
+@keyframes loadingBarShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ==========================================================================
+   BUTTON INLINE LOADING SPINNER
+   ========================================================================== */
+
+.btn .btn-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-left-color: currentColor;
+  border-radius: 50%;
+  animation: btnSpin 0.6s linear infinite;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.btn.loading {
+  pointer-events: none;
+  opacity: 0.75;
+  position: relative;
+}
+
+@keyframes btnSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   SECTION-LEVEL LOADING OVERLAY
+   ========================================================================== */
+
+.section-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.section-loading-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.section-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.section-spinner-ring {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: btnSpin 0.8s linear infinite;
+}
+
+/* ==========================================================================
+   LOG SIDEBAR LOADING PLACEHOLDER
+   ========================================================================== */
+
+.logs-loading-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.logs-loading-placeholder .logs-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: btnSpin 0.8s linear infinite;
 }
 
 /* ==========================================================================

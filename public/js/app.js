@@ -2,12 +2,111 @@
    PROXY SERVER LOG - MAIN FRONTEND APPLICATION CONTROLLER
    ========================================================================== */
 
+const SVG_ICONS = {
+  sun: `<svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`,
+  moon: `<svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`,
+  fork: `<svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px; vertical-align:-1px;"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>`,
+  cookie: `<svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px; vertical-align:-1px;"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"></path><path d="M8.5 8.5v.01"></path><path d="M16 15.5v.01"></path><path d="M12 12v.01"></path><path d="M11 17v.01"></path><path d="M7 13v.01"></path></svg>`,
+  save: `<svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>`,
+  antenna: `<svg class="svg-icon empty-state-svg" viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.75" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4.93 4.93a10 10 0 0 1 14.14 0"></path><path d="M7.76 7.76a6 6 0 0 1 8.48 0"></path><circle cx="12" cy="12" r="2"></circle><path d="M12 14v8"></path></svg>`,
+  chevronLeft: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>`,
+  chevronRight: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`,
+  chevronUp: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>`,
+  chevronDown: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`
+};
+
+// --- Loading State Manager ---
+const LoadingManager = {
+  _requestCount: 0,
+  _globalBar: null,
+
+  /** Increment in-flight request count and show global loading bar */
+  start() {
+    this._requestCount++;
+    this._showGlobalBar();
+  },
+
+  /** Decrement in-flight request count; hide bar when all complete */
+  end() {
+    this._requestCount = Math.max(0, this._requestCount - 1);
+    if (this._requestCount === 0) {
+      this._hideGlobalBar();
+    }
+  },
+
+  _showGlobalBar() {
+    if (!this._globalBar) {
+      this._globalBar = document.getElementById('global-loading-bar');
+    }
+    if (this._globalBar) {
+      this._globalBar.classList.add('visible');
+    }
+  },
+
+  _hideGlobalBar() {
+    if (this._globalBar) {
+      this._globalBar.classList.remove('visible');
+    }
+  },
+
+  /** Show a section-level loading overlay by element ID */
+  showSection(sectionId) {
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('visible');
+  },
+
+  /** Hide a section-level loading overlay by element ID */
+  hideSection(sectionId) {
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.remove('visible');
+  },
+
+  /** Put a button into loading state (add spinner, disable) */
+  setButtonLoading(btn, loading) {
+    if (!btn) return;
+    if (loading) {
+      btn.classList.add('loading');
+      btn.disabled = true;
+      // Preserve original text, insert spinner before it
+      if (!btn.querySelector('.btn-spinner')) {
+        const spinner = document.createElement('span');
+        spinner.className = 'btn-spinner';
+        btn.insertBefore(spinner, btn.firstChild);
+      }
+    } else {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      const spinner = btn.querySelector('.btn-spinner');
+      if (spinner) spinner.remove();
+    }
+  }
+};
+
+/**
+ * Tracked fetch wrapper that manages the global loading indicator
+ * and handles error toasts automatically.
+ */
+async function trackedFetch(url, options = {}) {
+  LoadingManager.start();
+  try {
+    const res = await fetch(url, options);
+    return res;
+  } catch (err) {
+    showToast('Network request failed', 'error');
+    throw err;
+  } finally {
+    LoadingManager.end();
+  }
+}
+
 // --- Module-level state (accessible by all functions) ---
 let applications = [];
 let currentAppId = localStorage.getItem('proxy_selected_app_id') || null;
 let logsList = [];
 let selectedLogId = null;
 let selectedLogDetail = null;
+let selectedIds = new Set();
+let selectMode = false;
 let currentTheme = localStorage.getItem('proxy_theme') || 'dark';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -20,6 +119,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (err) {
     console.error('Failed to load Monaco Editor from CDN:', err);
   }
+
+  // Load Available Dates
+  await loadAvailableDates();
 
   // Load Initial Applications
   await loadApplications();
@@ -37,7 +139,7 @@ function applyTheme(theme) {
   localStorage.setItem('proxy_theme', theme);
   const themeBtn = document.getElementById('theme-toggle-btn');
   if (themeBtn) {
-    themeBtn.innerHTML = theme === 'dark' ? '☀️' : '🌙';
+    themeBtn.innerHTML = theme === 'dark' ? SVG_ICONS.sun : SVG_ICONS.moon;
   }
   if (window.monacoManager) {
     window.monacoManager.setMonacoTheme(theme);
@@ -47,7 +149,8 @@ function applyTheme(theme) {
 // --- Applications API Management ---
 async function loadApplications() {
   try {
-    const res = await fetch('/dashboard-api/applications');
+    LoadingManager.showSection('apps-loading-overlay');
+    const res = await trackedFetch('/dashboard-api/applications');
     applications = await res.json();
 
     const dropdown = document.getElementById('app-dropdown');
@@ -57,6 +160,8 @@ async function loadApplications() {
       dropdown.innerHTML = '<option value="">No apps configured</option>';
       currentAppId = null;
       renderLogs([]);
+      document.getElementById('remove-logs-btn').disabled = true;
+      document.getElementById('archive-logs-btn').disabled = true;
       return;
     }
 
@@ -75,22 +180,145 @@ async function loadApplications() {
       dropdown.value = currentAppId;
     }
 
+    document.getElementById('remove-logs-btn').disabled = false;
+    document.getElementById('archive-logs-btn').disabled = false;
     localStorage.setItem('proxy_selected_app_id', currentAppId);
-
-    // Load logs for current app
+    await loadAvailableDates(currentAppId);
     await loadLogsForApp(currentAppId);
 
   } catch (err) {
     showToast('Failed to load web applications', 'error');
+  } finally {
+    LoadingManager.hideSection('apps-loading-overlay');
+  }
+}
+
+// --- Available Periods & Dates Management ---
+async function loadAvailableDates(appId) {
+  const periodDropdown = document.getElementById('period-dropdown');
+  if (!periodDropdown) return;
+
+  const previousSelected = periodDropdown.value || 'latest';
+  const queryParam = appId ? `?appId=${encodeURIComponent(appId)}` : '';
+  try {
+    const res = await trackedFetch(`/dashboard-api/logs/dates${queryParam}`);
+    if (!res.ok) return;
+    const dates = await res.json();
+
+    const datesGroup = document.getElementById('period-specific-dates-group');
+    if (datesGroup) {
+      datesGroup.innerHTML = '';
+      if (Array.isArray(dates) && dates.length > 0) {
+        dates.forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d;
+          opt.textContent = `Date: ${d}`;
+          datesGroup.appendChild(opt);
+        });
+      }
+    }
+
+    if (previousSelected) {
+      const exists = Array.from(periodDropdown.options).some(o => o.value === previousSelected);
+      if (exists) {
+        periodDropdown.value = previousSelected;
+      } else {
+        periodDropdown.value = 'latest';
+      }
+    }
+  } catch {
+    // ignore
+  }
+  updateDashboardArchiveButton();
+}
+
+function updateDashboardArchiveButton() {
+  const archiveBtn = document.getElementById('archive-logs-btn');
+  const periodDropdown = document.getElementById('period-dropdown');
+  if (!archiveBtn || !periodDropdown) return;
+
+  if (!currentAppId) {
+    archiveBtn.textContent = 'Archive App Logs';
+    archiveBtn.title = 'Select an application to archive logs';
+    archiveBtn.disabled = true;
+    return;
+  }
+
+  archiveBtn.disabled = false;
+  const periodVal = periodDropdown.value || 'latest';
+  const isDate = !['latest', 'today', 'yesterday', '7d', '30d', 'all'].includes(periodVal);
+
+  if (isDate) {
+    archiveBtn.textContent = `Archive Date (${periodVal})`;
+    archiveBtn.title = `Archive only logs from date ${periodVal} for this application`;
+  } else if (periodVal === 'today' || periodVal === 'latest') {
+    archiveBtn.textContent = `Archive Today's Logs`;
+    archiveBtn.title = `Archive only today's logs for this application`;
+  } else if (periodVal === 'yesterday') {
+    archiveBtn.textContent = `Archive Yesterday's Logs`;
+    archiveBtn.title = `Archive only yesterday's logs for this application`;
+  } else if (periodVal === '7d') {
+    archiveBtn.textContent = `Archive Last 7 Days`;
+    archiveBtn.title = `Archive logs from the last 7 days for this application`;
+  } else if (periodVal === '30d') {
+    archiveBtn.textContent = `Archive Last 30 Days`;
+    archiveBtn.title = `Archive logs from the last 30 days for this application`;
+  } else if (periodVal === 'all') {
+    archiveBtn.textContent = `Archive All Logs`;
+    archiveBtn.title = `Archive all historical logs across all dates for this application`;
+  }
+}
+
+function updateClearButtons() {
+  const epInput = document.getElementById('search-input');
+  const epClear = document.getElementById('clear-endpoint-search');
+  if (epInput && epClear) {
+    epClear.classList.toggle('visible', !!epInput.value);
+  }
+
+  const bodyInput = document.getElementById('advanced-search-input');
+  const bodyClear = document.getElementById('clear-body-search');
+  if (bodyInput && bodyClear) {
+    bodyClear.classList.toggle('visible', !!bodyInput.value);
   }
 }
 
 // --- Logs Management ---
 async function loadLogsForApp(appId) {
   try {
-    const res = await fetch(`/dashboard-api/logs?appId=${appId}`);
+    selectedIds.clear();
+    if (selectMode) {
+      selectMode = false;
+    }
+    updateSelectionUi();
+    updateClearButtons();
+    const endpointSearch = document.getElementById('search-input')?.value.trim();
+    const bodySearch = document.getElementById('advanced-search-input')?.value.trim();
+    const periodVal = document.getElementById('period-dropdown')?.value || 'latest';
+    const params = new URLSearchParams({ appId });
+    if (endpointSearch) params.set('endpoint', endpointSearch);
+    if (bodySearch) params.set('body', bodySearch);
+    if (periodVal && periodVal !== 'latest') {
+      if (['today', 'yesterday', '7d', '30d', 'all'].includes(periodVal)) {
+        params.set('period', periodVal);
+      } else {
+        params.set('date', periodVal);
+      }
+    }
+    const url = `/dashboard-api/logs?${params.toString()}`;
+    LoadingManager.showSection('logs-loading-overlay');
+    const res = await trackedFetch(url);
     logsList = await res.json();
     renderLogs(logsList);
+
+    const logCountBadge = document.getElementById('log-count-badge');
+    if (logCountBadge) {
+      if (endpointSearch || bodySearch) {
+        logCountBadge.textContent = `${logsList.length} MATCHED`;
+      } else {
+        logCountBadge.textContent = `${logsList.length} LOGS`;
+      }
+    }
 
     if (logsList.length > 0) {
       selectLog(logsList[0].id);
@@ -99,6 +327,126 @@ async function loadLogsForApp(appId) {
     }
   } catch (err) {
     showToast('Failed to load logs', 'error');
+  } finally {
+    LoadingManager.hideSection('logs-loading-overlay');
+  }
+}
+
+let searchTimer = null;
+function onSearchInput() {
+  updateClearButtons();
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    if (currentAppId) loadLogsForApp(currentAppId);
+  }, 250);
+}
+
+// --- Multi-selection helpers ---
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  if (!selectMode) {
+    selectedIds.clear();
+  }
+  updateSelectionUi();
+  renderLogs(logsList);
+}
+
+function toggleLogSelection(logId) {
+  if (selectedIds.has(logId)) {
+    selectedIds.delete(logId);
+  } else {
+    selectedIds.add(logId);
+  }
+  updateSelectionToolbar();
+}
+
+function clearLogSelection() {
+  selectedIds.clear();
+  updateSelectionToolbar();
+  renderLogs(logsList);
+}
+
+function updateSelectionUi() {
+  const toolbar = document.getElementById('selection-toolbar');
+  const selectBtn = document.getElementById('select-logs-btn');
+  if (!toolbar) return;
+
+  toolbar.style.display = selectMode ? 'flex' : 'none';
+  if (selectBtn) {
+    selectBtn.classList.toggle('active', selectMode);
+  }
+  updateSelectionToolbar();
+}
+
+function updateSelectionToolbar() {
+  const toolbar = document.getElementById('selection-toolbar');
+  const countEl = document.getElementById('selection-count');
+  if (!toolbar || !countEl) return;
+
+  const count = selectedIds.size;
+  countEl.textContent = `${count} selected`;
+}
+
+async function removeSelectedLogs() {
+  if (selectedIds.size === 0) return;
+  if (!confirm(`Remove ${selectedIds.size} selected log(s)?`)) return;
+
+  const ids = Array.from(selectedIds);
+  try {
+    const res = await trackedFetch('/dashboard-api/logs', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to remove logs');
+
+    selectedIds.clear();
+    updateSelectionToolbar();
+    renderLogs(logsList.filter(log => !ids.includes(log.id)));
+    if (ids.includes(selectedLogId)) {
+      selectedLogId = null;
+      clearLogDetailsView();
+    }
+    showToast(data.message || 'Logs removed', 'success');
+  } catch (err) {
+    showToast(err.message || 'Failed to remove logs', 'error');
+  }
+}
+
+async function archiveSelectedLogs() {
+  if (selectedIds.size === 0) {
+    showToast('No logs selected to archive', 'error');
+    return;
+  }
+  const app = applications.find(a => a.id === currentAppId);
+  const appName = app ? app.name : 'unknown';
+  const count = selectedIds.size;
+  if (!confirm(`Archive ${count} selected log(s) for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`)) {
+    return;
+  }
+
+  const ids = Array.from(selectedIds);
+  try {
+    const res = await trackedFetch('/dashboard-api/logs/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: currentAppId,
+        appName,
+        ids
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to archive selected logs');
+
+    selectedIds.clear();
+    updateSelectionToolbar();
+    if (selectMode) toggleSelectMode();
+    if (currentAppId) loadLogsForApp(currentAppId);
+    showToast(data.message || `${data.archived} log(s) archived`, 'success');
+  } catch (err) {
+    showToast(err.message || 'Failed to archive selected logs', 'error');
   }
 }
 
@@ -106,40 +454,43 @@ function renderLogs(logs) {
   const container = document.getElementById('logs-list-container');
   container.innerHTML = '';
 
-  const filterText = (document.getElementById('search-input')?.value || '').toLowerCase();
-
-  const filteredLogs = logs.filter(log => {
-    const endpoint = (log.endpoint || '').toLowerCase();
-    const method = (log.method || '').toLowerCase();
-    return endpoint.includes(filterText) || method.includes(filterText);
-  });
+  const filteredLogs = logs || [];
 
   if (filteredLogs.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">📡</div>
+        <div class="empty-state-icon">${SVG_ICONS.antenna}</div>
         <p>No logged requests found</p>
       </div>
     `;
     return;
   }
 
+  const fragment = document.createDocumentFragment();
+
   filteredLogs.forEach(log => {
     const li = document.createElement('li');
+    const isSelected = selectedIds.has(log.id);
     li.className = `log-item ${log.id === selectedLogId ? 'active' : ''}`;
     li.onclick = () => selectLog(log.id);
 
     const isOk = log.status === 'OK' || (log.statusCode >= 200 && log.statusCode < 400);
     const dotClass = isOk ? 'green' : 'red';
 
-    const formattedTime = new Date(log.timestamp).toLocaleTimeString();
+    const logDate = new Date(log.timestamp);
+    const formattedTime = logDate.getFullYear() + '-' +
+      String(logDate.getMonth() + 1).padStart(2, '0') + '-' +
+      String(logDate.getDate()).padStart(2, '0') + ' ' +
+      String(logDate.getHours()).padStart(2, '0') + ':' +
+      String(logDate.getMinutes()).padStart(2, '0') + ':' +
+      String(logDate.getSeconds()).padStart(2, '0');
     const isRedirect = log.routeType === 'redirect';
     const badgeStyle = isRedirect
       ? 'background:rgba(234, 179, 8, 0.15); color:#eab308; border: 1px solid rgba(234, 179, 8, 0.3);'
       : 'background:var(--accent-light); color:var(--accent-color);';
 
     const backendPill = log.backendName
-      ? `<span style="font-size:0.68rem; padding:1px 6px; border-radius:4px; ${badgeStyle} font-weight:600;">${isRedirect ? '🔀 ' : ''}${escapeHtml(log.backendName)}</span>`
+      ? `<span style="font-size:0.68rem; padding:1px 6px; border-radius:4px; ${badgeStyle} font-weight:600; display:inline-flex; align-items:center;">${isRedirect ? SVG_ICONS.fork : ''}${escapeHtml(log.backendName)}</span>`
       : '';
 
     li.innerHTML = `
@@ -157,8 +508,26 @@ function renderLogs(logs) {
         </div>
       </div>
     `;
-    container.appendChild(li);
+
+    if (selectMode) {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'log-select-checkbox';
+      checkbox.checked = isSelected;
+      checkbox.onclick = (e) => {
+        e.stopPropagation();
+        toggleLogSelection(log.id);
+      };
+      if (isSelected) {
+        li.classList.add('selected');
+      }
+      li.prepend(checkbox);
+    }
+
+    fragment.appendChild(li);
   });
+
+  container.appendChild(fragment);
 }
 
 async function selectLog(logId) {
@@ -172,11 +541,14 @@ async function selectLog(logId) {
   renderLogs(logsList);
 
   try {
-    const res = await fetch(`/dashboard-api/logs/${logId}`);
+    LoadingManager.showSection('detail-loading-overlay');
+    const res = await trackedFetch(`/dashboard-api/logs/${logId}`);
     selectedLogDetail = await res.json();
     renderLogDetail(selectedLogDetail);
   } catch (err) {
     showToast('Failed to load log detail', 'error');
+  } finally {
+    LoadingManager.hideSection('detail-loading-overlay');
   }
 }
 
@@ -203,6 +575,12 @@ function renderLogDetail(detail) {
   // Render Monaco Editor Content
   window.monacoManager.setRequestBodyContent(requestBody, reqMeta.fileExtension);
   window.monacoManager.setResponseBodyContent(responseBody, resMeta.fileExtension);
+
+  // Auto-highlight active body search query in Monaco
+  const bodyQuery = document.getElementById('advanced-search-input')?.value.trim();
+  if (bodyQuery && window.monacoManager?.highlightSearchTerm) {
+    window.monacoManager.highlightSearchTerm(bodyQuery);
+  }
 }
 
 function renderHeadersView(containerId, headersObj) {
@@ -233,7 +611,7 @@ function renderHeadersView(containerId, headersObj) {
 
         row.innerHTML = `
           <span class="header-key" style="${isCookieHeader ? 'color: #eab308; font-weight:700;' : ''}">
-            ${isCookieHeader ? '🍪 ' : ''}${escapeHtml(key)}:
+            ${isCookieHeader ? SVG_ICONS.cookie : ''}${escapeHtml(key)}:
           </span>
           <span class="header-val" style="word-break: break-all;">${escapeHtml(String(item))}</span>
         `;
@@ -247,7 +625,7 @@ function renderHeadersView(containerId, headersObj) {
         row.style.background = 'rgba(234, 179, 8, 0.08)';
         row.innerHTML = `
           <span class="header-key" style="color: #eab308; font-weight:700;">
-            🍪 Cookie${cookieItems.length > 1 ? ` #${idx + 1}` : ''}:
+            ${SVG_ICONS.cookie}Cookie${cookieItems.length > 1 ? ` #${idx + 1}` : ''}:
           </span>
           <span class="header-val" style="word-break: break-all;">${escapeHtml(item.trim())}</span>
         `;
@@ -260,7 +638,7 @@ function renderHeadersView(containerId, headersObj) {
 
       row.innerHTML = `
         <span class="header-key" style="${isCookieHeader ? 'color: #eab308; font-weight:700;' : ''}">
-          ${isCookieHeader ? '🍪 ' : ''}${escapeHtml(key)}:
+          ${isCookieHeader ? SVG_ICONS.cookie : ''}${escapeHtml(key)}:
         </span>
         <span class="header-val" style="word-break: break-all;">${escapeHtml(String(val))}</span>
       `;
@@ -281,18 +659,52 @@ function clearLogDetailsView() {
   window.monacoManager.setResponseBodyContent('');
 }
 
-// --- SSE Realtime Feed ---
+// --- SSE Realtime Feed with Frame-Throttled Batching ---
+let sseEventQueue = [];
+let sseBatchScheduled = false;
+
+function flushSseBatch() {
+  sseBatchScheduled = false;
+  if (sseEventQueue.length === 0) return;
+
+  const incomingLogs = sseEventQueue;
+  sseEventQueue = [];
+
+  const shouldAutoSelect = !selectedLogId;
+  let firstNewLogId = null;
+  let hasAppLogs = false;
+
+  for (let i = incomingLogs.length - 1; i >= 0; i--) {
+    const logSummary = incomingLogs[i];
+    if (logSummary.appId === currentAppId) {
+      logsList.unshift(logSummary);
+      hasAppLogs = true;
+      if (!firstNewLogId) {
+        firstNewLogId = logSummary.id;
+      }
+    }
+  }
+
+  if (hasAppLogs) {
+    renderLogs(logsList);
+    if (shouldAutoSelect && firstNewLogId) {
+      selectLog(firstNewLogId);
+    }
+  }
+}
+
 function initSseFeed() {
   const evtSource = new EventSource('/dashboard-api/events');
   evtSource.onmessage = (event) => {
     try {
       const logSummary = JSON.parse(event.data);
-      if (logSummary.appId === currentAppId) {
-        logsList.unshift(logSummary);
-        renderLogs(logsList);
-        // Auto select newly arrived log if none selected
-        if (!selectedLogId) {
-          selectLog(logSummary.id);
+      sseEventQueue.push(logSummary);
+      if (!sseBatchScheduled) {
+        sseBatchScheduled = true;
+        if (typeof requestAnimationFrame !== 'undefined') {
+          requestAnimationFrame(flushSseBatch);
+        } else {
+          setTimeout(flushSseBatch, 16);
         }
       }
     } catch (e) {
@@ -310,36 +722,213 @@ function attachEventListeners() {
   };
 
   // App Selector Change
-  document.getElementById('app-dropdown').onchange = (e) => {
+  document.getElementById('app-dropdown').onchange = async (e) => {
     currentAppId = e.target.value;
+    document.getElementById('remove-logs-btn').disabled = !currentAppId;
+    document.getElementById('archive-logs-btn').disabled = !currentAppId;
     localStorage.setItem('proxy_selected_app_id', currentAppId);
-    loadLogsForApp(currentAppId);
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+      searchInput.value = '';
+    }
+    const advancedSearchInput = document.getElementById('advanced-search-input');
+    if (advancedSearchInput) {
+      advancedSearchInput.value = '';
+    }
+    await loadAvailableDates(currentAppId);
+    await loadLogsForApp(currentAppId);
   };
 
-  // Search Filter
+  // Search Filter Inputs
   document.getElementById('search-input').oninput = () => {
-    renderLogs(logsList);
+    onSearchInput();
   };
+  document.getElementById('advanced-search-input').oninput = () => {
+    onSearchInput();
+  };
+
+  // Search Clear Buttons
+  const clearEpBtn = document.getElementById('clear-endpoint-search');
+  if (clearEpBtn) {
+    clearEpBtn.onclick = () => {
+      const input = document.getElementById('search-input');
+      if (input) {
+        input.value = '';
+        updateClearButtons();
+        if (currentAppId) loadLogsForApp(currentAppId);
+        input.focus();
+      }
+    };
+  }
+
+  const clearBodyBtn = document.getElementById('clear-body-search');
+  if (clearBodyBtn) {
+    clearBodyBtn.onclick = () => {
+      const input = document.getElementById('advanced-search-input');
+      if (input) {
+        input.value = '';
+        updateClearButtons();
+        if (currentAppId) loadLogsForApp(currentAppId);
+        input.focus();
+      }
+    };
+  }
+
+  // Global Keyboard Shortcuts for Search
+  window.addEventListener('keydown', (e) => {
+    // Press '/' to focus Endpoint Search when not in an active text input or modal
+    if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) && !document.activeElement?.classList.contains('monaco-editor') && !document.querySelector('.modal.active')) {
+      e.preventDefault();
+      const input = document.getElementById('search-input');
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }
+
+    // Press Escape to clear active search input
+    if (e.key === 'Escape') {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.id === 'search-input' || activeEl.id === 'advanced-search-input')) {
+        if (activeEl.value) {
+          activeEl.value = '';
+          updateClearButtons();
+          if (currentAppId) loadLogsForApp(currentAppId);
+        }
+        activeEl.blur();
+      }
+    }
+  });
+
+  // Period Selector Change
+  const periodDropdown = document.getElementById('period-dropdown');
+  if (periodDropdown) {
+    periodDropdown.onchange = () => {
+      updateDashboardArchiveButton();
+      if (currentAppId) loadLogsForApp(currentAppId);
+    };
+  }
 
   // Reload Logs Button
-  document.getElementById('reload-logs-btn').onclick = () => {
-    loadLogsForApp(currentAppId);
+  document.getElementById('reload-logs-btn').onclick = async () => {
+    await loadAvailableDates(currentAppId);
+    if (currentAppId) loadLogsForApp(currentAppId);
     showToast('Logs reloaded', 'success');
   };
 
-  // Clear All Logs Button
+  // Clear All Logs for selected app
   document.getElementById('remove-logs-btn').onclick = async () => {
-    if (confirm('Are you sure you want to remove all log files from the server?')) {
+    if (!currentAppId) {
+      showToast('Select an application first', 'error');
+      return;
+    }
+    if (confirm('Remove all logs for the selected application?')) {
       try {
-        await fetch('/dashboard-api/logs', { method: 'DELETE' });
+        await trackedFetch('/dashboard-api/logs', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appId: currentAppId })
+        });
         logsList = [];
+        selectedIds.clear();
+        updateSelectionToolbar();
         renderLogs([]);
         clearLogDetailsView();
-        showToast('All logs cleared successfully', 'success');
+        await loadAvailableDates(currentAppId);
+        showToast('Logs cleared for selected application', 'success');
       } catch (err) {
         showToast('Failed to clear logs', 'error');
       }
     }
+  };
+
+  // Archive Logs for selected app (Context-aware based on selected Date/Period)
+  document.getElementById('archive-logs-btn').onclick = async () => {
+    if (!currentAppId) {
+      showToast('Select an application first', 'error');
+      return;
+    }
+    const app = applications.find(a => a.id === currentAppId);
+    const appName = app ? app.name : 'unknown';
+    const periodDropdown = document.getElementById('period-dropdown');
+    const periodVal = periodDropdown?.value || 'latest';
+    const isDate = !['latest', 'today', 'yesterday', '7d', '30d', 'all'].includes(periodVal);
+
+    let promptText = '';
+    const archivePayload = { appId: currentAppId, appName };
+
+    if (isDate) {
+      promptText = `Archive logs for "${appName}" for date ${periodVal}?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+      archivePayload.date = periodVal;
+    } else if (periodVal === 'today' || periodVal === 'latest') {
+      promptText = `Archive today's logs for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+      archivePayload.period = 'today';
+    } else if (periodVal === 'yesterday') {
+      promptText = `Archive yesterday's logs for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+      archivePayload.period = 'yesterday';
+    } else if (periodVal === '7d') {
+      promptText = `Archive logs from the last 7 days for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+      archivePayload.period = '7d';
+    } else if (periodVal === '30d') {
+      promptText = `Archive logs from the last 30 days for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+      archivePayload.period = '30d';
+    } else {
+      promptText = `Archive ALL historical logs across all dates for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+    }
+
+    if (!confirm(promptText)) {
+      return;
+    }
+
+    try {
+      const res = await trackedFetch('/dashboard-api/logs/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(archivePayload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to archive logs');
+
+      showToast(
+        data.message || `${data.archived} log(s) archived!`,
+        'success',
+        'View in Archives',
+        () => { window.location.href = '/archives'; }
+      );
+
+      await loadAvailableDates(currentAppId);
+      await loadLogsForApp(currentAppId);
+    } catch (err) {
+      showToast(err.message || 'Failed to archive logs', 'error');
+    }
+  };
+
+  // Toggle select mode (show/hide checkboxes)
+  document.getElementById('select-logs-btn').onclick = () => {
+    toggleSelectMode();
+  };
+
+  // Exit select mode
+  document.getElementById('done-selection-btn').onclick = () => {
+    if (selectMode) toggleSelectMode();
+  };
+
+  // Archive selected logs (multi-select)
+  const archiveSelectedBtn = document.getElementById('archive-selected-logs-btn');
+  if (archiveSelectedBtn) {
+    archiveSelectedBtn.onclick = () => {
+      archiveSelectedLogs();
+    };
+  }
+
+  // Remove selected logs (multi-select)
+  document.getElementById('remove-selected-logs-btn').onclick = () => {
+    removeSelectedLogs();
+  };
+
+  // Clear selection
+  document.getElementById('clear-selection-btn').onclick = () => {
+    clearLogSelection();
   };
 
   // Export Request Button
@@ -359,8 +948,10 @@ function attachEventListeners() {
       return;
     }
 
+    const exportBtn = document.getElementById('confirm-export-btn');
     try {
-      const res = await fetch(`/dashboard-api/logs/${selectedLogId}/export`, {
+      LoadingManager.setButtonLoading(exportBtn, true);
+      const res = await trackedFetch(`/dashboard-api/logs/${selectedLogId}/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileName })
@@ -374,6 +965,8 @@ function attachEventListeners() {
       }
     } catch (err) {
       showToast('Export error', 'error');
+    } finally {
+      LoadingManager.setButtonLoading(exportBtn, false);
     }
   };
 
@@ -405,10 +998,13 @@ function attachEventListeners() {
     const body = document.getElementById('replay-body-input').value;
 
     const out = document.getElementById('replay-response-output');
+    const replayBtn = document.getElementById('execute-replay-btn');
     out.textContent = 'Executing replay request...';
 
     try {
-      const res = await fetch(`/dashboard-api/logs/${selectedLogId}/replay`, {
+      LoadingManager.showSection('replay-loading-overlay');
+      LoadingManager.setButtonLoading(replayBtn, true);
+      const res = await trackedFetch(`/dashboard-api/logs/${selectedLogId}/replay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -424,11 +1020,103 @@ function attachEventListeners() {
     } catch (err) {
       out.textContent = `Replay Error: ${err.message}`;
       showToast('Replay execution failed', 'error');
+    } finally {
+      LoadingManager.hideSection('replay-loading-overlay');
+      LoadingManager.setButtonLoading(replayBtn, false);
     }
   };
 
-  // Manage / Settings Modal (Web Applications Manager)
-  document.getElementById('manage-apps-btn').onclick = () => openAppManagerModal();
+  // Manage / Settings Modal
+  const settingsBtn = document.getElementById('settings-btn') || document.getElementById('manage-apps-btn');
+  if (settingsBtn) {
+    settingsBtn.onclick = () => openSettingsModal();
+  }
+
+  // Settings Tabs Switcher
+  const tabApps = document.getElementById('tab-settings-apps');
+  const tabPaths = document.getElementById('tab-settings-paths');
+  const secApps = document.getElementById('settings-section-apps');
+  const secPaths = document.getElementById('settings-section-paths');
+
+  if (tabApps && tabPaths && secApps && secPaths) {
+    tabApps.onclick = () => switchSettingsTab('apps');
+    tabPaths.onclick = () => switchSettingsTab('paths');
+  }
+
+  function switchSettingsTab(tab) {
+    if (tab === 'apps') {
+      tabApps.classList.add('active');
+      tabApps.style.color = 'var(--accent-color)';
+      tabApps.style.borderBottomColor = 'var(--accent-color)';
+      tabPaths.classList.remove('active');
+      tabPaths.style.color = 'var(--text-secondary)';
+      tabPaths.style.borderBottomColor = 'transparent';
+      secApps.style.display = 'block';
+      secPaths.style.display = 'none';
+    } else {
+      tabPaths.classList.add('active');
+      tabPaths.style.color = 'var(--accent-color)';
+      tabPaths.style.borderBottomColor = 'var(--accent-color)';
+      tabApps.classList.remove('active');
+      tabApps.style.color = 'var(--text-secondary)';
+      tabApps.style.borderBottomColor = 'transparent';
+      secApps.style.display = 'none';
+      secPaths.style.display = 'block';
+      loadStorageSettings();
+    }
+  }
+
+  // Reset to Default button handlers
+  const resetConfigBtn = document.getElementById('reset-config-path-btn');
+  if (resetConfigBtn) {
+    resetConfigBtn.onclick = () => {
+      const input = document.getElementById('setting-config-dir');
+      if (input) input.value = '';
+    };
+  }
+
+  const resetLogsBtn = document.getElementById('reset-logs-path-btn');
+  if (resetLogsBtn) {
+    resetLogsBtn.onclick = () => {
+      const input = document.getElementById('setting-logs-dir');
+      if (input) input.value = '';
+    };
+  }
+
+  // Save Storage Settings
+  const saveStorageBtn = document.getElementById('save-storage-settings-btn');
+  if (saveStorageBtn) {
+    saveStorageBtn.onclick = async () => {
+      const configDir = document.getElementById('setting-config-dir').value.trim();
+      const logsDir = document.getElementById('setting-logs-dir').value.trim();
+      const migrateExistingConfig = document.getElementById('setting-migrate-config').checked;
+
+      try {
+        saveStorageBtn.disabled = true;
+        saveStorageBtn.textContent = 'Saving...';
+
+        const res = await trackedFetch('/dashboard-api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ configDir, logsDir, migrateExistingConfig })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to update storage paths');
+
+        showToast('Storage paths updated successfully', 'success');
+        await loadStorageSettings();
+        await loadApplications();
+        renderAppManagerList();
+        loadLogsList();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        saveStorageBtn.disabled = false;
+        saveStorageBtn.innerHTML = `${SVG_ICONS.save} Save Storage Settings`;
+      }
+    };
+  }
 
   // Tab View Switchers (Body vs Headers)
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -472,16 +1160,32 @@ function attachEventListeners() {
     };
   }
 
+  // Collapse / Expand Sidebar
+  const sidebar = document.getElementById('log-sidebar');
+  const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn');
+  if (toggleSidebarBtn && sidebar) {
+    toggleSidebarBtn.onclick = (e) => {
+      e.stopPropagation();
+      sidebar.classList.toggle('collapsed');
+      const icon = toggleSidebarBtn.querySelector('.collapse-icon');
+      if (sidebar.classList.contains('collapsed')) {
+        if (icon) icon.innerHTML = SVG_ICONS.chevronRight;
+      } else {
+        if (icon) icon.innerHTML = SVG_ICONS.chevronLeft;
+      }
+    };
+  }
+
   function togglePane(pane, btn) {
     const isCollapsed = pane.classList.toggle('collapsed');
     const icon = btn.querySelector('.collapse-icon');
     const text = btn.querySelector('.collapse-text');
 
     if (isCollapsed) {
-      if (icon) icon.textContent = '▼';
+      if (icon) icon.innerHTML = SVG_ICONS.chevronDown;
       if (text) text.textContent = 'Expand';
     } else {
-      if (icon) icon.textContent = '▲';
+      if (icon) icon.innerHTML = SVG_ICONS.chevronUp;
       if (text) text.textContent = 'Collapse';
     }
 
@@ -493,10 +1197,39 @@ function attachEventListeners() {
   }
 }
 
-// --- App Manager Modal Logic ---
-function openAppManagerModal() {
+// --- Settings Modal & Storage Settings Logic ---
+async function loadStorageSettings() {
+  try {
+    const res = await trackedFetch('/dashboard-api/settings');
+    const data = await res.json();
+
+    const configInput = document.getElementById('setting-config-dir');
+    const logsInput = document.getElementById('setting-logs-dir');
+
+    if (configInput) {
+      configInput.value = data.isDefaultConfig ? '' : data.configDir;
+      configInput.placeholder = `Default: ${data.defaults?.configDir || 'config/'}`;
+    }
+
+    if (logsInput) {
+      logsInput.value = data.isDefaultLogs ? '' : data.logsBaseDir;
+      logsInput.placeholder = `Default: ${data.defaults?.logsBaseDir || 'project root'}`;
+    }
+  } catch (err) {
+    console.error('Failed to load storage settings:', err);
+  }
+}
+
+function openSettingsModal() {
   renderAppManagerList();
-  openModal('app-manager-modal');
+  loadStorageSettings();
+  const tabApps = document.getElementById('tab-settings-apps');
+  if (tabApps) tabApps.click();
+  openModal('settings-modal');
+}
+
+function openAppManagerModal() {
+  openSettingsModal();
 }
 
 function renderAppManagerList() {
@@ -524,7 +1257,8 @@ function renderAppManagerList() {
 
     const redirects = (app.redirectUrls || []);
     const redLines = redirects.map(r => {
-      return `<li style="font-size:0.78rem; color:var(--text-muted);"><span style="color:#eab308;">🔀 ${escapeHtml(r.name)}</span> [prefix: <code>${escapeHtml(r.pathPrefix)}</code>] → ${escapeHtml(r.targetUrl)}</li>`;
+      const portText = r.port ? `http://localhost:${r.port}` : 'auto-assigned on save';
+      return `<li style="font-size:0.78rem; color:var(--text-muted);"><span style="color:#eab308; display:inline-flex; align-items:center;">${SVG_ICONS.fork}${escapeHtml(r.name)}</span> → <code style="color:var(--accent-color);">${portText}</code> → ${escapeHtml(r.targetUrl)}</li>`;
     }).join('');
 
     item.innerHTML = `
@@ -540,11 +1274,15 @@ function renderAppManagerList() {
           <div style="font-size:0.78rem; font-weight:600; color:var(--text-color); margin-top:6px;">Backend Services:</div>
           <ul style="margin: 2px 0 6px 4px; padding: 0; list-style: none;">${beLines || '<li style="color:var(--text-muted); font-size:0.78rem;">No backends configured</li>'}</ul>
           ${redirects.length > 0 ? `
-            <div style="font-size:0.78rem; font-weight:600; color:#eab308; margin-top:4px;">API Redirections / Forwarding:</div>
+            <div style="font-size:0.78rem; font-weight:600; color:#eab308; margin-top:4px;">External APIs:</div>
             <ul style="margin: 2px 0 0 4px; padding: 0; list-style: none;">${redLines}</ul>
           ` : ''}
         </div>
-        <div style="display:flex; gap:6px; flex-shrink:0;">
+        <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-color); cursor:pointer;" title="Listen and proxy requests for this application">
+            <input type="checkbox" ${app.isActive ? 'checked' : ''} onchange="setAppActive('${app.id}', this.checked)" style="cursor:pointer;">
+            Active
+          </label>
           <button class="btn btn-primary" style="padding:5px 12px;" onclick="editApp('${app.id}')">Edit</button>
           <button class="btn btn-danger" style="padding:5px 12px;" onclick="deleteApp('${app.id}')">Delete</button>
         </div>
@@ -577,10 +1315,28 @@ window.editApp = (id) => {
   openModal('edit-app-modal');
 };
 
+window.setAppActive = async (id, isActive) => {
+  try {
+    const res = await trackedFetch(`/dashboard-api/applications/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive })
+    });
+    if (!res.ok) throw new Error((await res.json()).error || 'Failed to update');
+    await loadApplications();
+    renderAppManagerList();
+    if (currentAppId === id) loadLogsForApp(id);
+    showToast(`${isActive ? 'Activated' : 'Deactivated'} application`, isActive ? 'success' : 'info');
+  } catch (err) {
+    showToast(err.message, 'error');
+    renderAppManagerList();
+  }
+};
+
 window.deleteApp = async (id) => {
   if (confirm('Delete this web application config?')) {
     try {
-      await fetch(`/dashboard-api/applications/${id}`, { method: 'DELETE' });
+      await trackedFetch(`/dashboard-api/applications/${id}`, { method: 'DELETE' });
       await loadApplications();
       renderAppManagerList();
       showToast('Application deleted', 'success');
@@ -628,29 +1384,25 @@ document.getElementById('save-app-config-btn').onclick = async () => {
     return;
   }
 
-  const hasInvalidPrefix = backendUrls.some(be => !be.pathPrefix || be.pathPrefix === '/');
-  if (hasInvalidPrefix) {
-    showToast('Path Prefix is required for every backend service (e.g. /api, /auth)', 'error');
-    return;
-  }
-
-  const hasInvalidRedirection = redirectUrls.some(red => !red.targetUrl.trim() || !red.pathPrefix || red.pathPrefix === '/');
+  const hasInvalidRedirection = redirectUrls.some(red => !red.targetUrl.trim());
   if (hasInvalidRedirection) {
-    showToast('All API redirections must have a Target URL and Path Prefix (e.g. /external/payment)', 'error');
+    showToast('All API redirections must have a Target URL', 'error');
     return;
   }
 
   const payload = { name, frontEndUrl, backendUrls, redirectUrls, isActive };
+  const saveBtn = document.getElementById('save-app-config-btn');
 
   try {
+    LoadingManager.setButtonLoading(saveBtn, true);
     if (id) {
-      await fetch(`/dashboard-api/applications/${id}`, {
+      await trackedFetch(`/dashboard-api/applications/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
     } else {
-      await fetch('/dashboard-api/applications', {
+      await trackedFetch('/dashboard-api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -662,6 +1414,8 @@ document.getElementById('save-app-config-btn').onclick = async () => {
     showToast('Application configuration saved', 'success');
   } catch (err) {
     showToast('Failed to save application config', 'error');
+  } finally {
+    LoadingManager.setButtonLoading(saveBtn, false);
   }
 };
 
@@ -702,8 +1456,8 @@ function addBackendRow(be = { name: '', url: '', pathPrefix: '/api' }) {
         <input type="text" class="form-control be-url" placeholder="http://localhost:5000" value="${escapeHtml(be.url)}">
       </div>
       <div class="form-group">
-        <label class="form-label" style="color:var(--accent-color); font-weight:700;">Path Prefix *:</label>
-        <input type="text" class="form-control be-prefix" placeholder="e.g. /api" value="${escapeHtml(be.pathPrefix || '')}">
+        <label class="form-label" style="color:var(--accent-color); font-weight:700;">Path Prefix <span style="font-weight:400; color:var(--text-muted);">(optional — leave empty to match all paths)</span>:</label>
+        <input type="text" class="form-control be-prefix" placeholder="e.g. /api  or leave empty to catch all" value="${escapeHtml(be.pathPrefix || '')}">
       </div>
     </div>
   `;
@@ -760,14 +1514,14 @@ function readBackendRows() {
 
 // --- Add-Redirect button inside edit modal ---
 document.getElementById('add-redirect-btn').onclick = () => {
-  addRedirectRow({ name: '', targetUrl: '', pathPrefix: '/external' });
+  addRedirectRow({ name: '', targetUrl: '' });
 };
 
 /**
  * Renders one API redirection row inside the redirect-services-list container.
- * @param {{ name: string, targetUrl: string, pathPrefix?: string }} red
+ * @param {{ id?: string, name: string, targetUrl: string, port?: number }} red
  */
-function addRedirectRow(red = { name: '', targetUrl: '', pathPrefix: '/external' }) {
+function addRedirectRow(red = { name: '', targetUrl: '', port: null, id: '' }) {
   const list = document.getElementById('redirect-services-list');
   const idx = list.children.length;
 
@@ -775,10 +1529,16 @@ function addRedirectRow(red = { name: '', targetUrl: '', pathPrefix: '/external'
   row.className = 'backend-row';
   row.style.borderColor = 'rgba(234, 179, 8, 0.4)';
   row.dataset.redirectIdx = idx;
+  row.dataset.redirectId = red.id || '';
+  row.dataset.redirectPort = red.port || '';
+
+  const portDisplay = red.port
+    ? `http://localhost:${red.port}`
+    : '(assigned automatically after save)';
 
   row.innerHTML = `
     <div class="backend-row-header">
-      <span class="backend-row-title" style="color:#eab308;">🔀 Redirection #${idx + 1}</span>
+      <span class="backend-row-title" style="color:#eab308; display:inline-flex; align-items:center;">${SVG_ICONS.fork}Redirection #${idx + 1}</span>
       <button type="button" class="backend-row-remove">Remove</button>
     </div>
     <div class="backend-row-fields">
@@ -791,8 +1551,8 @@ function addRedirectRow(red = { name: '', targetUrl: '', pathPrefix: '/external'
         <input type="text" class="form-control red-url" placeholder="https://api.stripe.com" value="${escapeHtml(red.targetUrl || red.url || '')}">
       </div>
       <div class="form-group">
-        <label class="form-label" style="color:#eab308; font-weight:700;">Path Prefix *:</label>
-        <input type="text" class="form-control red-prefix" placeholder="e.g. /external/payment" value="${escapeHtml(red.pathPrefix || '')}">
+        <label class="form-label" style="color:#eab308; font-weight:700;">Proxy URL (Dedicated Port):</label>
+        <input type="text" class="form-control red-port" readonly disabled style="opacity: 0.75; cursor: default; background: var(--bg-hover);" value="${escapeHtml(portDisplay)}">
       </div>
     </div>
   `;
@@ -811,28 +1571,23 @@ function addRedirectRow(red = { name: '', targetUrl: '', pathPrefix: '/external'
 function reindexRedirectRows() {
   const list = document.getElementById('redirect-services-list');
   Array.from(list.children).forEach((row, i) => {
-    row.querySelector('.backend-row-title').textContent = `🔀 Redirection #${i + 1}`;
+    row.querySelector('.backend-row-title').innerHTML = `${SVG_ICONS.fork}Redirection #${i + 1}`;
   });
 }
 
 /**
  * Reads all redirect rows from the list and returns an array of redirect objects.
- * @returns {{ name: string, targetUrl: string, pathPrefix: string }[]}
+ * @returns {{ id?: string, name: string, targetUrl: string, port?: number }[]}
  */
 function readRedirectRows() {
   const list = document.getElementById('redirect-services-list');
   return Array.from(list.children).map(row => {
-    let prefix = row.querySelector('.red-prefix').value.trim();
-    if (prefix && !prefix.startsWith('/')) {
-      prefix = '/' + prefix;
-    }
-    if (prefix.length > 1 && prefix.endsWith('/')) {
-      prefix = prefix.slice(0, -1);
-    }
+    const portVal = parseInt(row.dataset.redirectPort, 10);
     return {
+      id: row.dataset.redirectId || undefined,
       name: row.querySelector('.red-name').value.trim(),
       targetUrl: row.querySelector('.red-url').value.trim(),
-      pathPrefix: prefix
+      port: !isNaN(portVal) && portVal > 0 ? portVal : undefined
     };
   });
 }

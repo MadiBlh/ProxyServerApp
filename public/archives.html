@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proxy Server Log — Archives Explorer</title>
+  <meta name="description" content="Browse, search, inspect, and restore historical HTTP and SOAP logs in ProxyServerApp.">
+  <link rel="icon" type="image/svg" href="/dashboard-static/img/network.svg">
+  <link rel="stylesheet" href="/dashboard-static/css/styles.css">
+
+  <!-- Apply saved theme before first paint to prevent FOUC -->
+  <script>
+    (function() {
+      var theme = localStorage.getItem('proxy_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- GLOBAL LOADING BAR -->
+  <div id="global-loading-bar" class="loading-bar" role="status" aria-live="polite" aria-label="Loading"></div>
+
+  <!-- NAVBAR -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="brand-icon">P</div>
+      <span>Proxy Log Server &mdash; Archives Explorer</span>
+    </div>
+
+    <div class="nav-controls">
+      <!-- Archived Application Selector Dropdown -->
+      <div class="app-select-container">
+        <span class="app-select-label" style="display:flex; align-items:center; gap:4px;">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+          Archived App:
+        </span>
+        <select id="archive-app-dropdown" class="app-dropdown">
+          <option value="">Loading archived apps...</option>
+        </select>
+      </div>
+
+      <!-- Preserved Date Folder Dropdown -->
+      <div class="app-select-container" id="archive-date-select-container">
+        <span class="app-select-label" style="display:flex; align-items:center; gap:4px;">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          Date:
+        </span>
+        <select id="archive-date-dropdown" class="app-dropdown" title="Select historical date folder">
+          <option value="all">All Preserved Dates</option>
+        </select>
+      </div>
+
+      <nav class="nav-links">
+        <a href="/dashboard" class="nav-btn" title="Return to Live Dashboard">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          Live Dashboard
+        </a>
+        <a href="/archives" class="nav-btn active" style="font-weight:700; border-color:var(--accent-color);" title="Archives Explorer">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+          Archives
+        </a>
+        <a href="/doc" target="_blank" class="nav-btn" title="Open documentation">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          Docs
+        </a>
+        <button id="theme-toggle-btn" class="theme-toggle" title="Toggle Theme">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ARCHIVE TOOLBAR -->
+  <section class="toolbar">
+    <div class="action-buttons">
+      <!-- Reload archives -->
+      <button id="reload-archives-btn" class="btn btn-secondary">
+        Reload Archives
+      </button>
+
+      <!-- Restore Session to Live -->
+      <button id="restore-app-btn" class="btn btn-success" title="Restore this archived session back to the live dashboard">
+        Restore Session to Live
+      </button>
+
+      <!-- Delete Archive -->
+      <button id="delete-app-btn" class="btn btn-danger" title="Permanently delete this application archive from disk">
+        Delete Archive
+      </button>
+    </div>
+
+    <!-- Search fields -->
+    <div class="search-box">
+      <span class="search-icon">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </span>
+      <input type="text" id="archive-search-input" class="search-input" placeholder="Search endpoint, method, status... (/)" title="Search archived calls by path, HTTP method, or status.">
+      <button type="button" id="clear-archive-endpoint-search" class="search-clear-btn" aria-label="Clear endpoint search" title="Clear search">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="search-box">
+      <span class="search-icon">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+      </span>
+      <input type="text" id="archive-advanced-search-input" class="search-input" placeholder="Search headers &amp; body content..." title="Search deep content across archived headers and request/response payloads.">
+      <button type="button" id="clear-archive-body-search" class="search-clear-btn" aria-label="Clear body search" title="Clear search">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ARCHIVE VIEWER MAIN CONTENT (SPLIT UI) -->
+  <main class="main-content">
+    
+    <!-- FIRST SECTION (LEFT): LIST OF ARCHIVED CALLS -->
+    <aside id="log-sidebar" class="log-sidebar">
+      <div class="sidebar-header">
+        <span style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="archive-select-all-checkbox" class="log-checkbox" title="Select / deselect all visible archived calls">
+          <span>Archived Calls</span>
+        </span>
+        <span style="display:flex; align-items:center; gap:8px;">
+          <span id="archived-count-badge" class="method-badge">0 CALLS</span>
+          <button type="button" class="btn-collapse-pane" id="toggle-sidebar-btn" title="Collapse / Expand Sidebar">
+            <span class="collapse-icon">
+              <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </span>
+          </button>
+        </span>
+      </div>
+
+      <!-- MULTI-SELECT ACTION BAR (Appears when items are checked) -->
+      <div id="archive-multi-select-bar" class="multi-select-bar" style="display:none; padding:8px 12px; background:var(--bg-card); border-bottom:1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <div class="multi-select-info" style="font-size:0.8rem; font-weight:600; color:var(--text-secondary);">
+          <span id="archive-selected-count" class="selected-count-badge" style="background:var(--accent-color); color:var(--bg-primary); padding:2px 6px; border-radius:4px; font-weight:700;">0</span> selected
+        </div>
+        <div class="multi-select-actions" style="display:flex; gap:6px;">
+          <button id="archive-restore-selected-btn" class="btn btn-sm btn-success" style="padding:4px 10px; font-size:0.75rem;" title="Restore checked calls back to live logs">
+            Restore Selected
+          </button>
+          <button id="archive-clear-selection-btn" class="btn btn-sm btn-secondary" style="padding:4px 8px; font-size:0.75rem;" title="Clear checkbox selection">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <div style="position:relative; flex:1; display:flex; flex-direction:column; overflow:hidden;">
+        <div id="archives-loading-overlay" class="section-loading-overlay">
+          <div class="section-spinner">
+            <div class="logs-spinner"></div>
+            <span>Loading archived logs...</span>
+          </div>
+        </div>
+        <ul id="archived-logs-list-container" class="logs-list">
+          <div class="empty-state">
+            <div class="empty-state-icon">
+              <svg class="svg-icon empty-state-svg" viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.75" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+            </div>
+            <p>Select an archived application to view historical traffic</p>
+          </div>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- SECOND SECTION (RIGHT): SPLIT TOP (REQUEST) & BOTTOM (RESPONSE) -->
+    <section class="log-detail-container" style="position:relative;">
+      <div id="archive-detail-loading-overlay" class="section-loading-overlay">
+        <div class="section-spinner">
+          <div class="section-spinner-ring"></div>
+          <span>Loading details...</span>
+        </div>
+      </div>
+
+      <!-- TOP PANEL: REQUEST BODY & HEADERS IN MONACO -->
+      <div id="request-pane" class="detail-pane">
+        <div class="detail-header" id="request-header">
+          <div class="pane-title">
+            <span class="uppercase">ARCHIVED REQUEST</span>
+            <span id="req-method-badge" class="method-badge method-GET uppercase">GET</span>
+            <span id="req-url-text" style="font-family: 'Fira Code', monospace; font-size: 0.70rem;">Select an archived call from the left list</span>
+          </div>
+          <div class="pane-controls">
+            <button id="restore-single-call-btn" class="btn btn-sm btn-success" style="padding: 3px 8px; font-size: 0.75rem; display: none;" title="Restore only this single call back to active logs">
+              <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              Restore Call
+            </button>
+            <button class="tab-btn active" data-tab="body">Body (Monaco)</button>
+            <button class="tab-btn" data-tab="headers">Headers</button>
+            <button type="button" class="btn-collapse-pane" id="toggle-request-pane-btn" title="Collapse / Expand Request Panel">
+              <span class="collapse-icon">
+                <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+              </span>
+              <span class="collapse-text">Collapse</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="request-monaco-container" class="monaco-container"></div>
+        <div id="request-headers-view" class="headers-view" style="display: none;"></div>
+      </div>
+
+      <!-- BOTTOM PANEL: RESPONSE BODY & HEADERS IN MONACO -->
+      <div id="response-pane" class="detail-pane">
+        <div class="detail-header" id="response-header">
+          <div class="pane-title">
+            <span class="uppercase">ARCHIVED RESPONSE</span>
+            <span id="res-status-badge" class="btn uppercase" style="padding: 2px 8px; font-size: 0.70rem;">-</span>
+            <span id="res-duration-text" style="font-size: 0.8rem; color: var(--text-muted);">-</span>
+          </div>
+          <div class="pane-controls">
+            <button class="tab-btn active" data-tab="body">Body (Monaco)</button>
+            <button class="tab-btn" data-tab="headers">Headers</button>
+            <button type="button" class="btn-collapse-pane" id="toggle-response-pane-btn" title="Collapse / Expand Response Panel">
+              <span class="collapse-icon">
+                <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+              </span>
+              <span class="collapse-text">Collapse</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="response-monaco-container" class="monaco-container"></div>
+        <div id="response-headers-view" class="headers-view" style="display: none;"></div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Monaco Editor Library -->
+  <script src="/dashboard-static/js/monaco-init.js"></script>
+  <!-- Archives Page Controller -->
+  <script src="/dashboard-static/js/archives.js"></script>
+</body>
+</html>

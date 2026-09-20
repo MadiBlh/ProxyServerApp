@@ -1,11 +1,14 @@
-﻿require('../utils/bootstrap');
-
-const http = require('http');
-const express = require('express');
-const cors = require('cors');
-const httpProxy = require('http-proxy');
-const uuidv4 = require('../utils/uuid');
-const logManager = require('./logManager');
+import '../utils/bootstrap';
+import http from 'http';
+import express from 'express';
+import cors from 'cors';
+import httpProxy from 'http-proxy';
+import { PassThrough } from 'stream';
+import type { Request, Response } from 'express';
+import type * as httpModule from 'http';
+import uuidv4 from '../utils/uuid';
+import * as logManager from './logManager';
+import type { RedirectSubscriber, ProxyEntry, SseClient, RunningRedirectProxy } from '../types';
 
 /* ==========================================================================
    REDIRECT PROXY MANAGER
@@ -14,63 +17,90 @@ const logManager = require('./logManager');
    they share the same proxy server port seamlessly without port collision.
    ========================================================================== */
 
-// Map of port (number) -> { server, proxy, port, targetUrl, subscribers: [ { app, redirect } ] }
-const runningProxies = new Map();
+// Map of port (number) -> { server, proxy, port, targetUrl, subscribers }
+interface RunningProxyEntry extends ProxyEntry {
+  server: http.Server;
+  proxy: httpProxy;
+}
+
+const runningProxies = new Map<number, RunningProxyEntry>();
 
 // SSE clients shared with the main proxy engine for the unified log feed
-let sseClients = [];
+let sseClients: SseClient[] = [];
 
-function setSseClients(clients) {
+export function setSseClients(clients: SseClient[]): void {
   sseClients = clients;
 }
 
-function broadcastLogEvent(logSummary) {
+function broadcastLogEvent(logSummary: object): void {
   const data = `data: ${JSON.stringify(logSummary)}\n\n`;
   sseClients.forEach(client => {
-    try { client.write(data); } catch (e) { /* client disconnected */ }
+    try {
+      client.write(data);
+    } catch {
+      // client disconnected
+    }
   });
 }
 
 /**
  * Resolves the most relevant subscriber app for an incoming request on a shared redirect port.
  */
-function resolveSubscriber(subscribers, req) {
+export function resolveSubscriber(
+  subscribers: RedirectSubscriber[],
+  req: Request | httpModule.IncomingMessage
+): RedirectSubscriber {
   if (!subscribers || subscribers.length === 0) {
     return {
-      app: { id: 'shared', name: 'Shared API Redirect' },
-      redirect: { id: 'shared', name: 'External API' }
+      app: {
+        id: 'shared',
+        name: 'Shared API Redirect',
+        frontEndUrl: '',
+        backendUrls: [],
+        redirectUrls: [],
+        isActive: true
+      },
+      redirect: { id: 'shared', name: 'External API', targetUrl: '', port: 0 }
     };
   }
 
+  const headers = req.headers;
+
   // 1. Check explicit header
-  const explicitAppId = req.headers['x-proxy-app-id'] || req.headers['x-app-id'];
+  const explicitAppId = headers['x-proxy-app-id'] || headers['x-app-id'];
   if (explicitAppId) {
-    const match = subscribers.find(s => s.app.id === explicitAppId);
+    const appIdStr = Array.isArray(explicitAppId) ? explicitAppId[0] : explicitAppId;
+    const match = subscribers.find(s => s.app.id === appIdStr);
     if (match) return match;
   }
 
   // 2. Check Referer or Origin header against frontend URLs
-  const referer = (req.headers['referer'] || req.headers['origin'] || '').toLowerCase();
+  const refererRaw = headers['referer'] || headers['origin'] || '';
+  const referer = (Array.isArray(refererRaw) ? refererRaw[0] : refererRaw).toLowerCase();
   if (referer) {
     const match = subscribers.find(s => {
       if (!s.app.frontEndUrl) return false;
-      const cleanFront = s.app.frontEndUrl.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const cleanFront = s.app.frontEndUrl
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/$/, '');
       return referer.includes(cleanFront);
     });
     if (match) return match;
   }
 
   // 3. Fallback: First subscriber
-  return subscribers[0];
+  return subscribers[0]!;
 }
 
 /**
  * Starts a dedicated proxy server on a specific port for a target URL.
- * @param {number} port
- * @param {string} targetUrl
- * @param {Array<{ app: object, redirect: object }>} subscribers
  */
-function startRedirectProxy(port, targetUrl, subscribers) {
+export function startRedirectProxy(
+  port: number,
+  targetUrl: string,
+  subscribers: RedirectSubscriber[]
+): void {
   if (runningProxies.has(port)) {
     stopRedirectProxy(port);
   }
@@ -79,8 +109,6 @@ function startRedirectProxy(port, targetUrl, subscribers) {
     console.warn(`[RedirectProxy] Skipping start on port ${port} — missing targetUrl or port`);
     return;
   }
-
-  const primaryName = subscribers.map(s => s.redirect.name).filter(Boolean).join(' / ') || 'API Redirection';
 
   const proxy = httpProxy.createProxyServer({
     target: targetUrl,
@@ -91,16 +119,20 @@ function startRedirectProxy(port, targetUrl, subscribers) {
   });
 
   // Response handler: buffer, log, forward
-  proxy.on('proxyRes', (proxyRes, req, res) => {
-    const startTime = req._redirectStartTime || Date.now();
-    const durationMs = Date.now() - startTime;
-    const requestId = req._redirectRequestId;
-    const subscriber = req._redirectSubscriber || resolveSubscriber(subscribers, req);
-    const responseHeaders = proxyRes.headers;
-    const statusCode = proxyRes.statusCode;
+  proxy.on('proxyRes', (proxyRes: httpModule.IncomingMessage, req: httpModule.IncomingMessage, res: httpModule.ServerResponse) => {
+    const expressReq = req as Request;
+    const expressRes = res as Response;
 
-    const bodyChunks = [];
-    proxyRes.on('data', chunk => bodyChunks.push(chunk));
+    const startTime = expressReq._redirectStartTime || Date.now();
+    const durationMs = Date.now() - startTime;
+    const requestId = expressReq._redirectRequestId!;
+    const subscriber =
+      expressReq._redirectSubscriber || resolveSubscriber(subscribers, req);
+    const responseHeaders = proxyRes.headers;
+    const statusCode = proxyRes.statusCode ?? 500;
+
+    const bodyChunks: Buffer[] = [];
+    proxyRes.on('data', (chunk: Buffer) => bodyChunks.push(chunk));
     proxyRes.on('end', () => {
       const responseBuffer = Buffer.concat(bodyChunks);
       const responseBodyStr = responseBuffer.toString('utf8');
@@ -112,12 +144,12 @@ function startRedirectProxy(port, targetUrl, subscribers) {
         backendName: subscriber.redirect.name,
         routeType: 'redirect',
         targetUrl,
-        method: req.method,
-        endpoint: req.url,
+        method: req.method || 'GET',
+        endpoint: req.url || '/',
         requestHeaders: req.headers,
-        requestBody: req._redirectRawBodyStr || '',
+        requestBody: expressReq._redirectRawBodyStr || '',
         statusCode,
-        responseHeaders,
+        responseHeaders: responseHeaders as Record<string, string | string[] | undefined>,
         responseBody: responseBodyStr,
         durationMs
       });
@@ -136,23 +168,29 @@ function startRedirectProxy(port, targetUrl, subscribers) {
         durationMs
       });
 
-      res.status(statusCode);
+      expressRes.status(statusCode);
       Object.keys(responseHeaders).forEach(key => {
         const lk = key.toLowerCase();
         if (lk === 'content-length' || lk === 'transfer-encoding') return;
-        try { res.setHeader(key, responseHeaders[key]); } catch (_) {}
+        try {
+          expressRes.setHeader(key, responseHeaders[key] as string | string[]);
+        } catch { /* ignore */ }
       });
-      res.end(responseBuffer);
+      expressRes.end(responseBuffer);
     });
   });
 
   // Error handler
-  proxy.on('error', (err, req, res) => {
+  proxy.on('error', (err: Error, req: httpModule.IncomingMessage, res: httpModule.ServerResponse | import('net').Socket) => {
     console.error(`[RedirectProxy :${port}] Error:`, err.message);
-    const startTime = req._redirectStartTime || Date.now();
+    const expressReq = req as Request;
+    const expressRes = res as Response;
+
+    const startTime = expressReq._redirectStartTime || Date.now();
     const durationMs = Date.now() - startTime;
-    const requestId = req._redirectRequestId || uuidv4();
-    const subscriber = req._redirectSubscriber || resolveSubscriber(subscribers, req);
+    const requestId = expressReq._redirectRequestId || uuidv4();
+    const subscriber =
+      expressReq._redirectSubscriber || resolveSubscriber(subscribers, req);
 
     logManager.saveLogEntry({
       id: requestId,
@@ -161,10 +199,10 @@ function startRedirectProxy(port, targetUrl, subscribers) {
       backendName: subscriber.redirect.name,
       routeType: 'redirect',
       targetUrl,
-      method: req.method,
-      endpoint: req.url,
+      method: req.method || 'GET',
+      endpoint: req.url || '/',
       requestHeaders: req.headers || {},
-      requestBody: req._redirectRawBodyStr || '',
+      requestBody: expressReq._redirectRawBodyStr || '',
       statusCode: 502,
       responseHeaders: { 'content-type': 'text/plain' },
       responseBody: `Redirect Proxy Error: ${err.message}`,
@@ -172,8 +210,8 @@ function startRedirectProxy(port, targetUrl, subscribers) {
       error: err.message
     });
 
-    if (!res.headersSent) {
-      res.status(502).json({ error: 'Redirect Proxy Error', details: err.message });
+    if (!expressRes.headersSent) {
+      expressRes.status(502).json({ error: 'Redirect Proxy Error', details: err.message });
     }
   });
 
@@ -181,9 +219,9 @@ function startRedirectProxy(port, targetUrl, subscribers) {
   const expressApp = express();
   expressApp.use(cors());
 
-  expressApp.use((req, res) => {
-    const reqChunks = [];
-    req.on('data', chunk => reqChunks.push(chunk));
+  expressApp.use((req: Request, res: Response) => {
+    const reqChunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => reqChunks.push(chunk));
     req.on('end', () => {
       const rawReqBuffer = Buffer.concat(reqChunks);
       req._redirectRawBodyStr = rawReqBuffer.toString('utf8');
@@ -192,8 +230,7 @@ function startRedirectProxy(port, targetUrl, subscribers) {
       req._redirectStartTime = Date.now();
       req._redirectSubscriber = resolveSubscriber(subscribers, req);
 
-      const Stream = require('stream');
-      const bufferStream = new Stream.PassThrough();
+      const bufferStream = new PassThrough();
       bufferStream.end(rawReqBuffer);
 
       proxy.web(req, res, { buffer: bufferStream });
@@ -202,7 +239,7 @@ function startRedirectProxy(port, targetUrl, subscribers) {
 
   const server = http.createServer(expressApp);
 
-  server.on('error', err => {
+  server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`[RedirectProxy] Port ${port} already in use. Skipping.`);
     } else {
@@ -210,26 +247,23 @@ function startRedirectProxy(port, targetUrl, subscribers) {
     }
   });
 
-  server.listen(port, '0.0.0.0', () => {});
+  server.listen(port, '0.0.0.0', () => { /* started */ });
 
   runningProxies.set(port, { server, proxy, port, targetUrl, subscribers });
 }
 
 /**
  * Stops the proxy server running on the specified port.
- * @param {number} port
  */
-function stopRedirectProxy(port) {
+export function stopRedirectProxy(port: number): void {
   const entry = runningProxies.get(port);
   if (!entry) return;
-  entry.server.close(() => {});
+  entry.server.close(() => { /* closed */ });
   runningProxies.delete(port);
 }
 
-/**
- * Normalizes URL for comparison.
- */
-function normalizeTargetUrl(url) {
+/** Normalizes URL for comparison. */
+function normalizeTargetUrl(url: string): string {
   if (!url) return '';
   return url.trim().replace(/\/+$/, '').toLowerCase();
 }
@@ -237,15 +271,21 @@ function normalizeTargetUrl(url) {
 /**
  * Reconciles running proxies against all active applications.
  * Groups by port, starts new servers, updates subscribers, and stops unused ports.
- * @param {Array} allApps
  */
-function syncRedirectProxies(allApps) {
+export function syncRedirectProxies(allApps: Array<{
+  isActive: boolean;
+  id: string;
+  name: string;
+  frontEndUrl: string;
+  backendUrls: Array<{ id: string; name: string; url: string; pathPrefix: string }>;
+  redirectUrls: Array<{ id: string; name: string; targetUrl: string; port: number }>;
+}>): void {
   // Group all active redirects by port
-  const desiredByPort = new Map(); // port -> { port, targetUrl, subscribers: [] }
+  const desiredByPort = new Map<number, { port: number; targetUrl: string; subscribers: RedirectSubscriber[] }>();
 
   for (const app of allApps) {
     if (!app.isActive) continue;
-    for (const red of (app.redirectUrls || [])) {
+    for (const red of app.redirectUrls || []) {
       if (red.targetUrl && red.port) {
         if (!desiredByPort.has(red.port)) {
           desiredByPort.set(red.port, {
@@ -254,7 +294,7 @@ function syncRedirectProxies(allApps) {
             subscribers: []
           });
         }
-        desiredByPort.get(red.port).subscribers.push({ app, redirect: red });
+        desiredByPort.get(red.port)!.subscribers.push({ app, redirect: red });
       }
     }
   }
@@ -272,7 +312,6 @@ function syncRedirectProxies(allApps) {
     if (!existing) {
       startRedirectProxy(port, desired.targetUrl, desired.subscribers);
     } else {
-      // If targetUrl changed on the same port, restart
       if (normalizeTargetUrl(existing.targetUrl) !== normalizeTargetUrl(desired.targetUrl)) {
         startRedirectProxy(port, desired.targetUrl, desired.subscribers);
       } else {
@@ -286,7 +325,7 @@ function syncRedirectProxies(allApps) {
 /**
  * Returns all currently running redirect proxies (for the dashboard status API).
  */
-function getRunningRedirects() {
+export function getRunningRedirects(): RunningRedirectProxy[] {
   return Array.from(runningProxies.values()).map(entry => {
     const names = entry.subscribers.map(s => s.redirect.name).filter(Boolean);
     const appNames = entry.subscribers.map(s => s.app.name).filter(Boolean);
@@ -305,10 +344,3 @@ function getRunningRedirects() {
     };
   });
 }
-
-module.exports = {
-  syncRedirectProxies,
-  stopRedirectProxy,
-  getRunningRedirects,
-  setSseClients
-};

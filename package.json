@@ -1,11 +1,18 @@
 {
   "name": "proxy-server-log",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "Local proxy server tool to intercept, log, and inspect web application requests and responses.",
-  "main": "server.js",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node dist/server.js",
+    "dev": "node --watch -r ts-node/register server.ts",
+    "start:ts": "ts-node server.ts",
+    "dev:ts": "node --watch -r ts-node/register server.ts",
+    "build": "tsc",
+    "start:dist": "node dist/server.js",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
   },
   "keywords": [
     "proxy",
@@ -21,5 +28,18 @@
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "http-proxy": "^1.18.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/http-proxy": "^1.17.17",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.6.1",
+    "@types/supertest": "^7.2.1",
+    "jest": "^30.5.1",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }

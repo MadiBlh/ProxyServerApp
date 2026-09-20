@@ -1,12 +1,22 @@
-﻿const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const settingsManager = require('./settingsManager');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import * as settingsManager from './settingsManager';
+import type {
+  SaveLogEntryParams,
+  SaveLogEntryResult,
+  ReqMeta,
+  ResMeta,
+  LogEntry,
+  LogDetail,
+  LogSearchOptions,
+  ArchiveResult,
+  ExportResult
+} from '../types';
 
-function ensureDirectories() {
+function ensureDirectories(): void {
   const logsDir = settingsManager.getLogsDir();
   const headersDir = settingsManager.getHeadersDir();
-
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
   }
@@ -15,39 +25,57 @@ function ensureDirectories() {
   }
 }
 
-// Detect extension based on Content-Type or body content
-function getFileExtension(contentType, bodyStr) {
-  contentType = (contentType || '').toLowerCase();
-  if (contentType.includes('json') || (bodyStr && bodyStr.trim().startsWith('{') || bodyStr && bodyStr.trim().startsWith('['))) {
+/** Detect file extension based on Content-Type or body content. */
+function getFileExtension(contentType: string | undefined, bodyStr: string | undefined): string {
+  const ct = (contentType || '').toLowerCase();
+  if (ct.includes('json') || (bodyStr && (bodyStr.trim().startsWith('{') || bodyStr.trim().startsWith('[')))) {
     return 'json';
   }
-  if (contentType.includes('xml') || (bodyStr && bodyStr.trim().startsWith('<'))) {
+  if (ct.includes('xml') || (bodyStr && bodyStr.trim().startsWith('<'))) {
     return 'xml';
   }
-  if (contentType.includes('html')) {
-    return 'html';
-  }
-  if (contentType.includes('javascript') || contentType.includes('js')) {
-    return 'js';
-  }
-  if (contentType.includes('css')) {
-    return 'css';
-  }
+  if (ct.includes('html')) return 'html';
+  if (ct.includes('javascript') || ct.includes('js')) return 'js';
+  if (ct.includes('css')) return 'css';
   return 'txt';
 }
 
-function saveLogEntry({ id, appId, appName, backendName, routeType, targetUrl, method, endpoint, requestHeaders, requestBody, statusCode, responseHeaders, responseBody, durationMs, error }) {
+export function saveLogEntry({
+  id,
+  appId,
+  appName,
+  backendName,
+  routeType,
+  targetUrl,
+  method,
+  endpoint,
+  requestHeaders,
+  requestBody,
+  statusCode,
+  responseHeaders,
+  responseBody,
+  durationMs,
+  error
+}: SaveLogEntryParams): SaveLogEntryResult {
   ensureDirectories();
 
   const logsDir = settingsManager.getLogsDir();
   const headersDir = settingsManager.getHeadersDir();
 
-  const reqExt = getFileExtension(requestHeaders['content-type'], requestBody);
-  const resExt = getFileExtension(responseHeaders ? responseHeaders['content-type'] : '', responseBody);
+  const contentTypeReq = requestHeaders['content-type'];
+  const contentTypeRes = responseHeaders ? responseHeaders['content-type'] : undefined;
+
+  const reqExt = getFileExtension(
+    Array.isArray(contentTypeReq) ? contentTypeReq[0] : contentTypeReq,
+    requestBody
+  );
+  const resExt = getFileExtension(
+    Array.isArray(contentTypeRes) ? contentTypeRes[0] : contentTypeRes,
+    responseBody
+  );
 
   const reqBodyPath = path.join(logsDir, `${id}_request.${reqExt}`);
   const resBodyPath = path.join(logsDir, `${id}_response.${resExt}`);
-
   const reqHeaderPath = path.join(headersDir, `${id}_request.json`);
   const resHeaderPath = path.join(headersDir, `${id}_response.json`);
 
@@ -55,30 +83,41 @@ function saveLogEntry({ id, appId, appName, backendName, routeType, targetUrl, m
   fs.writeFileSync(reqBodyPath, requestBody || '', 'utf8');
   fs.writeFileSync(resBodyPath, responseBody || (error ? `Error: ${error}` : ''), 'utf8');
 
-  const reqMeta = {
+  const contentTypeReqStr = Array.isArray(contentTypeReq)
+    ? (contentTypeReq[0] ?? 'text/plain')
+    : (contentTypeReq ?? 'text/plain');
+
+  const reqMeta: ReqMeta = {
     id,
     appId,
     appName,
     backendName: backendName || null,
-    routeType: routeType || 'backend',
+    routeType: (routeType as 'backend' | 'redirect') || 'backend',
     timestamp: new Date().toISOString(),
     method: method || 'GET',
     endpoint: endpoint || targetUrl || '/',
     targetUrl,
-    contentType: requestHeaders['content-type'] || 'text/plain',
+    contentType: contentTypeReqStr,
     fileExtension: reqExt,
     headers: requestHeaders
   };
 
-  const statusOk = statusCode >= 200 && statusCode < 400 && !error;
+  const finalStatusCode = statusCode ?? 500;
+  const statusOk = finalStatusCode >= 200 && finalStatusCode < 400 && !error;
 
-  const resMeta = {
+  const contentTypeResStr = responseHeaders
+    ? (Array.isArray(responseHeaders['content-type'])
+        ? (responseHeaders['content-type'][0] ?? 'text/plain')
+        : (responseHeaders['content-type'] ?? 'text/plain'))
+    : 'text/plain';
+
+  const resMeta: ResMeta = {
     id,
     appId,
-    statusCode: statusCode || 500,
+    statusCode: finalStatusCode,
     statusText: statusOk ? 'OK' : 'FAILED',
     durationMs: durationMs || 0,
-    contentType: responseHeaders ? (responseHeaders['content-type'] || 'text/plain') : 'text/plain',
+    contentType: contentTypeResStr,
     fileExtension: resExt,
     headers: responseHeaders || {},
     error: error || null
@@ -90,7 +129,11 @@ function saveLogEntry({ id, appId, appName, backendName, routeType, targetUrl, m
   return { id, reqMeta, resMeta };
 }
 
-function getAllLogs(appIdFilter = null, searchText = null, options = {}) {
+export function getAllLogs(
+  appIdFilter: string | null = null,
+  searchText: string | null = null,
+  options: LogSearchOptions = {}
+): LogEntry[] {
   ensureDirectories();
   const headersDir = settingsManager.getHeadersDir();
   const logsDir = settingsManager.getLogsDir();
@@ -103,7 +146,7 @@ function getAllLogs(appIdFilter = null, searchText = null, options = {}) {
   const endpointSearch = (options.endpoint || '').toLowerCase().trim();
   const bodySearch = (options.body || searchText || '').toLowerCase().trim();
 
-  const logEntries = [];
+  const logEntries: LogEntry[] = [];
 
   for (const file of reqHeaderFiles) {
     try {
@@ -111,11 +154,11 @@ function getAllLogs(appIdFilter = null, searchText = null, options = {}) {
       const reqPath = path.join(headersDir, file);
       const resPath = path.join(headersDir, `${uuid}_response.json`);
 
-      const reqMeta = JSON.parse(fs.readFileSync(reqPath, 'utf8'));
-      let resMeta = { statusCode: 500, statusText: 'FAILED', durationMs: 0, headers: {} };
+      const reqMeta = JSON.parse(fs.readFileSync(reqPath, 'utf8')) as ReqMeta;
+      let resMeta: Partial<ResMeta> = { statusCode: 500, statusText: 'FAILED', durationMs: 0, headers: {} };
 
       if (fs.existsSync(resPath)) {
-        resMeta = JSON.parse(fs.readFileSync(resPath, 'utf8'));
+        resMeta = JSON.parse(fs.readFileSync(resPath, 'utf8')) as ResMeta;
       }
 
       if (appIdFilter && reqMeta.appId !== appIdFilter) {
@@ -125,7 +168,7 @@ function getAllLogs(appIdFilter = null, searchText = null, options = {}) {
       const endpoint = reqMeta.endpoint || reqMeta.targetUrl || '';
 
       if (endpointSearch || bodySearch) {
-        if (!matchesSearch(endpointSearch, bodySearch, reqMeta, resMeta, endpoint, logsDir, uuid)) {
+        if (!matchesSearch(endpointSearch, bodySearch, reqMeta, resMeta as ResMeta, endpoint, logsDir, uuid)) {
           continue;
         }
       }
@@ -140,11 +183,13 @@ function getAllLogs(appIdFilter = null, searchText = null, options = {}) {
         method: reqMeta.method,
         endpoint,
         targetUrl: reqMeta.targetUrl,
-        statusCode: resMeta.statusCode,
-        status: resMeta.statusText || (resMeta.statusCode >= 200 && resMeta.statusCode < 400 ? 'OK' : 'FAILED'),
-        durationMs: resMeta.durationMs,
+        statusCode: resMeta.statusCode ?? 500,
+        status:
+          resMeta.statusText ||
+          ((resMeta.statusCode ?? 500) >= 200 && (resMeta.statusCode ?? 500) < 400 ? 'OK' : 'FAILED'),
+        durationMs: resMeta.durationMs ?? 0,
         requestExt: reqMeta.fileExtension,
-        responseExt: resMeta.fileExtension
+        responseExt: resMeta.fileExtension ?? 'txt'
       });
     } catch (err) {
       console.error(`Error reading log ${file}:`, err);
@@ -152,40 +197,54 @@ function getAllLogs(appIdFilter = null, searchText = null, options = {}) {
   }
 
   // Sort by timestamp descending
-  return logEntries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  return logEntries.sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
 }
 
-function matchesSearch(endpointSearch, bodySearch, reqMeta, resMeta, endpoint, logsDir, uuid) {
+function matchesSearch(
+  endpointSearch: string,
+  bodySearch: string,
+  reqMeta: ReqMeta,
+  resMeta: ResMeta,
+  endpoint: string,
+  logsDir: string,
+  uuid: string
+): boolean {
   if (endpointSearch) {
     if (!(endpoint || '').toLowerCase().includes(endpointSearch)) {
       return false;
     }
   }
-
   if (bodySearch) {
     const reqBody = readBodyFile(logsDir, uuid, 'request', reqMeta.fileExtension);
     const resBody = readBodyFile(logsDir, uuid, 'response', resMeta.fileExtension);
-    const bodyMatch = (reqBody && reqBody.toLowerCase().includes(bodySearch)) ||
-                      (resBody && resBody.toLowerCase().includes(bodySearch));
+    const bodyMatch =
+      (reqBody && reqBody.toLowerCase().includes(bodySearch)) ||
+      (resBody && resBody.toLowerCase().includes(bodySearch));
     if (!bodyMatch) {
       return false;
     }
   }
-
   return true;
 }
 
-function readBodyFile(logsDir, uuid, kind, extension) {
+function readBodyFile(
+  logsDir: string,
+  uuid: string,
+  kind: 'request' | 'response',
+  extension: string | undefined
+): string | null {
   try {
     const bodyPath = path.join(logsDir, `${uuid}_${kind}.${extension || 'txt'}`);
     if (!fs.existsSync(bodyPath)) return null;
     return fs.readFileSync(bodyPath, 'utf8');
-  } catch (err) {
+  } catch {
     return null;
   }
 }
 
-function getLogDetail(id) {
+export function getLogDetail(id: string): LogDetail | null {
   ensureDirectories();
   const logsDir = settingsManager.getLogsDir();
   const headersDir = settingsManager.getHeadersDir();
@@ -197,8 +256,10 @@ function getLogDetail(id) {
     return null;
   }
 
-  const reqMeta = JSON.parse(fs.readFileSync(reqHeaderPath, 'utf8'));
-  const resMeta = fs.existsSync(resHeaderPath) ? JSON.parse(fs.readFileSync(resHeaderPath, 'utf8')) : {};
+  const reqMeta = JSON.parse(fs.readFileSync(reqHeaderPath, 'utf8')) as ReqMeta;
+  const resMeta: ResMeta = fs.existsSync(resHeaderPath)
+    ? (JSON.parse(fs.readFileSync(resHeaderPath, 'utf8')) as ResMeta)
+    : ({} as ResMeta);
 
   // Read request body file
   const reqBodyPath = path.join(logsDir, `${id}_request.${reqMeta.fileExtension || 'txt'}`);
@@ -214,42 +275,31 @@ function getLogDetail(id) {
     responseBody = fs.readFileSync(resBodyPath, 'utf8');
   }
 
-  return {
-    id,
-    reqMeta,
-    resMeta,
-    requestBody,
-    responseBody
-  };
+  return { id, reqMeta, resMeta, requestBody, responseBody };
 }
 
-function clearAllLogs() {
+export function clearAllLogs(): boolean {
   ensureDirectories();
   const logsDir = settingsManager.getLogsDir();
   const headersDir = settingsManager.getHeadersDir();
 
   if (fs.existsSync(logsDir)) {
-    const logFiles = fs.readdirSync(logsDir);
-    for (const f of logFiles) {
+    for (const f of fs.readdirSync(logsDir)) {
       const fullPath = path.join(logsDir, f);
       if (fs.statSync(fullPath).isFile()) fs.unlinkSync(fullPath);
     }
   }
-
   if (fs.existsSync(headersDir)) {
-    const headerFiles = fs.readdirSync(headersDir);
-    for (const f of headerFiles) {
+    for (const f of fs.readdirSync(headersDir)) {
       const fullPath = path.join(headersDir, f);
       if (fs.statSync(fullPath).isFile()) fs.unlinkSync(fullPath);
     }
   }
-
   return true;
 }
 
-function clearLogsForApp(appId) {
+export function clearLogsForApp(appId: string): number {
   if (!appId) return 0;
-
   ensureDirectories();
   const logsDir = settingsManager.getLogsDir();
   const headersDir = settingsManager.getHeadersDir();
@@ -257,13 +307,13 @@ function clearLogsForApp(appId) {
 
   for (const dir of [headersDir, logsDir]) {
     if (!fs.existsSync(dir)) continue;
-    const fnames = fs.readdirSync(dir);
-    for (const f of fnames) {
-      let fullPath = path.join(dir, f);
+    for (const f of fs.readdirSync(dir)) {
+      const fullPath = path.join(dir, f);
       if (!fs.statSync(fullPath).isFile()) continue;
+
       if (f.endsWith('_request.json') || f.endsWith('_response.json')) {
         try {
-          const meta = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+          const meta = JSON.parse(fs.readFileSync(fullPath, 'utf8')) as { appId: string };
           if (meta.appId === appId) {
             fs.unlinkSync(fullPath);
             deleted++;
@@ -277,7 +327,7 @@ function clearLogsForApp(appId) {
         if (base === f) continue;
         const reqPath = path.join(headersDir, `${base}_request.json`);
         try {
-          const meta = JSON.parse(fs.readFileSync(reqPath, 'utf8'));
+          const meta = JSON.parse(fs.readFileSync(reqPath, 'utf8')) as { appId: string };
           if (meta.appId === appId) {
             fs.unlinkSync(fullPath);
             deleted++;
@@ -288,20 +338,20 @@ function clearLogsForApp(appId) {
       }
     }
   }
-
   return deleted;
 }
 
-function archiveLogsForApp(appId, appName) {
+export function archiveLogsForApp(appId: string, appName?: string): ArchiveResult {
   if (!appId) return { archived: 0 };
-
   ensureDirectories();
+
   const logsDir = settingsManager.getLogsDir();
   const headersDir = settingsManager.getHeadersDir();
   const archivesDir = settingsManager.getArchivesDir();
 
-  // Create archive subdirectories: archives/<appName>/logs/ and archives/<appName>/headers/
-  const sanitizeName = (appName || 'unknown').replace(/[^a-zA-Z0-9_\- ]/g, '_').trim() || 'unknown';
+  // Create archive subdirectories
+  const sanitizeName =
+    (appName || 'unknown').replace(/[^a-zA-Z0-9_\- ]/g, '_').trim() || 'unknown';
   const archiveLogsDir = path.join(archivesDir, sanitizeName, 'logs');
   const archiveHeadersDir = path.join(archivesDir, sanitizeName, 'headers');
 
@@ -309,13 +359,12 @@ function archiveLogsForApp(appId, appName) {
   if (!fs.existsSync(archiveHeadersDir)) fs.mkdirSync(archiveHeadersDir, { recursive: true });
 
   let archived = 0;
-  const filesToMove = [];
+  const filesToMove: Array<{ src: string; dest: string }> = [];
 
   // First pass: identify all files belonging to this appId
   for (const dir of [headersDir, logsDir]) {
     if (!fs.existsSync(dir)) continue;
-    const fnames = fs.readdirSync(dir);
-    for (const f of fnames) {
+    for (const f of fs.readdirSync(dir)) {
       const fullPath = path.join(dir, f);
       if (!fs.statSync(fullPath).isFile()) continue;
 
@@ -323,18 +372,17 @@ function archiveLogsForApp(appId, appName) {
 
       if (f.endsWith('_request.json') || f.endsWith('_response.json')) {
         try {
-          const meta = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+          const meta = JSON.parse(fs.readFileSync(fullPath, 'utf8')) as { appId: string };
           if (meta.appId === appId) belongsToApp = true;
         } catch {
           // skip unparseable header
         }
       } else {
-        // Match body files by stripping the _request/_response suffix to get the UUID
         const base = f.replace(/_(request|response)\..+$/, '');
         if (base === f) continue;
         const reqPath = path.join(headersDir, `${base}_request.json`);
         try {
-          const meta = JSON.parse(fs.readFileSync(reqPath, 'utf8'));
+          const meta = JSON.parse(fs.readFileSync(reqPath, 'utf8')) as { appId: string };
           if (meta.appId === appId) belongsToApp = true;
         } catch {
           continue;
@@ -353,14 +401,14 @@ function archiveLogsForApp(appId, appName) {
     try {
       fs.renameSync(src, dest);
       archived++;
-    } catch (err) {
+    } catch {
       // If rename fails across devices, fall back to copy + delete
       try {
         fs.copyFileSync(src, dest);
         fs.unlinkSync(src);
         archived++;
       } catch (copyErr) {
-        console.error(`Failed to archive ${src}:`, copyErr.message);
+        console.error(`Failed to archive ${src}:`, (copyErr as Error).message);
       }
     }
   }
@@ -368,10 +416,10 @@ function archiveLogsForApp(appId, appName) {
   return { archived, archivePath: path.join(archivesDir, sanitizeName) };
 }
 
-function deleteLogsByIds(ids) {
+export function deleteLogsByIds(ids: string[]): number {
   if (!Array.isArray(ids) || ids.length === 0) return 0;
-
   ensureDirectories();
+
   const logsDir = settingsManager.getLogsDir();
   const headersDir = settingsManager.getHeadersDir();
   const idSet = new Set(ids);
@@ -379,17 +427,16 @@ function deleteLogsByIds(ids) {
 
   for (const dir of [headersDir, logsDir]) {
     if (!fs.existsSync(dir)) continue;
-    const fnames = fs.readdirSync(dir);
-    for (const f of fnames) {
-      let fullPath = path.join(dir, f);
+    for (const f of fs.readdirSync(dir)) {
+      const fullPath = path.join(dir, f);
       if (!fs.statSync(fullPath).isFile()) continue;
 
-      let baseId = null;
+      let baseId: string | null = null;
       if (f.endsWith('_request.json') || f.endsWith('_response.json')) {
         baseId = f.replace(/_(request|response)\.json$/, '');
       } else {
         const m = f.match(/^(.*?)_(request|response)\..+$/);
-        if (m) baseId = m[1];
+        if (m) baseId = m[1] ?? null;
       }
 
       if (baseId && idSet.has(baseId)) {
@@ -397,16 +444,15 @@ function deleteLogsByIds(ids) {
           fs.unlinkSync(fullPath);
           deleted++;
         } catch (err) {
-          console.error(`Failed to delete ${fullPath}:`, err.message);
+          console.error(`Failed to delete ${fullPath}:`, (err as Error).message);
         }
       }
     }
   }
-
   return deleted;
 }
 
-function getDownloadsDir() {
+function getDownloadsDir(): string {
   const dir = path.join(os.homedir(), 'Downloads');
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -414,7 +460,7 @@ function getDownloadsDir() {
   return dir;
 }
 
-function exportLog(id, customName) {
+export function exportLog(id: string, customName: string): ExportResult | null {
   const detail = getLogDetail(id);
   if (!detail) return null;
 
@@ -438,14 +484,3 @@ function exportLog(id, customName) {
     responseFile: resFileName
   };
 }
-
-module.exports = {
-  saveLogEntry,
-  getAllLogs,
-  getLogDetail,
-  clearAllLogs,
-  clearLogsForApp,
-  archiveLogsForApp,
-  deleteLogsByIds,
-  exportLog
-};

@@ -1,10 +1,50 @@
-const fs = require('fs');
-const path = require('path');
-const uuidv4 = require('../utils/uuid');
-const settingsManager = require('./settingsManager');
+import fs from 'fs';
+import path from 'path';
+import uuidv4 from '../utils/uuid';
+import * as settingsManager from './settingsManager';
+import type { Application, BackendUrl, RedirectUrl, CreateApplicationInput, UpdateApplicationInput } from '../types';
+
+// Main server port (defaults to 4000)
+const MAIN_SERVER_PORT = parseInt(process.env['PORT'] || '4000', 10);
+// First port used for redirect proxy servers
+const BASE_REDIRECT_PORT = parseInt(process.env['REDIRECT_BASE_PORT'] || '4001', 10);
+
+// Sample default configurations if empty
+const DEFAULT_CONFIG: Application[] = [
+  {
+    id: 'app-default-1',
+    name: 'Sample JSON Store API',
+    frontEndUrl: 'http://localhost:3000',
+    backendUrls: [
+      {
+        id: 'be-1',
+        name: 'JSON Placeholder API',
+        url: 'https://jsonplaceholder.typicode.com',
+        pathPrefix: '/posts'
+      }
+    ],
+    redirectUrls: [],
+    isActive: true
+  },
+  {
+    id: 'app-default-2',
+    name: 'Sample SOAP Calculator Service',
+    frontEndUrl: 'http://localhost:3001',
+    backendUrls: [
+      {
+        id: 'be-2',
+        name: 'Calculator SOAP Backend',
+        url: 'http://www.dneonline.com',
+        pathPrefix: '/calculator'
+      }
+    ],
+    redirectUrls: [],
+    isActive: true
+  }
+];
 
 // Ensure directory exists
-function ensureConfigDir() {
+function ensureConfigDir(): void {
   const configDir = settingsManager.getConfigDir();
   if (!fs.existsSync(configDir)) {
     fs.mkdirSync(configDir, { recursive: true });
@@ -15,7 +55,7 @@ function ensureConfigDir() {
  * Normalizes a path prefix string to always start with '/' and end without trailing '/'
  * e.g., "api/users" -> "/api/users"
  */
-function normalizePathPrefix(prefix) {
+export function normalizePathPrefix(prefix: string | undefined): string {
   if (!prefix) return '/';
   let str = prefix.trim();
   if (!str.startsWith('/')) {
@@ -30,43 +70,34 @@ function normalizePathPrefix(prefix) {
 /**
  * Normalizes a target URL for comparison (trims whitespace and trailing slashes, lowercases scheme/host).
  */
-function normalizeTargetUrl(url) {
+export function normalizeTargetUrl(url: string | undefined): string {
   if (!url) return '';
   return url.trim().replace(/\/+$/, '').toLowerCase();
 }
 
-// Main server port (defaults to 4000)
-const MAIN_SERVER_PORT = parseInt(process.env.PORT || '4000', 10);
-// First port used for redirect proxy servers
-const BASE_REDIRECT_PORT = parseInt(process.env.REDIRECT_BASE_PORT || '4001', 10);
-
 /**
- * Returns the appropriate redirect proxy port for a given targetUrl:
- * 1. If another redirection across any active/configured application already targets
- *    the exact same targetUrl and has a port assigned, reuse that port.
- * 2. If existingPort is provided, is not the main server port, and does not collide
- *    with a different targetUrl's assigned port, keep it.
- * 3. Otherwise, find the next available port starting from BASE_REDIRECT_PORT
- *    (avoiding MAIN_SERVER_PORT and ports used by different targets).
- *
- * @param {number|undefined} existingPort - current port assigned to this entry
- * @param {string} targetUrl - the destination external URL
- * @param {Array} allApps - full applications array
- * @param {string} [currentAppId] - id of app being created/updated
- * @param {string} [currentRedId] - id of redirection entry being created/updated
- * @returns {number}
+ * Returns the appropriate redirect proxy port for a given targetUrl.
+ * 1. Reuse port if another redirect already targets the exact same URL.
+ * 2. Keep existingPort if it doesn't collide with a different target.
+ * 3. Otherwise, find the next available port from BASE_REDIRECT_PORT.
  */
-function assignRedirectPort(existingPort, targetUrl, allApps = [], currentAppId = null, currentRedId = null) {
+export function assignRedirectPort(
+  existingPort: number | undefined,
+  targetUrl: string,
+  allApps: Application[] = [],
+  currentAppId: string | null = null,
+  currentRedId: string | null = null
+): number {
   const normTarget = normalizeTargetUrl(targetUrl);
 
   // 1. Check if any other redirection already uses a port for the exact same targetUrl
   if (normTarget) {
     for (const app of allApps) {
-      for (const red of (app.redirectUrls || [])) {
+      for (const red of app.redirectUrls || []) {
         if (currentAppId && currentRedId && app.id === currentAppId && red.id === currentRedId) {
           continue;
         }
-        if (red.port && normalizeTargetUrl(red.targetUrl || red.url) === normTarget) {
+        if (red.port && normalizeTargetUrl(red.targetUrl) === normTarget) {
           return red.port;
         }
       }
@@ -74,14 +105,14 @@ function assignRedirectPort(existingPort, targetUrl, allApps = [], currentAppId 
   }
 
   // 2. Collect all ports used by DIFFERENT targets (and the main server port)
-  const portsUsedByOtherTargets = new Set([MAIN_SERVER_PORT]);
+  const portsUsedByOtherTargets = new Set<number>([MAIN_SERVER_PORT]);
   for (const app of allApps) {
-    for (const red of (app.redirectUrls || [])) {
+    for (const red of app.redirectUrls || []) {
       if (currentAppId && currentRedId && app.id === currentAppId && red.id === currentRedId) {
         continue;
       }
       if (red.port) {
-        const otherNorm = normalizeTargetUrl(red.targetUrl || red.url);
+        const otherNorm = normalizeTargetUrl(red.targetUrl);
         if (!normTarget || otherNorm !== normTarget) {
           portsUsedByOtherTargets.add(red.port);
         }
@@ -102,39 +133,7 @@ function assignRedirectPort(existingPort, targetUrl, allApps = [], currentAppId 
   return port;
 }
 
-// Sample default configurations if empty
-const DEFAULT_CONFIG = [
-  {
-    id: "app-default-1",
-    name: "Sample JSON Store API",
-    frontEndUrl: "http://localhost:3000",
-    backendUrls: [
-      {
-        id: "be-1",
-        name: "JSON Placeholder API",
-        url: "https://jsonplaceholder.typicode.com",
-        pathPrefix: "/posts"
-      }
-    ],
-    isActive: true
-  },
-  {
-    id: "app-default-2",
-    name: "Sample SOAP Calculator Service",
-    frontEndUrl: "http://localhost:3001",
-    backendUrls: [
-      {
-        id: "be-2",
-        name: "Calculator SOAP Backend",
-        url: "http://www.dneonline.com",
-        pathPrefix: "/calculator"
-      }
-    ],
-    isActive: true
-  }
-];
-
-function getApplications() {
+export function getApplications(): Application[] {
   ensureConfigDir();
   const configFile = settingsManager.getConfigFile();
   if (!fs.existsSync(configFile)) {
@@ -143,31 +142,31 @@ function getApplications() {
   }
   try {
     const data = fs.readFileSync(configFile, 'utf8');
-    return JSON.parse(data);
+    return JSON.parse(data) as Application[];
   } catch (err) {
     console.error('Error reading config file:', err);
     return [];
   }
 }
 
-function saveApplications(applications) {
+export function saveApplications(applications: Application[]): void {
   ensureConfigDir();
   const configFile = settingsManager.getConfigFile();
   fs.writeFileSync(configFile, JSON.stringify(applications, null, 2), 'utf8');
 }
 
-function getApplicationById(id) {
+export function getApplicationById(id: string): Application | undefined {
   const apps = getApplications();
   return apps.find(app => app.id === id);
 }
 
-function createApplication(appData) {
+export function createApplication(appData: CreateApplicationInput): Application {
   const apps = getApplications();
-  const newApp = {
+  const newApp: Application = {
     id: appData.id || uuidv4(),
     name: appData.name || 'New Application',
     frontEndUrl: appData.frontEndUrl || '',
-    backendUrls: (appData.backendUrls || []).map(be => ({
+    backendUrls: (appData.backendUrls || []).map((be: Partial<BackendUrl>) => ({
       id: be.id || uuidv4(),
       name: be.name || 'Backend Service',
       url: be.url || '',
@@ -177,58 +176,69 @@ function createApplication(appData) {
     isActive: appData.isActive !== undefined ? appData.isActive : true
   };
   apps.push(newApp);
+
   // Assign ports now that newApp is in the array (avoids collisions with itself)
-  newApp.redirectUrls = (appData.redirectUrls || []).map(red => {
+  newApp.redirectUrls = (appData.redirectUrls || []).map((red: Partial<RedirectUrl>) => {
     const redId = red.id || uuidv4();
-    const targetUrl = red.targetUrl || red.url || '';
+    const targetUrl = red.targetUrl || '';
     return {
       id: redId,
       name: red.name || 'API Redirection',
-      targetUrl: targetUrl,
+      targetUrl,
       port: assignRedirectPort(red.port, targetUrl, apps, newApp.id, redId)
     };
   });
+
   saveApplications(apps);
   return newApp;
 }
 
-function updateApplication(id, appData) {
+export function updateApplication(
+  id: string,
+  appData: UpdateApplicationInput
+): Application | null {
   const apps = getApplications();
   const index = apps.findIndex(app => app.id === id);
   if (index === -1) return null;
 
   // Build updated redirect list — preserve existing ports where possible
-  const existingRedirects = apps[index].redirectUrls || [];
-  const updatedRedirects = (appData.redirectUrls || existingRedirects).map(red => {
+  const existingRedirects = apps[index]?.redirectUrls || [];
+  const updatedRedirects: RedirectUrl[] = (
+    appData.redirectUrls || existingRedirects
+  ).map((red: Partial<RedirectUrl>) => {
     const existing = existingRedirects.find(e => e.id === red.id);
     const redId = red.id || (existing && existing.id) || uuidv4();
-    const targetUrl = red.targetUrl || red.url || (existing && (existing.targetUrl || existing.url)) || '';
+    const targetUrl =
+      red.targetUrl || (existing && existing.targetUrl) || '';
     const existingPort = red.port || (existing && existing.port);
     return {
       id: redId,
       name: red.name || 'API Redirection',
-      targetUrl: targetUrl,
+      targetUrl,
       port: assignRedirectPort(existingPort, targetUrl, apps, id, redId)
     };
   });
 
   apps[index] = {
-    ...apps[index],
+    ...apps[index]!,
     ...appData,
     id, // preserve id
-    backendUrls: (appData.backendUrls || apps[index].backendUrls || []).map(be => ({
-      id: be.id || uuidv4(),
-      name: be.name || 'Backend Service',
-      url: be.url || '',
-      pathPrefix: normalizePathPrefix(be.pathPrefix)
-    })),
+    backendUrls: (appData.backendUrls || apps[index]?.backendUrls || []).map(
+      (be: Partial<BackendUrl>) => ({
+        id: be.id || uuidv4(),
+        name: be.name || 'Backend Service',
+        url: be.url || '',
+        pathPrefix: normalizePathPrefix(be.pathPrefix)
+      })
+    ),
     redirectUrls: updatedRedirects
   };
+
   saveApplications(apps);
-  return apps[index];
+  return apps[index]!;
 }
 
-function deleteApplication(id) {
+export function deleteApplication(id: string): boolean {
   let apps = getApplications();
   const initialLength = apps.length;
   apps = apps.filter(app => app.id !== id);
@@ -238,15 +248,3 @@ function deleteApplication(id) {
   }
   return false;
 }
-
-module.exports = {
-  getApplications,
-  getApplicationById,
-  saveApplications,
-  createApplication,
-  updateApplication,
-  deleteApplication,
-  normalizePathPrefix,
-  normalizeTargetUrl,
-  assignRedirectPort
-};

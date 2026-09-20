@@ -186,19 +186,31 @@ ProxyServerApp/
 |   |-- doc.html                  Full code documentation (served at /doc)
 |   |-- css/                      styles.css (design system) + doc.css
 |   '-- js/                       app.js (controller), monaco-init.js, doc.js
-'-- src/
-    |-- routes/
-    |   '-- api.js                All /dashboard-api endpoints (REST + SSE)
-    |-- services/
-    |   |-- configManager.js      Applications CRUD + redirect port assignment
-    |   |-- logManager.js         Write/read/clear/archive/export capture files
-    |   |-- proxyEngine.js        Main http-proxy wiring, route matching, SSE broadcaster
-    |   |-- redirectProxyManager.js  Dedicated proxy servers per redirect port
-    |   |-- replayService.js      Re-fires a captured request via fetch()
-    |   '-- settingsManager.js    Configurable storage paths including archives (env / settings.json)
-    '-- utils/
-        |-- bootstrap.js          util._extend polyfill (silences DEP0060 warning)
-        '-- uuid.js               Dependency-free UUID v4 generator
+|-- src/
+|   |-- routes/
+|   |   |-- api.ts                All /dashboard-api endpoints (REST + SSE)
+|   |   '-- api.test.ts           Unit tests for API routes
+|   |-- services/
+|   |   |-- configManager.ts      Applications CRUD + redirect port assignment
+|   |   |-- configManager.test.ts Unit tests for configManager
+|   |   |-- logManager.ts         Write/read/clear/archive/export capture files
+|   |   |-- logManager.test.ts    Unit tests for logManager
+|   |   |-- proxyEngine.ts        Main http-proxy wiring, route matching, SSE broadcaster
+|   |   |-- proxyEngine.test.ts   Unit tests for proxyEngine
+|   |   |-- redirectProxyManager.ts Dedicated proxy servers per redirect port
+|   |   |-- redirectProxyManager.test.ts Unit tests for redirectProxyManager
+|   |   |-- replayService.ts      Re-fires a captured request via fetch()
+|   |   |-- replayService.test.ts Unit tests for replayService
+|   |   |-- settingsManager.ts    Configurable storage paths including archives
+|   |   '-- settingsManager.test.ts Unit tests for settingsManager
+|   |-- types/
+|   |   '-- index.ts              Shared TypeScript types & Express augmentation
+|   '-- utils/
+|       |-- bootstrap.ts          util._extend polyfill (silences DEP0060 warning)
+|       |-- bootstrap.test.ts     Unit tests for bootstrap
+|       |-- uuid.ts               Dependency-free UUID v4 generator
+|       '-- uuid.test.ts          Unit tests for uuid
+'-- server.ts                     Application entry point & setup
 ```
 
 Captured files per transaction (keyed by a shared UUID `id`):
@@ -210,10 +222,26 @@ Captured files per transaction (keyed by a shared UUID `id`):
 
 ---
 
-## Development
+## Development & Testing
 
 ```bash
-npm run dev      # restart on file changes (node --watch)
+# Run unit tests
+npm test
+
+# Run tests with coverage report
+npm run test:coverage
+
+# Run TypeScript compiler
+npm run build
+
+# Start TypeScript development server
+npm run start:ts
+
+# Start TypeScript development server with auto-reload on file changes
+npm run dev:ts
+
+# Start production build
+npm run start:dist
 ```
 
 Full line-level documentation (every module, function reference, route table and

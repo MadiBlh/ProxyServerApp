@@ -153,5 +153,13 @@ describe('Redirect Proxy Manager (src/services/redirectProxyManager.ts)', () => 
       redirectProxyManager.stopRedirectProxy(5001);
       expect(redirectProxyManager.getRunningRedirects().length).toBe(0);
     });
+
+    it('should stop all running redirect proxies', () => {
+      redirectProxyManager.syncRedirectProxies([appA]);
+      expect(redirectProxyManager.getRunningRedirects().length).toBe(1);
+
+      redirectProxyManager.stopAllRedirectProxies();
+      expect(redirectProxyManager.getRunningRedirects().length).toBe(0);
+    });
   });
 });

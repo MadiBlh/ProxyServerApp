@@ -37,6 +37,20 @@ describe('Proxy Engine (src/services/proxyEngine.ts)', () => {
       proxyEngine.unregisterSseClient(mockRes);
       expect(proxyEngine.sseClients).not.toContain(mockRes);
     });
+
+    it('should close all SSE clients gracefully', () => {
+      const mockRes1 = { end: jest.fn() } as unknown as Response;
+      const mockRes2 = { end: jest.fn() } as unknown as Response;
+
+      proxyEngine.registerSseClient(mockRes1);
+      proxyEngine.registerSseClient(mockRes2);
+      expect(proxyEngine.sseClients.length).toBe(2);
+
+      proxyEngine.closeAllSseClients();
+      expect(mockRes1.end).toHaveBeenCalled();
+      expect(mockRes2.end).toHaveBeenCalled();
+      expect(proxyEngine.sseClients.length).toBe(0);
+    });
   });
 
   describe('proxyMiddleware', () => {
@@ -164,6 +178,29 @@ describe('Proxy Engine (src/services/proxyEngine.ts)', () => {
 
       expect(req._proxyTargetUrl).toBe('http://app2.internal');
       expect(req._proxyApp?.id).toBe('app-2');
+    });
+
+    it('should capture and extract request body properly', () => {
+      const mockApps: Application[] = [
+        {
+          id: 'app-body',
+          name: 'Body App',
+          frontEndUrl: 'http://localhost:3000',
+          backendUrls: [{ id: 'b1', name: 'API', url: 'http://api.local', pathPrefix: '/api' }],
+          redirectUrls: [],
+          isActive: true
+        }
+      ];
+      (configManager.getApplications as jest.Mock).mockReturnValue(mockApps);
+
+      const { req, res, next } = createMockReqRes('/api/submit');
+      proxyEngine.proxyMiddleware(req, res, next);
+
+      (req as unknown as EventEmitter).emit('data', Buffer.from('{"key":"value"}'));
+      (req as unknown as EventEmitter).emit('end');
+
+      expect(req._proxyRawBodyStr).toBe('{"key":"value"}');
+      expect(req._proxyRawBuffer).toEqual(Buffer.from('{"key":"value"}'));
     });
   });
 });

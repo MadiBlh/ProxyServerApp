@@ -37,10 +37,41 @@
         </select>
       </div>
 
+      <!-- Period Selector Dropdown -->
+      <div class="app-select-container" id="period-select-container">
+        <span class="app-select-label" style="display:flex; align-items:center; gap:4px;">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          Period:
+        </span>
+        <select id="period-dropdown" class="app-dropdown" title="Filter logs by time period or specific date">
+          <option value="latest">Latest Day</option>
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="7d">Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
+          <option value="all">All Dates</option>
+          <optgroup id="period-specific-dates-group" label="Specific Dates">
+            <!-- Dynamically populated -->
+          </optgroup>
+        </select>
+      </div>
+
       <nav class="nav-links">
-        <button id="manage-apps-btn" class="nav-btn">Settings</button>
-        <a href="/doc" target="_blank" class="nav-btn" title="Open documentation">📖 Docs</a>
-        <button id="theme-toggle-btn" class="theme-toggle" title="Toggle Theme">☀️</button>
+        <a href="/archives" class="nav-btn" title="View historical archived logs">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+          Archives
+        </a>
+        <button id="manage-apps-btn" class="nav-btn">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          Settings
+        </button>
+        <a href="/doc" target="_blank" class="nav-btn" title="Open documentation">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          Docs
+        </a>
+        <button id="theme-toggle-btn" class="theme-toggle" title="Toggle Theme">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        </button>
       </nav>
     </div>
   </header>
@@ -72,12 +103,22 @@
 
     <!-- Search fields -->
     <div class="search-box">
-      <span class="search-icon">🔎</span>
-      <input type="text" id="search-input" class="search-input" placeholder="Search endpoint...">
+      <span class="search-icon">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </span>
+      <input type="text" id="search-input" class="search-input" placeholder="Search endpoint, method, status... (/)" title="Search by path, HTTP method (POST, GET), status (200, 500), or backend name. Press / to focus.">
+      <button type="button" id="clear-endpoint-search" class="search-clear-btn" aria-label="Clear endpoint search" title="Clear search">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
     </div>
     <div class="search-box">
-      <span class="search-icon">📄</span>
-      <input type="text" id="advanced-search-input" class="search-input" placeholder="Search request &amp; response body...">
+      <span class="search-icon">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+      </span>
+      <input type="text" id="advanced-search-input" class="search-input" placeholder="Search headers &amp; body content..." title="Deep search across request headers, response headers, request body, and response body.">
+      <button type="button" id="clear-body-search" class="search-clear-btn" aria-label="Clear body search" title="Clear search">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
     </div>
   </section>
 
@@ -92,14 +133,17 @@
           <button id="select-logs-btn" class="btn btn-sm" title="Select multiple logs">Select</button>
           <span id="log-count-badge" class="method-badge">LOGS</span>
           <button type="button" class="btn-collapse-pane" id="toggle-sidebar-btn" title="Collapse / Expand Sidebar">
-            <span class="collapse-icon">◀</span>
+            <span class="collapse-icon">
+              <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </span>
           </button>
         </span>
       </div>
       <div id="selection-toolbar" class="selection-toolbar" style="display:none;">
         <span id="selection-count" class="selection-count">0 selected</span>
         <div style="display:flex; gap:8px;">
-          <button id="remove-selected-logs-btn" class="btn btn-danger btn-sm">Remove selected logs</button>
+          <button id="archive-selected-logs-btn" class="btn btn-secondary btn-sm" title="Archive selected logs">Archive selected</button>
+          <button id="remove-selected-logs-btn" class="btn btn-danger btn-sm">Remove selected</button>
           <button id="clear-selection-btn" class="btn btn-sm">Clear</button>
           <button id="done-selection-btn" class="btn btn-sm">Done</button>
         </div>
@@ -113,7 +157,9 @@
         </div>
         <ul id="logs-list-container" class="logs-list">
           <div class="empty-state">
-            <div class="empty-state-icon">📡</div>
+            <div class="empty-state-icon">
+              <svg class="svg-icon empty-state-svg" viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.75" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4.93 4.93a10 10 0 0 1 14.14 0"></path><path d="M7.76 7.76a6 6 0 0 1 8.48 0"></path><circle cx="12" cy="12" r="2"></circle><path d="M12 14v8"></path></svg>
+            </div>
             <p>Listening for HTTP & SOAP proxy calls...</p>
           </div>
         </ul>
@@ -141,7 +187,9 @@
             <button class="tab-btn active" data-tab="body">Body (Monaco)</button>
             <button class="tab-btn" data-tab="headers">Headers</button>
             <button type="button" class="btn-collapse-pane" id="toggle-request-pane-btn" title="Collapse / Expand Request Panel">
-              <span class="collapse-icon">▲</span>
+              <span class="collapse-icon">
+                <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+              </span>
               <span class="collapse-text">Collapse</span>
             </button>
           </div>
@@ -163,7 +211,9 @@
             <button class="tab-btn active" data-tab="body">Body (Monaco)</button>
             <button class="tab-btn" data-tab="headers">Headers</button>
             <button type="button" class="btn-collapse-pane" id="toggle-response-pane-btn" title="Collapse / Expand Response Panel">
-              <span class="collapse-icon">▲</span>
+              <span class="collapse-icon">
+                <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+              </span>
               <span class="collapse-text">Collapse</span>
             </button>
           </div>
@@ -181,7 +231,9 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 class="modal-title">Export Selected Request</h3>
-        <button class="modal-close" onclick="closeModal('export-modal')">✕</button>
+        <button class="modal-close" onclick="closeModal('export-modal')">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div class="form-group">
@@ -203,8 +255,13 @@
   <div id="replay-modal" class="modal-overlay">
     <div class="modal-card" style="max-width: 650px;">
       <div class="modal-header">
-        <h3 class="modal-title">⚡ Replay Request</h3>
-        <button class="modal-close" onclick="closeModal('replay-modal')">✕</button>
+        <h3 class="modal-title" style="display:flex; align-items:center; gap:8px;">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warning-color);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          Replay Request
+        </h3>
+        <button class="modal-close" onclick="closeModal('replay-modal')">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
       <div class="modal-body">
         <div class="form-group">
@@ -245,7 +302,10 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-error-outline" onclick="closeModal('replay-modal')">Close</button>
-        <button id="execute-replay-btn" class="btn btn-primary">⚡ Send Replay</button>
+        <button id="execute-replay-btn" class="btn btn-primary" style="display:flex; align-items:center; gap:6px;">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          Send Replay
+        </button>
       </div>
     </div>
   </div>
@@ -254,8 +314,13 @@
   <div id="settings-modal" class="modal-overlay">
     <div class="modal-card settings-modal-card" style="max-width: 900px; max-height: 92vh;">
       <div class="modal-header">
-        <h3 class="modal-title">⚙️ Settings</h3>
-        <button class="modal-close" onclick="closeModal('settings-modal')">✕</button>
+        <h3 class="modal-title" style="display:flex; align-items:center; gap:8px;">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-color);"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          Settings
+        </h3>
+        <button class="modal-close" onclick="closeModal('settings-modal')">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
 
       <!-- Settings Tabs -->
@@ -321,7 +386,10 @@
           </div>
 
           <div style="display: flex; justify-content: flex-end; margin-top: 18px;">
-            <button id="save-storage-settings-btn" class="btn btn-primary">💾 Save Storage Settings</button>
+            <button id="save-storage-settings-btn" class="btn btn-primary" style="display:flex; align-items:center; gap:6px;">
+              <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+              Save Storage Settings
+            </button>
           </div>
         </div>
       </div>
@@ -337,7 +405,9 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 class="modal-title">Application Configuration</h3>
-        <button class="modal-close" onclick="closeModal('edit-app-modal')">✕</button>
+        <button class="modal-close" onclick="closeModal('edit-app-modal')">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="edit-app-id">
@@ -366,14 +436,18 @@
         <!-- API Redirections / Forwarding section -->
         <div class="form-group" style="margin-top: 16px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <label class="form-label" style="margin: 0; color: var(--accent-color);">🔀 API Redirections / Forwarding (Backend to External APIs)</label>
+            <label class="form-label" style="margin: 0; color: var(--accent-color); display:flex; align-items:center; gap:6px;">
+              <svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warning-color);"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+              API Redirections / Forwarding (Backend to External APIs)
+            </label>
             <button type="button" id="add-redirect-btn" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.8rem;">
               + Add Redirection
             </button>
           </div>
           <div id="redirect-services-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
-          <p style="font-size: 0.76rem; color: var(--text-muted); margin-top: 6px;">
-            💡 Configure external API redirections. Each redirection runs on its own dedicated proxy port (e.g. <code>http://localhost:4001</code>) and captures request/response logs.
+          <p style="font-size: 0.76rem; color: var(--text-muted); margin-top: 6px; display:flex; align-items:center; gap:4px;">
+            <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warning-color);"><line x1="9" y1="18" x2="15" y2="18"></line><line x1="10" y1="22" x2="14" y2="22"></line><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>
+            Configure external API redirections. Each redirection runs on its own dedicated proxy port (e.g. <code>http://localhost:4001</code>) and captures request/response logs.
           </p>
         </div>
 

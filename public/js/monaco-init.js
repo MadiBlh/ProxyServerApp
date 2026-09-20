@@ -11,15 +11,15 @@ function initMonacoEditors(theme = 'vs') {
       return resolve();
     }
 
-    // Configure require object for Monaco CDN
+    // Configure require object for local Monaco Editor assets
     window.require = {
       paths: {
-        'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs'
+        'vs': '/dashboard-static/vendor/monaco'
       }
     };
 
     const loaderScript = document.createElement('script');
-    loaderScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js';
+    loaderScript.src = '/dashboard-static/vendor/monaco/loader.js';
     loaderScript.onload = () => {
       window.require(['vs/editor/editor.main'], () => {
         monacoLoaded = true;
@@ -305,6 +305,27 @@ function setResponseBodyContent(content, ext = 'txt') {
   responseEditor.setValue(formattedContent);
 }
 
+function highlightSearchTerm(term) {
+  if (!term || typeof term !== 'string') return;
+  const trimmed = term.trim();
+  if (!trimmed) return;
+
+  [requestEditor, responseEditor].forEach(editor => {
+    if (!editor) return;
+    const model = editor.getModel();
+    if (!model) return;
+    try {
+      const matches = model.findMatches(trimmed, false, false, false, null, true);
+      if (matches && matches.length > 0) {
+        editor.revealRangeInCenter(matches[0].range);
+        editor.setSelection(matches[0].range);
+      }
+    } catch {
+      // Ignore regex/search syntax errors
+    }
+  });
+}
+
 function layoutEditors() {
   if (requestEditor) requestEditor.layout();
   if (responseEditor) responseEditor.layout();
@@ -315,6 +336,7 @@ window.monacoManager = {
   setMonacoTheme,
   setRequestBodyContent,
   setResponseBodyContent,
+  highlightSearchTerm,
   formatXml,
   formatEditor,
   layoutEditors

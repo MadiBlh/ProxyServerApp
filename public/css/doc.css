@@ -101,10 +101,17 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   color: var(--text-primary);
-  font-size: 1.05rem;
   width: 36px;
   height: 36px;
   cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.menu-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
 }
 
 .brand {
@@ -200,6 +207,10 @@ body {
   border: 1px solid var(--border-color);
   color: var(--text-secondary);
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
 }
 
 .btn-back:hover {
@@ -214,8 +225,16 @@ body {
   width: 36px;
   height: 36px;
   cursor: pointer;
-  font-size: 0.95rem;
   color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
 }
 
 /* ==========================================================================

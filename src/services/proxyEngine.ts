@@ -4,6 +4,7 @@ import { PassThrough } from 'stream';
 import type { Request, Response, NextFunction } from 'express';
 import type * as http from 'http';
 import uuidv4 from '../utils/uuid';
+import { extractBodyString } from '../utils/payload';
 import * as configManager from './configManager';
 import * as logManager from './logManager';
 import type { SseClient, Application } from '../types';
@@ -28,6 +29,19 @@ export function registerSseClient(res: Response): void {
 export function unregisterSseClient(res: Response): void {
   const idx = sseClients.indexOf(res);
   if (idx !== -1) sseClients.splice(idx, 1);
+}
+
+export function closeAllSseClients(): void {
+  while (sseClients.length > 0) {
+    const client = sseClients.pop();
+    if (client) {
+      try {
+        client.end();
+      } catch {
+        // client already closed
+      }
+    }
+  }
 }
 
 function broadcastLogEvent(logSummary: object): void {
@@ -63,7 +77,7 @@ proxy.on('proxyRes', (proxyRes: http.IncomingMessage, req: http.IncomingMessage,
 
   proxyRes.on('end', () => {
     const responseBuffer = Buffer.concat(bodyChunks);
-    const responseBodyStr = responseBuffer.toString('utf8');
+    const responseBodyStr = extractBodyString(bodyChunks);
 
     // Save log entry to files (logs/ & headers/)
     const { reqMeta, resMeta } = logManager.saveLogEntry({
@@ -168,7 +182,7 @@ export function proxyMiddleware(req: Request, res: Response, next: NextFunction)
 
   req.on('end', () => {
     const rawReqBuffer = Buffer.concat(reqChunks);
-    req._proxyRawBodyStr = rawReqBuffer.toString('utf8');
+    req._proxyRawBodyStr = extractBodyString(reqChunks);
     req._proxyRawBuffer = rawReqBuffer;
 
     // 1. Determine request path

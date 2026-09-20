@@ -4,12 +4,10 @@
   "description": "Local proxy server tool to intercept, log, and inspect web application requests and responses.",
   "main": "dist/server.js",
   "scripts": {
-    "start": "node dist/server.js",
     "dev": "node --watch -r ts-node/register server.ts",
-    "start:ts": "ts-node server.ts",
     "dev:ts": "node --watch -r ts-node/register server.ts",
     "build": "tsc",
-    "start:dist": "node dist/server.js",
+    "start": "node dist/server.js",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch"
@@ -25,11 +23,14 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "compression": "^1.8.2",
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "http-proxy": "^1.18.1"
+    "http-proxy": "^1.18.1",
+    "monaco-editor": "^0.56.0"
   },
   "devDependencies": {
+    "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/http-proxy": "^1.17.17",

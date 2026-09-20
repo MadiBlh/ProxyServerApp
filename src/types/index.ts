@@ -129,6 +129,8 @@ export interface SaveLogEntryParams {
   responseBody?: string;
   durationMs?: number;
   error?: string;
+  timestamp?: string;
+  date?: string;
 }
 
 /** Return type of `logManager.saveLogEntry()`. */
@@ -142,12 +144,54 @@ export interface SaveLogEntryResult {
 export interface LogSearchOptions {
   endpoint?: string;
   body?: string;
+  method?: string;
+  status?: string | number;
+  date?: string;
+  period?: string;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Options for archiving logs in `logManager.archiveLogsForApp()`. */
+export interface ArchiveOptions {
+  ids?: string[];
+  date?: string;
+  period?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+/** Archive manifest metadata stored in `archives/<appName>/manifest.json`. */
+export interface ArchiveManifest {
+  appName: string;
+  appId: string;
+  lastArchivedAt: string;
+  totalTransactionsArchived: number;
+  dates: string[];
+}
+
+/** Summary of an archived application returned by `logManager.getArchivedApps()`. */
+export interface ArchivedAppSummary {
+  appName: string;
+  appId: string;
+  lastArchivedAt: string;
+  totalTransactions: number;
+  dates: string[];
+}
+
+/** Result of `logManager.restoreArchivedLogs()`. */
+export interface RestoreResult {
+  restored: number;
+  appName: string;
 }
 
 /** Result of `logManager.archiveLogsForApp()`. */
 export interface ArchiveResult {
   archived: number;
   archivePath?: string;
+  manifest?: ArchiveManifest;
 }
 
 /** Result of `logManager.exportLog()`. */

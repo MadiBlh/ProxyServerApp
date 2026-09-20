@@ -195,6 +195,12 @@ select.app-dropdown option {
   color: var(--text-primary);
 }
 
+select.app-dropdown optgroup {
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
 .nav-links {
   display: flex;
   align-items: center;
@@ -370,18 +376,19 @@ select.app-dropdown option {
 .search-box {
   position: relative;
   flex: 1;
-  max-width: 300px;
+  max-width: 320px;
 }
 
 .search-input {
   width: 100%;
   background: var(--bg-input);
   border: 1px solid var(--border-color);
-  padding: 8px 14px 8px 36px;
+  padding: 8px 30px 8px 36px;
   border-radius: 8px;
   color: var(--text-primary);
   font-size: 0.88rem;
   outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .search-input:focus {
@@ -396,6 +403,33 @@ select.app-dropdown option {
   transform: translateY(-50%);
   color: var(--text-muted);
   font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.search-clear-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.search-clear-btn.visible {
+  display: flex;
 }
 
 /* ==========================================================================
@@ -746,7 +780,42 @@ select.app-dropdown option {
 
 .empty-state-icon {
   font-size: 3rem;
-  opacity: 0.5;
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   SVG ICONS
+   ========================================================================== */
+
+.svg-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.svg-icon-sm {
+  width: 13px;
+  height: 13px;
+}
+
+.search-icon svg {
+  color: var(--text-muted);
+}
+
+.modal-close svg {
+  stroke: var(--text-secondary);
+  transition: stroke 0.15s ease;
+}
+
+.modal-close:hover svg {
+  stroke: var(--text-primary);
+}
+
+.theme-toggle svg {
+  display: block;
 }
 
 /* ==========================================================================

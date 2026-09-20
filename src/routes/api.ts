@@ -38,7 +38,8 @@ router.put('/settings', (req: Request, res: Response) => {
       logsDir,
       migrateExistingConfig: Boolean(migrateExistingConfig)
     });
-    // Synchronize redirect proxies with the new configuration
+    // Invalidate config cache and synchronize redirect proxies with the new configuration
+    configManager.clearConfigCache();
     redirectProxyManager.syncRedirectProxies(configManager.getApplications());
     res.json(updated);
   } catch (err) {
@@ -55,9 +56,9 @@ router.get('/applications', (_req: Request, res: Response) => {
 });
 
 // Create application
-router.post('/applications', (req: Request, res: Response) => {
+router.post('/applications', async (req: Request, res: Response) => {
   try {
-    const newApp = configManager.createApplication(req.body);
+    const newApp = await configManager.createApplicationAsync(req.body);
     redirectProxyManager.syncRedirectProxies(configManager.getApplications());
     res.status(201).json(newApp);
   } catch (err) {
@@ -66,10 +67,10 @@ router.post('/applications', (req: Request, res: Response) => {
 });
 
 // Update application
-router.put('/applications/:id', (req: Request, res: Response) => {
+router.put('/applications/:id', async (req: Request, res: Response) => {
   try {
     const id = getParam(req, 'id');
-    const updated = configManager.updateApplication(id, req.body);
+    const updated = await configManager.updateApplicationAsync(id, req.body);
     if (!updated) return res.status(404).json({ error: 'Application not found' });
     redirectProxyManager.syncRedirectProxies(configManager.getApplications());
     res.json(updated);
@@ -94,13 +95,34 @@ router.get('/redirect-proxies', (_req: Request, res: Response) => {
 
 // --- Logs API ---
 
+// Get available date folders (optionally filtered by appId)
+router.get('/logs/dates', (req: Request, res: Response) => {
+  try {
+    const appId = (req.query.appId as string) || undefined;
+    const dates = logManager.getAvailableDateFolders(appId);
+    res.json(dates);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 // Get logs list
 router.get('/logs', (req: Request, res: Response) => {
   const appId = (req.query.appId as string) || null;
   const q = (req.query.q as string) || null;
+  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+  const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
   const searchOpts: LogSearchOptions = {
     endpoint: (req.query.endpoint as string) || '',
-    body: (req.query.body as string) || ''
+    body: (req.query.body as string) || '',
+    method: (req.query.method as string) || undefined,
+    status: (req.query.status as string) || undefined,
+    date: (req.query.date as string) || undefined,
+    period: (req.query.period as string) || undefined,
+    startDate: (req.query.startDate as string) || undefined,
+    endDate: (req.query.endDate as string) || undefined,
+    limit: !isNaN(limit as number) ? limit : undefined,
+    offset: !isNaN(offset as number) ? offset : undefined
   };
   const logs = logManager.getAllLogs(appId, q, searchOpts);
   res.json(logs);
@@ -109,7 +131,8 @@ router.get('/logs', (req: Request, res: Response) => {
 // Get log detail
 router.get('/logs/:id', (req: Request, res: Response) => {
   const id = getParam(req, 'id');
-  const detail = logManager.getLogDetail(id);
+  const date = (req.query.date as string) || undefined;
+  const detail = logManager.getLogDetail(id, date);
   if (!detail) return res.status(404).json({ error: 'Log not found' });
   res.json(detail);
 });
@@ -135,20 +158,117 @@ router.delete('/logs', (req: Request, res: Response) => {
   }
 });
 
-// Archive all logs for an application
+// Archive logs for an application (supports full app, selective IDs, or date-filtered archiving)
 router.post('/logs/archive', (req: Request, res: Response) => {
   try {
-    const { appId, appName } = req.body || {};
+    const { appId, appName, ids, date, period, startDate, endDate } = req.body || {};
     if (!appId) return res.status(400).json({ error: 'appId is required' });
 
-    const result = logManager.archiveLogsForApp(appId as string, appName as string | undefined);
+    const archiveOpts = {
+      ids: Array.isArray(ids) ? (ids as string[]) : undefined,
+      date: typeof date === 'string' ? date : undefined,
+      period: typeof period === 'string' ? period : undefined,
+      startDate: typeof startDate === 'string' ? startDate : undefined,
+      endDate: typeof endDate === 'string' ? endDate : undefined
+    };
+
+    const result = logManager.archiveLogsForApp(
+      appId as string,
+      appName as string | undefined,
+      archiveOpts
+    );
     res.json({
       success: true,
       archived: result.archived,
       archivePath: result.archivePath,
+      manifest: result.manifest,
       message: result.archived > 0
         ? `${result.archived} log(s) archived successfully`
         : 'No logs found to archive'
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// List all archived applications with metadata
+router.get('/archives', (_req: Request, res: Response) => {
+  try {
+    const archives = logManager.getArchivedApps();
+    res.json(archives);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// List logs within an application archive
+router.get('/archives/:appName/logs', (req: Request, res: Response) => {
+  try {
+    const appName = getParam(req, 'appName');
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : undefined;
+    const searchOpts: LogSearchOptions = {
+      endpoint: (req.query.endpoint as string) || (req.query.q as string) || '',
+      body: (req.query.body as string) || '',
+      method: (req.query.method as string) || undefined,
+      status: (req.query.status as string) || undefined,
+      date: (req.query.date as string) || undefined,
+      limit: !isNaN(limit as number) ? limit : undefined,
+      offset: !isNaN(offset as number) ? offset : undefined
+    };
+    const logs = logManager.getArchivedLogs(appName, searchOpts);
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Get detail of a specific archived log
+router.get('/archives/:appName/logs/:id', (req: Request, res: Response) => {
+  try {
+    const appName = getParam(req, 'appName');
+    const id = getParam(req, 'id');
+    const date = (req.query.date as string) || undefined;
+    const detail = logManager.getArchivedLogDetail(appName, id, date);
+    if (!detail) return res.status(404).json({ error: 'Archived log not found' });
+    res.json(detail);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Restore archived logs back into active logs
+router.post('/archives/:appName/restore', (req: Request, res: Response) => {
+  try {
+    const appName = getParam(req, 'appName');
+    const { ids, date } = req.body || {};
+    const result = logManager.restoreArchivedLogs(appName, {
+      ids: Array.isArray(ids) ? ids : undefined,
+      date: typeof date === 'string' ? date : undefined
+    });
+    res.json({
+      success: true,
+      restored: result.restored,
+      appName: result.appName,
+      message: result.restored > 0
+        ? `${result.restored} log(s) restored successfully to active logs`
+        : 'No logs found to restore'
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Delete an entire application archive or a specific historical date folder
+router.delete('/archives/:appName', (req: Request, res: Response) => {
+  try {
+    const appName = getParam(req, 'appName');
+    const date = (req.query.date as string) || (req.body && req.body.date) || undefined;
+    const deleted = logManager.deleteArchivedApp(appName, date);
+    if (!deleted) return res.status(404).json({ error: 'Archive not found' });
+    res.json({
+      success: true,
+      message: date ? `Archived date folder "${date}" deleted for "${appName}"` : `Archive for "${appName}" deleted`
     });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -170,10 +290,10 @@ router.delete('/logs/:id', (req: Request, res: Response) => {
 // Export selected request & response log file
 router.post('/logs/:id/export', (req: Request, res: Response) => {
   const id = getParam(req, 'id');
-  const { fileName } = req.body;
+  const { fileName, date } = req.body || {};
   if (!fileName) return res.status(400).json({ error: 'File name prefix is required' });
 
-  const result = logManager.exportLog(id, fileName);
+  const result = logManager.exportLog(id, fileName, date);
   if (!result) return res.status(404).json({ error: 'Log not found' });
 
   res.json({

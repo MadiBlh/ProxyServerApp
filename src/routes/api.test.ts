@@ -88,7 +88,7 @@ describe('API Routes (src/routes/api.ts)', () => {
 
     it('POST /dashboard-api/applications should create an app and return 201', async () => {
       const newApp = { id: 'app-new', name: 'New App' };
-      (configManager.createApplication as jest.Mock).mockReturnValue(newApp);
+      (configManager.createApplicationAsync as jest.Mock).mockResolvedValue(newApp);
       (configManager.getApplications as jest.Mock).mockReturnValue([newApp]);
 
       const res = await request(app)
@@ -102,7 +102,7 @@ describe('API Routes (src/routes/api.ts)', () => {
 
     it('PUT /dashboard-api/applications/:id should update an existing app', async () => {
       const updated = { id: 'app-1', name: 'Updated' };
-      (configManager.updateApplication as jest.Mock).mockReturnValue(updated);
+      (configManager.updateApplicationAsync as jest.Mock).mockResolvedValue(updated);
       (configManager.getApplications as jest.Mock).mockReturnValue([updated]);
 
       const res = await request(app)
@@ -114,7 +114,7 @@ describe('API Routes (src/routes/api.ts)', () => {
     });
 
     it('PUT /dashboard-api/applications/:id should return 404 if app not found', async () => {
-      (configManager.updateApplication as jest.Mock).mockReturnValue(null);
+      (configManager.updateApplicationAsync as jest.Mock).mockResolvedValue(null);
 
       const res = await request(app)
         .put('/dashboard-api/applications/unknown')
@@ -150,16 +150,73 @@ describe('API Routes (src/routes/api.ts)', () => {
   });
 
   describe('Logs Endpoints', () => {
-    it('GET /dashboard-api/logs should return filtered logs', async () => {
+    it('GET /dashboard-api/logs/dates should return available dates and forward appId query param', async () => {
+      const dates = ['2026-09-19', '2026-09-18'];
+      (logManager.getAvailableDateFolders as jest.Mock).mockReturnValue(dates);
+
+      const res = await request(app).get('/dashboard-api/logs/dates?appId=app-1');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(dates);
+      expect(logManager.getAvailableDateFolders).toHaveBeenCalledWith('app-1');
+    });
+
+    it('GET /dashboard-api/logs should return filtered logs with date parameter', async () => {
       const logs = [{ id: 'l1', endpoint: '/users' }];
       (logManager.getAllLogs as jest.Mock).mockReturnValue(logs);
 
-      const res = await request(app).get('/dashboard-api/logs?appId=app-1&endpoint=users');
+      const res = await request(app).get('/dashboard-api/logs?appId=app-1&endpoint=users&date=2026-09-19');
       expect(res.status).toBe(200);
       expect(res.body).toEqual(logs);
       expect(logManager.getAllLogs).toHaveBeenCalledWith('app-1', null, {
         endpoint: 'users',
-        body: ''
+        body: '',
+        method: undefined,
+        status: undefined,
+        date: '2026-09-19',
+        period: undefined,
+        startDate: undefined,
+        endDate: undefined,
+        limit: undefined,
+        offset: undefined
+      });
+    });
+
+    it('GET /dashboard-api/logs should pass method and status query params', async () => {
+      const logs = [{ id: 'l2', endpoint: '/orders', method: 'POST', statusCode: 201 }];
+      (logManager.getAllLogs as jest.Mock).mockReturnValue(logs);
+
+      const res = await request(app).get('/dashboard-api/logs?method=POST&status=201');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(logs);
+      expect(logManager.getAllLogs).toHaveBeenCalledWith(null, null, {
+        endpoint: '',
+        body: '',
+        method: 'POST',
+        status: '201',
+        date: undefined,
+        period: undefined,
+        startDate: undefined,
+        endDate: undefined,
+        limit: undefined,
+        offset: undefined
+      });
+    });
+
+    it('GET /dashboard-api/logs should pass limit and offset when provided', async () => {
+      const logs = [{ id: 'l1', endpoint: '/users' }];
+      (logManager.getAllLogs as jest.Mock).mockReturnValue(logs);
+
+      const res = await request(app).get('/dashboard-api/logs?limit=10&offset=20');
+      expect(res.status).toBe(200);
+      expect(logManager.getAllLogs).toHaveBeenCalledWith(null, null, {
+        endpoint: '',
+        body: '',
+        date: undefined,
+        period: undefined,
+        startDate: undefined,
+        endDate: undefined,
+        limit: 10,
+        offset: 20
       });
     });
 
@@ -167,9 +224,10 @@ describe('API Routes (src/routes/api.ts)', () => {
       const detail = { id: 'l1', requestBody: 'abc' };
       (logManager.getLogDetail as jest.Mock).mockReturnValue(detail);
 
-      const res = await request(app).get('/dashboard-api/logs/l1');
+      const res = await request(app).get('/dashboard-api/logs/l1?date=2026-09-19');
       expect(res.status).toBe(200);
       expect(res.body).toEqual(detail);
+      expect(logManager.getLogDetail).toHaveBeenCalledWith('l1', '2026-09-19');
     });
 
     it('GET /dashboard-api/logs/:id should return 404 if detail not found', async () => {
@@ -213,15 +271,23 @@ describe('API Routes (src/routes/api.ts)', () => {
     it('POST /dashboard-api/logs/archive should archive logs for an app', async () => {
       (logManager.archiveLogsForApp as jest.Mock).mockReturnValue({
         archived: 3,
-        archivePath: '/archives/App'
+        archivePath: '/archives/App',
+        manifest: { totalTransactionsArchived: 3 }
       });
 
       const res = await request(app)
         .post('/dashboard-api/logs/archive')
-        .send({ appId: 'app-1', appName: 'App' });
+        .send({ appId: 'app-1', appName: 'App', ids: ['id-1', 'id-2'] });
 
       expect(res.status).toBe(200);
       expect(res.body.archived).toBe(3);
+      expect(logManager.archiveLogsForApp).toHaveBeenCalledWith('app-1', 'App', {
+        ids: ['id-1', 'id-2'],
+        date: undefined,
+        period: undefined,
+        startDate: undefined,
+        endDate: undefined
+      });
     });
 
     it('POST /dashboard-api/logs/archive should return 400 if appId missing', async () => {
@@ -282,6 +348,91 @@ describe('API Routes (src/routes/api.ts)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual(replayResult);
+    });
+  });
+
+  describe('Archive Management Endpoints', () => {
+    it('GET /dashboard-api/archives should list archived apps', async () => {
+      const archives = [{ appName: 'App1', totalTransactions: 5, dates: ['2026-09-19'] }];
+      (logManager.getArchivedApps as jest.Mock).mockReturnValue(archives);
+
+      const res = await request(app).get('/dashboard-api/archives');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(archives);
+    });
+
+    it('GET /dashboard-api/archives/:appName/logs should return archived logs', async () => {
+      const logs = [{ id: 'arch-1', endpoint: '/users' }];
+      (logManager.getArchivedLogs as jest.Mock).mockReturnValue(logs);
+
+      const res = await request(app).get('/dashboard-api/archives/App1/logs?endpoint=users&date=2026-09-19');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(logs);
+      expect(logManager.getArchivedLogs).toHaveBeenCalledWith('App1', {
+        endpoint: 'users',
+        body: '',
+        method: undefined,
+        status: undefined,
+        date: '2026-09-19',
+        limit: undefined,
+        offset: undefined
+      });
+    });
+
+    it('GET /dashboard-api/archives/:appName/logs/:id should return archived log detail', async () => {
+      const detail = { id: 'arch-1', requestBody: 'hello' };
+      (logManager.getArchivedLogDetail as jest.Mock).mockReturnValue(detail);
+
+      const res = await request(app).get('/dashboard-api/archives/App1/logs/arch-1');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(detail);
+    });
+
+    it('GET /dashboard-api/archives/:appName/logs/:id should return 404 if not found', async () => {
+      (logManager.getArchivedLogDetail as jest.Mock).mockReturnValue(null);
+
+      const res = await request(app).get('/dashboard-api/archives/App1/logs/unknown');
+      expect(res.status).toBe(404);
+    });
+
+    it('POST /dashboard-api/archives/:appName/restore should restore archived logs', async () => {
+      (logManager.restoreArchivedLogs as jest.Mock).mockReturnValue({ restored: 2, appName: 'App1' });
+
+      const res = await request(app)
+        .post('/dashboard-api/archives/App1/restore')
+        .send({ ids: ['a1', 'a2'] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.restored).toBe(2);
+      expect(logManager.restoreArchivedLogs).toHaveBeenCalledWith('App1', {
+        ids: ['a1', 'a2'],
+        date: undefined
+      });
+    });
+
+    it('DELETE /dashboard-api/archives/:appName should delete archive', async () => {
+      (logManager.deleteArchivedApp as jest.Mock).mockReturnValue(true);
+
+      const res = await request(app).delete('/dashboard-api/archives/App1');
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(logManager.deleteArchivedApp).toHaveBeenCalledWith('App1', undefined);
+    });
+
+    it('DELETE /dashboard-api/archives/:appName?date= should delete specific date folder', async () => {
+      (logManager.deleteArchivedApp as jest.Mock).mockReturnValue(true);
+
+      const res = await request(app).delete('/dashboard-api/archives/App1?date=2026-09-19');
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(logManager.deleteArchivedApp).toHaveBeenCalledWith('App1', '2026-09-19');
+    });
+
+    it('DELETE /dashboard-api/archives/:appName should return 404 if not found', async () => {
+      (logManager.deleteArchivedApp as jest.Mock).mockReturnValue(false);
+
+      const res = await request(app).delete('/dashboard-api/archives/UnknownApp');
+      expect(res.status).toBe(404);
     });
   });
 

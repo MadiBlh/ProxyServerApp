@@ -8,6 +8,8 @@ logs/*
 !logs/.gitkeep
 headers/*
 !headers/.gitkeep
+archives/*
+!archives/.gitkeep
 config/*
 !config/.gitkeep
 *.log

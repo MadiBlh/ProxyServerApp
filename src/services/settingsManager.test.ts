@@ -85,15 +85,19 @@ describe('Settings Manager (src/services/settingsManager.ts)', () => {
     });
 
     it('should handle corrupt settings.json gracefully and fall back to defaults', () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       (fs.existsSync as jest.Mock).mockReturnValue(true);
       (fs.readFileSync as jest.Mock).mockReturnValue('invalid JSON string');
 
       expect(settingsManager.getConfigDir()).toBe(settingsManager.DEFAULT_CONFIG_DIR);
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
   });
 
   describe('updateSettings()', () => {
     it('should create directories and write new settings.json', () => {
+      const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
       const fileMap = new Map<string, string>();
       (fs.existsSync as jest.Mock).mockImplementation((p: string) => fileMap.has(p));
       (fs.readFileSync as jest.Mock).mockImplementation((p: string) => fileMap.get(p) || '');
@@ -117,9 +121,13 @@ describe('Settings Manager (src/services/settingsManager.ts)', () => {
       expect(fs.writeFileSync).toHaveBeenCalled();
       expect(updated.configDir).toBe(targetConfig);
       expect(updated.logsBaseDir).toBe(targetLogs);
+      expect(updated.isDefaultConfig).toBe(false);
+      expect(updated.isDefaultLogs).toBe(false);
+      logSpy.mockRestore();
     });
 
     it('should migrate existing applications.json if migrateExistingConfig is true', () => {
+      const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
       const oldConfigDir = settingsManager.DEFAULT_CONFIG_DIR;
       const newConfigDir = path.resolve('/migrated/config');
       const fileMap = new Map<string, string>();
@@ -138,6 +146,7 @@ describe('Settings Manager (src/services/settingsManager.ts)', () => {
 
       const newConfigFile = path.join(newConfigDir, 'applications.json');
       expect(fileMap.get(newConfigFile)).toBe(JSON.stringify([{ id: 'app1', name: 'App 1' }]));
+      logSpy.mockRestore();
     });
 
     it('should throw an error if mkdirSync fails for config directory', () => {

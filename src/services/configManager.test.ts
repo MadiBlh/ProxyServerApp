@@ -14,6 +14,7 @@ describe('Config Manager (src/services/configManager.ts)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    configManager.clearConfigCache();
     fileContent = null;
 
     (settingsManager.getConfigDir as jest.Mock).mockReturnValue(fakeConfigDir);
@@ -135,7 +136,7 @@ describe('Config Manager (src/services/configManager.ts)', () => {
       expect(JSON.parse(fileContent!)).toEqual(apps);
     });
 
-    it('should read existing applications from disk', () => {
+    it('should read existing applications from disk and cache in memory for subsequent calls', () => {
       const mockData: Application[] = [
         {
           id: 'app-test',
@@ -148,14 +149,29 @@ describe('Config Manager (src/services/configManager.ts)', () => {
       ];
       fileContent = JSON.stringify(mockData);
 
-      const apps = configManager.getApplications();
-      expect(apps).toEqual(mockData);
+      const apps1 = configManager.getApplications();
+      expect(apps1).toEqual(mockData);
+      expect(fs.readFileSync).toHaveBeenCalledTimes(1);
+
+      // Second call should return cached apps without reading from disk again
+      const apps2 = configManager.getApplications();
+      expect(apps2).toEqual(mockData);
+      expect(fs.readFileSync).toHaveBeenCalledTimes(1);
+
+      // After clearing cache, next call should read from disk again
+      configManager.clearConfigCache();
+      const apps3 = configManager.getApplications();
+      expect(apps3).toEqual(mockData);
+      expect(fs.readFileSync).toHaveBeenCalledTimes(2);
     });
 
     it('should return empty array when JSON is malformed', () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       fileContent = '{ bad json';
       const apps = configManager.getApplications();
       expect(apps).toEqual([]);
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
     });
 
     it('should get application by id', () => {
@@ -230,6 +246,76 @@ describe('Config Manager (src/services/configManager.ts)', () => {
 
       const notFoundResult = configManager.deleteApplication('non-existent');
       expect(notFoundResult).toBe(false);
+    });
+
+    it('should keep in-memory cache synchronized across create, update, and delete without redundant disk reads', () => {
+      const created = configManager.createApplication({ name: 'App Synchronized' });
+      expect(fs.writeFileSync).toHaveBeenCalled();
+
+      // Read after create should use memory cache (0 extra readFileSync calls)
+      (fs.readFileSync as jest.Mock).mockClear();
+      const read1 = configManager.getApplications();
+      expect(read1.some(a => a.id === created.id)).toBe(true);
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+
+      // Update should update cache
+      configManager.updateApplication(created.id, { name: 'App Synchronized Renamed' });
+      const read2 = configManager.getApplications();
+      expect(read2.find(a => a.id === created.id)?.name).toBe('App Synchronized Renamed');
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+
+      // Delete should update cache
+      configManager.deleteApplication(created.id);
+      const read3 = configManager.getApplications();
+      expect(read3.some(a => a.id === created.id)).toBe(false);
+      expect(fs.readFileSync).not.toHaveBeenCalled();
+    });
+
+    it('should support async creation and updating with port probing', async () => {
+      const created = await configManager.createApplicationAsync({
+        name: 'Async App',
+        frontEndUrl: 'http://localhost:3000',
+        redirectUrls: [{ name: 'Async API', targetUrl: 'http://async.external.com' }]
+      });
+
+      expect(created.id).toBeDefined();
+      expect(created.redirectUrls[0]?.port).toBeGreaterThanOrEqual(4001);
+
+      const updated = await configManager.updateApplicationAsync(created.id, {
+        name: 'Async App Updated'
+      });
+
+      expect(updated?.name).toBe('Async App Updated');
+      expect(updated?.redirectUrls[0]?.port).toBe(created.redirectUrls[0]?.port);
+    });
+  });
+
+  describe('assignRedirectPortAsync', () => {
+    it('should assign port asynchronously and match sync behavior', async () => {
+      const port = await configManager.assignRedirectPortAsync(undefined, 'http://example.com/api', []);
+      expect(port).toBe(4001);
+    });
+
+    it('should reuse port for identical targetUrl asynchronously', async () => {
+      const existingApps: Application[] = [
+        {
+          id: 'app-1',
+          name: 'App 1',
+          frontEndUrl: 'http://localhost:3000',
+          backendUrls: [],
+          redirectUrls: [
+            { id: 'r1', name: 'R1', targetUrl: 'http://example.com/api', port: 4005 }
+          ],
+          isActive: true
+        }
+      ];
+
+      const port = await configManager.assignRedirectPortAsync(
+        undefined,
+        'http://example.com/api/',
+        existingApps
+      );
+      expect(port).toBe(4005);
     });
   });
 });

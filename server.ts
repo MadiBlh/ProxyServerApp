@@ -2,9 +2,10 @@ import './src/utils/bootstrap';
 
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import path from 'path';
 import apiRoutes from './src/routes/api';
-import { proxyMiddleware, sseClients } from './src/services/proxyEngine';
+import { proxyMiddleware, sseClients, closeAllSseClients } from './src/services/proxyEngine';
 import * as configManager from './src/services/configManager';
 import * as redirectProxyManager from './src/services/redirectProxyManager';
 import type { Application, RedirectUrl } from './src/types';
@@ -12,8 +13,16 @@ import type { Application, RedirectUrl } from './src/types';
 export const app = express();
 const PORT = Number(process.env.PORT) || 4000;
 
-// Enable CORS
+// Enable CORS and Response Compression
 app.use(cors());
+app.use(compression({
+  filter: (req: Request, res: Response) => {
+    if (req.headers['x-no-compression'] || req.path === '/dashboard-api/events') {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
 
 // 1. Dashboard Admin Management API (/dashboard-api/applications, /dashboard-api/logs, /dashboard-api/events)
 app.use('/dashboard-api', apiRoutes);
@@ -22,8 +31,12 @@ const isDist = __dirname.replace(/\\/g, '/').endsWith('/dist');
 const PUBLIC_DIR = isDist
   ? path.resolve(__dirname, '../public')
   : path.resolve(__dirname, 'public');
+const MONACO_DIR = isDist
+  ? path.resolve(__dirname, '../node_modules/monaco-editor/min/vs')
+  : path.resolve(__dirname, 'node_modules/monaco-editor/min/vs');
 
-// 2. Dashboard UI Static Assets (/dashboard-static/css, /dashboard-static/js)
+// 2. Dashboard UI Static Assets (/dashboard-static/vendor/monaco, /dashboard-static/css, /dashboard-static/js)
+app.use('/dashboard-static/vendor/monaco', express.static(MONACO_DIR));
 app.use('/dashboard-static', express.static(PUBLIC_DIR));
 
 // 3. Dashboard UI Page: http://localhost:4000/dashboard
@@ -34,6 +47,11 @@ app.get(['/dashboard', '/dashboard/*'], (_req: Request, res: Response) => {
 // 3b. Code Documentation Page: http://localhost:4000/doc
 app.get(['/doc', '/doc/*'], (_req: Request, res: Response) => {
   res.sendFile(path.join(PUBLIC_DIR, 'doc.html'));
+});
+
+// 3c. Dedicated Archives Page: http://localhost:4000/archives
+app.get(['/archives', '/archives/*'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'archives.html'));
 });
 
 // 4. Redirect browser navigation at root GET / to /dashboard
@@ -85,10 +103,26 @@ export function initializeServer(): void {
   redirectProxyManager.syncRedirectProxies(apps);
 }
 
+/**
+ * Gracefully shuts down all active SSE connections, redirect proxy servers, and main HTTP server.
+ */
+export function gracefulShutdown(server?: import('http').Server, cb?: () => void): void {
+  closeAllSseClients();
+  redirectProxyManager.stopAllRedirectProxies();
+
+  if (server && typeof server.close === 'function') {
+    server.close(() => {
+      if (cb) cb();
+    });
+  } else {
+    if (cb) cb();
+  }
+}
+
 // Only start listening if not in test environment and run directly
 if (process.env.NODE_ENV !== 'test') {
   initializeServer();
-  app.listen(PORT, '0.0.0.0', () => {
+  const serverInstance = app.listen(PORT, '0.0.0.0', () => {
     const redirectList = redirectProxyManager.getRunningRedirects();
     console.log(`====================================================`);
     console.log(`  🚀 PROXY SERVER LOG TOOL RUNNING ON PORT ${PORT}`);
@@ -103,4 +137,15 @@ if (process.env.NODE_ENV !== 'test') {
     }
     console.log(`====================================================`);
   });
+
+  const handleSignal = () => {
+    console.log('\n[Server] Shutting down gracefully...');
+    gracefulShutdown(serverInstance, () => {
+      console.log('[Server] Shutdown complete.');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGINT', handleSignal);
+  process.on('SIGTERM', handleSignal);
 }

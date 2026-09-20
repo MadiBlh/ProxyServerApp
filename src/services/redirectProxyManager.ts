@@ -7,6 +7,7 @@ import { PassThrough } from 'stream';
 import type { Request, Response } from 'express';
 import type * as httpModule from 'http';
 import uuidv4 from '../utils/uuid';
+import { extractBodyString } from '../utils/payload';
 import * as logManager from './logManager';
 import type { RedirectSubscriber, ProxyEntry, SseClient, RunningRedirectProxy } from '../types';
 
@@ -135,7 +136,7 @@ export function startRedirectProxy(
     proxyRes.on('data', (chunk: Buffer) => bodyChunks.push(chunk));
     proxyRes.on('end', () => {
       const responseBuffer = Buffer.concat(bodyChunks);
-      const responseBodyStr = responseBuffer.toString('utf8');
+      const responseBodyStr = extractBodyString(bodyChunks);
 
       const { reqMeta, resMeta } = logManager.saveLogEntry({
         id: requestId,
@@ -224,7 +225,7 @@ export function startRedirectProxy(
     req.on('data', (chunk: Buffer) => reqChunks.push(chunk));
     req.on('end', () => {
       const rawReqBuffer = Buffer.concat(reqChunks);
-      req._redirectRawBodyStr = rawReqBuffer.toString('utf8');
+      req._redirectRawBodyStr = extractBodyString(reqChunks);
       req._redirectRawBuffer = rawReqBuffer;
       req._redirectRequestId = uuidv4();
       req._redirectStartTime = Date.now();
@@ -242,6 +243,7 @@ export function startRedirectProxy(
   server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`[RedirectProxy] Port ${port} already in use. Skipping.`);
+      runningProxies.delete(port);
     } else {
       console.error(`[RedirectProxy :${port}] Server error:`, err.message);
     }
@@ -260,6 +262,15 @@ export function stopRedirectProxy(port: number): void {
   if (!entry) return;
   entry.server.close(() => { /* closed */ });
   runningProxies.delete(port);
+}
+
+/**
+ * Stops all running redirect proxy servers.
+ */
+export function stopAllRedirectProxies(): void {
+  for (const port of Array.from(runningProxies.keys())) {
+    stopRedirectProxy(port);
+  }
 }
 
 /** Normalizes URL for comparison. */

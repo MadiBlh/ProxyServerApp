@@ -2,6 +2,19 @@
    PROXY SERVER LOG - MAIN FRONTEND APPLICATION CONTROLLER
    ========================================================================== */
 
+const SVG_ICONS = {
+  sun: `<svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`,
+  moon: `<svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`,
+  fork: `<svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px; vertical-align:-1px;"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>`,
+  cookie: `<svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px; vertical-align:-1px;"><path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"></path><path d="M8.5 8.5v.01"></path><path d="M16 15.5v.01"></path><path d="M12 12v.01"></path><path d="M11 17v.01"></path><path d="M7 13v.01"></path></svg>`,
+  save: `<svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>`,
+  antenna: `<svg class="svg-icon empty-state-svg" viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.75" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4.93 4.93a10 10 0 0 1 14.14 0"></path><path d="M7.76 7.76a6 6 0 0 1 8.48 0"></path><circle cx="12" cy="12" r="2"></circle><path d="M12 14v8"></path></svg>`,
+  chevronLeft: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>`,
+  chevronRight: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`,
+  chevronUp: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>`,
+  chevronDown: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`
+};
+
 // --- Loading State Manager ---
 const LoadingManager = {
   _requestCount: 0,
@@ -107,6 +120,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('Failed to load Monaco Editor from CDN:', err);
   }
 
+  // Load Available Dates
+  await loadAvailableDates();
+
   // Load Initial Applications
   await loadApplications();
 
@@ -123,7 +139,7 @@ function applyTheme(theme) {
   localStorage.setItem('proxy_theme', theme);
   const themeBtn = document.getElementById('theme-toggle-btn');
   if (themeBtn) {
-    themeBtn.innerHTML = theme === 'dark' ? '☀️' : '🌙';
+    themeBtn.innerHTML = theme === 'dark' ? SVG_ICONS.sun : SVG_ICONS.moon;
   }
   if (window.monacoManager) {
     window.monacoManager.setMonacoTheme(theme);
@@ -164,15 +180,106 @@ async function loadApplications() {
       dropdown.value = currentAppId;
     }
 
-        document.getElementById('remove-logs-btn').disabled = false;
-        document.getElementById('archive-logs-btn').disabled = false;
-        localStorage.setItem('proxy_selected_app_id', currentAppId);
-        await loadLogsForApp(currentAppId);
+    document.getElementById('remove-logs-btn').disabled = false;
+    document.getElementById('archive-logs-btn').disabled = false;
+    localStorage.setItem('proxy_selected_app_id', currentAppId);
+    await loadAvailableDates(currentAppId);
+    await loadLogsForApp(currentAppId);
 
   } catch (err) {
     showToast('Failed to load web applications', 'error');
   } finally {
     LoadingManager.hideSection('apps-loading-overlay');
+  }
+}
+
+// --- Available Periods & Dates Management ---
+async function loadAvailableDates(appId) {
+  const periodDropdown = document.getElementById('period-dropdown');
+  if (!periodDropdown) return;
+
+  const previousSelected = periodDropdown.value || 'latest';
+  const queryParam = appId ? `?appId=${encodeURIComponent(appId)}` : '';
+  try {
+    const res = await trackedFetch(`/dashboard-api/logs/dates${queryParam}`);
+    if (!res.ok) return;
+    const dates = await res.json();
+
+    const datesGroup = document.getElementById('period-specific-dates-group');
+    if (datesGroup) {
+      datesGroup.innerHTML = '';
+      if (Array.isArray(dates) && dates.length > 0) {
+        dates.forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d;
+          opt.textContent = `Date: ${d}`;
+          datesGroup.appendChild(opt);
+        });
+      }
+    }
+
+    if (previousSelected) {
+      const exists = Array.from(periodDropdown.options).some(o => o.value === previousSelected);
+      if (exists) {
+        periodDropdown.value = previousSelected;
+      } else {
+        periodDropdown.value = 'latest';
+      }
+    }
+  } catch {
+    // ignore
+  }
+  updateDashboardArchiveButton();
+}
+
+function updateDashboardArchiveButton() {
+  const archiveBtn = document.getElementById('archive-logs-btn');
+  const periodDropdown = document.getElementById('period-dropdown');
+  if (!archiveBtn || !periodDropdown) return;
+
+  if (!currentAppId) {
+    archiveBtn.textContent = 'Archive App Logs';
+    archiveBtn.title = 'Select an application to archive logs';
+    archiveBtn.disabled = true;
+    return;
+  }
+
+  archiveBtn.disabled = false;
+  const periodVal = periodDropdown.value || 'latest';
+  const isDate = !['latest', 'today', 'yesterday', '7d', '30d', 'all'].includes(periodVal);
+
+  if (isDate) {
+    archiveBtn.textContent = `Archive Date (${periodVal})`;
+    archiveBtn.title = `Archive only logs from date ${periodVal} for this application`;
+  } else if (periodVal === 'today' || periodVal === 'latest') {
+    archiveBtn.textContent = `Archive Today's Logs`;
+    archiveBtn.title = `Archive only today's logs for this application`;
+  } else if (periodVal === 'yesterday') {
+    archiveBtn.textContent = `Archive Yesterday's Logs`;
+    archiveBtn.title = `Archive only yesterday's logs for this application`;
+  } else if (periodVal === '7d') {
+    archiveBtn.textContent = `Archive Last 7 Days`;
+    archiveBtn.title = `Archive logs from the last 7 days for this application`;
+  } else if (periodVal === '30d') {
+    archiveBtn.textContent = `Archive Last 30 Days`;
+    archiveBtn.title = `Archive logs from the last 30 days for this application`;
+  } else if (periodVal === 'all') {
+    archiveBtn.textContent = `Archive All Logs`;
+    archiveBtn.title = `Archive all historical logs across all dates for this application`;
+  }
+}
+
+function updateClearButtons() {
+  const epInput = document.getElementById('search-input');
+  const epClear = document.getElementById('clear-endpoint-search');
+  if (epInput && epClear) {
+    epClear.classList.toggle('visible', !!epInput.value);
+  }
+
+  const bodyInput = document.getElementById('advanced-search-input');
+  const bodyClear = document.getElementById('clear-body-search');
+  if (bodyInput && bodyClear) {
+    bodyClear.classList.toggle('visible', !!bodyInput.value);
   }
 }
 
@@ -184,16 +291,34 @@ async function loadLogsForApp(appId) {
       selectMode = false;
     }
     updateSelectionUi();
+    updateClearButtons();
     const endpointSearch = document.getElementById('search-input')?.value.trim();
     const bodySearch = document.getElementById('advanced-search-input')?.value.trim();
+    const periodVal = document.getElementById('period-dropdown')?.value || 'latest';
     const params = new URLSearchParams({ appId });
     if (endpointSearch) params.set('endpoint', endpointSearch);
     if (bodySearch) params.set('body', bodySearch);
+    if (periodVal && periodVal !== 'latest') {
+      if (['today', 'yesterday', '7d', '30d', 'all'].includes(periodVal)) {
+        params.set('period', periodVal);
+      } else {
+        params.set('date', periodVal);
+      }
+    }
     const url = `/dashboard-api/logs?${params.toString()}`;
     LoadingManager.showSection('logs-loading-overlay');
     const res = await trackedFetch(url);
     logsList = await res.json();
     renderLogs(logsList);
+
+    const logCountBadge = document.getElementById('log-count-badge');
+    if (logCountBadge) {
+      if (endpointSearch || bodySearch) {
+        logCountBadge.textContent = `${logsList.length} MATCHED`;
+      } else {
+        logCountBadge.textContent = `${logsList.length} LOGS`;
+      }
+    }
 
     if (logsList.length > 0) {
       selectLog(logsList[0].id);
@@ -209,10 +334,11 @@ async function loadLogsForApp(appId) {
 
 let searchTimer = null;
 function onSearchInput() {
+  updateClearButtons();
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
     if (currentAppId) loadLogsForApp(currentAppId);
-  }, 300);
+  }, 250);
 }
 
 // --- Multi-selection helpers ---
@@ -288,6 +414,42 @@ async function removeSelectedLogs() {
   }
 }
 
+async function archiveSelectedLogs() {
+  if (selectedIds.size === 0) {
+    showToast('No logs selected to archive', 'error');
+    return;
+  }
+  const app = applications.find(a => a.id === currentAppId);
+  const appName = app ? app.name : 'unknown';
+  const count = selectedIds.size;
+  if (!confirm(`Archive ${count} selected log(s) for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`)) {
+    return;
+  }
+
+  const ids = Array.from(selectedIds);
+  try {
+    const res = await trackedFetch('/dashboard-api/logs/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        appId: currentAppId,
+        appName,
+        ids
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to archive selected logs');
+
+    selectedIds.clear();
+    updateSelectionToolbar();
+    if (selectMode) toggleSelectMode();
+    if (currentAppId) loadLogsForApp(currentAppId);
+    showToast(data.message || `${data.archived} log(s) archived`, 'success');
+  } catch (err) {
+    showToast(err.message || 'Failed to archive selected logs', 'error');
+  }
+}
+
 function renderLogs(logs) {
   const container = document.getElementById('logs-list-container');
   container.innerHTML = '';
@@ -297,12 +459,14 @@ function renderLogs(logs) {
   if (filteredLogs.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">📡</div>
+        <div class="empty-state-icon">${SVG_ICONS.antenna}</div>
         <p>No logged requests found</p>
       </div>
     `;
     return;
   }
+
+  const fragment = document.createDocumentFragment();
 
   filteredLogs.forEach(log => {
     const li = document.createElement('li');
@@ -326,7 +490,7 @@ function renderLogs(logs) {
       : 'background:var(--accent-light); color:var(--accent-color);';
 
     const backendPill = log.backendName
-      ? `<span style="font-size:0.68rem; padding:1px 6px; border-radius:4px; ${badgeStyle} font-weight:600;">${isRedirect ? '🔀 ' : ''}${escapeHtml(log.backendName)}</span>`
+      ? `<span style="font-size:0.68rem; padding:1px 6px; border-radius:4px; ${badgeStyle} font-weight:600; display:inline-flex; align-items:center;">${isRedirect ? SVG_ICONS.fork : ''}${escapeHtml(log.backendName)}</span>`
       : '';
 
     li.innerHTML = `
@@ -360,8 +524,10 @@ function renderLogs(logs) {
       li.prepend(checkbox);
     }
 
-    container.appendChild(li);
+    fragment.appendChild(li);
   });
+
+  container.appendChild(fragment);
 }
 
 async function selectLog(logId) {
@@ -409,6 +575,12 @@ function renderLogDetail(detail) {
   // Render Monaco Editor Content
   window.monacoManager.setRequestBodyContent(requestBody, reqMeta.fileExtension);
   window.monacoManager.setResponseBodyContent(responseBody, resMeta.fileExtension);
+
+  // Auto-highlight active body search query in Monaco
+  const bodyQuery = document.getElementById('advanced-search-input')?.value.trim();
+  if (bodyQuery && window.monacoManager?.highlightSearchTerm) {
+    window.monacoManager.highlightSearchTerm(bodyQuery);
+  }
 }
 
 function renderHeadersView(containerId, headersObj) {
@@ -439,7 +611,7 @@ function renderHeadersView(containerId, headersObj) {
 
         row.innerHTML = `
           <span class="header-key" style="${isCookieHeader ? 'color: #eab308; font-weight:700;' : ''}">
-            ${isCookieHeader ? '🍪 ' : ''}${escapeHtml(key)}:
+            ${isCookieHeader ? SVG_ICONS.cookie : ''}${escapeHtml(key)}:
           </span>
           <span class="header-val" style="word-break: break-all;">${escapeHtml(String(item))}</span>
         `;
@@ -453,7 +625,7 @@ function renderHeadersView(containerId, headersObj) {
         row.style.background = 'rgba(234, 179, 8, 0.08)';
         row.innerHTML = `
           <span class="header-key" style="color: #eab308; font-weight:700;">
-            🍪 Cookie${cookieItems.length > 1 ? ` #${idx + 1}` : ''}:
+            ${SVG_ICONS.cookie}Cookie${cookieItems.length > 1 ? ` #${idx + 1}` : ''}:
           </span>
           <span class="header-val" style="word-break: break-all;">${escapeHtml(item.trim())}</span>
         `;
@@ -466,7 +638,7 @@ function renderHeadersView(containerId, headersObj) {
 
       row.innerHTML = `
         <span class="header-key" style="${isCookieHeader ? 'color: #eab308; font-weight:700;' : ''}">
-          ${isCookieHeader ? '🍪 ' : ''}${escapeHtml(key)}:
+          ${isCookieHeader ? SVG_ICONS.cookie : ''}${escapeHtml(key)}:
         </span>
         <span class="header-val" style="word-break: break-all;">${escapeHtml(String(val))}</span>
       `;
@@ -487,18 +659,52 @@ function clearLogDetailsView() {
   window.monacoManager.setResponseBodyContent('');
 }
 
-// --- SSE Realtime Feed ---
+// --- SSE Realtime Feed with Frame-Throttled Batching ---
+let sseEventQueue = [];
+let sseBatchScheduled = false;
+
+function flushSseBatch() {
+  sseBatchScheduled = false;
+  if (sseEventQueue.length === 0) return;
+
+  const incomingLogs = sseEventQueue;
+  sseEventQueue = [];
+
+  const shouldAutoSelect = !selectedLogId;
+  let firstNewLogId = null;
+  let hasAppLogs = false;
+
+  for (let i = incomingLogs.length - 1; i >= 0; i--) {
+    const logSummary = incomingLogs[i];
+    if (logSummary.appId === currentAppId) {
+      logsList.unshift(logSummary);
+      hasAppLogs = true;
+      if (!firstNewLogId) {
+        firstNewLogId = logSummary.id;
+      }
+    }
+  }
+
+  if (hasAppLogs) {
+    renderLogs(logsList);
+    if (shouldAutoSelect && firstNewLogId) {
+      selectLog(firstNewLogId);
+    }
+  }
+}
+
 function initSseFeed() {
   const evtSource = new EventSource('/dashboard-api/events');
   evtSource.onmessage = (event) => {
     try {
       const logSummary = JSON.parse(event.data);
-      if (logSummary.appId === currentAppId) {
-        logsList.unshift(logSummary);
-        renderLogs(logsList);
-        // Auto select newly arrived log if none selected
-        if (!selectedLogId) {
-          selectLog(logSummary.id);
+      sseEventQueue.push(logSummary);
+      if (!sseBatchScheduled) {
+        sseBatchScheduled = true;
+        if (typeof requestAnimationFrame !== 'undefined') {
+          requestAnimationFrame(flushSseBatch);
+        } else {
+          setTimeout(flushSseBatch, 16);
         }
       }
     } catch (e) {
@@ -516,7 +722,7 @@ function attachEventListeners() {
   };
 
   // App Selector Change
-  document.getElementById('app-dropdown').onchange = (e) => {
+  document.getElementById('app-dropdown').onchange = async (e) => {
     currentAppId = e.target.value;
     document.getElementById('remove-logs-btn').disabled = !currentAppId;
     document.getElementById('archive-logs-btn').disabled = !currentAppId;
@@ -529,10 +735,11 @@ function attachEventListeners() {
     if (advancedSearchInput) {
       advancedSearchInput.value = '';
     }
-    loadLogsForApp(currentAppId);
+    await loadAvailableDates(currentAppId);
+    await loadLogsForApp(currentAppId);
   };
 
-  // Search Filter
+  // Search Filter Inputs
   document.getElementById('search-input').oninput = () => {
     onSearchInput();
   };
@@ -540,9 +747,72 @@ function attachEventListeners() {
     onSearchInput();
   };
 
+  // Search Clear Buttons
+  const clearEpBtn = document.getElementById('clear-endpoint-search');
+  if (clearEpBtn) {
+    clearEpBtn.onclick = () => {
+      const input = document.getElementById('search-input');
+      if (input) {
+        input.value = '';
+        updateClearButtons();
+        if (currentAppId) loadLogsForApp(currentAppId);
+        input.focus();
+      }
+    };
+  }
+
+  const clearBodyBtn = document.getElementById('clear-body-search');
+  if (clearBodyBtn) {
+    clearBodyBtn.onclick = () => {
+      const input = document.getElementById('advanced-search-input');
+      if (input) {
+        input.value = '';
+        updateClearButtons();
+        if (currentAppId) loadLogsForApp(currentAppId);
+        input.focus();
+      }
+    };
+  }
+
+  // Global Keyboard Shortcuts for Search
+  window.addEventListener('keydown', (e) => {
+    // Press '/' to focus Endpoint Search when not in an active text input or modal
+    if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) && !document.activeElement?.classList.contains('monaco-editor') && !document.querySelector('.modal.active')) {
+      e.preventDefault();
+      const input = document.getElementById('search-input');
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }
+
+    // Press Escape to clear active search input
+    if (e.key === 'Escape') {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.id === 'search-input' || activeEl.id === 'advanced-search-input')) {
+        if (activeEl.value) {
+          activeEl.value = '';
+          updateClearButtons();
+          if (currentAppId) loadLogsForApp(currentAppId);
+        }
+        activeEl.blur();
+      }
+    }
+  });
+
+  // Period Selector Change
+  const periodDropdown = document.getElementById('period-dropdown');
+  if (periodDropdown) {
+    periodDropdown.onchange = () => {
+      updateDashboardArchiveButton();
+      if (currentAppId) loadLogsForApp(currentAppId);
+    };
+  }
+
   // Reload Logs Button
-  document.getElementById('reload-logs-btn').onclick = () => {
-    loadLogsForApp(currentAppId);
+  document.getElementById('reload-logs-btn').onclick = async () => {
+    await loadAvailableDates(currentAppId);
+    if (currentAppId) loadLogsForApp(currentAppId);
     showToast('Logs reloaded', 'success');
   };
 
@@ -564,6 +834,7 @@ function attachEventListeners() {
         updateSelectionToolbar();
         renderLogs([]);
         clearLogDetailsView();
+        await loadAvailableDates(currentAppId);
         showToast('Logs cleared for selected application', 'success');
       } catch (err) {
         showToast('Failed to clear logs', 'error');
@@ -571,7 +842,7 @@ function attachEventListeners() {
     }
   };
 
-  // Archive All Logs for selected app
+  // Archive Logs for selected app (Context-aware based on selected Date/Period)
   document.getElementById('archive-logs-btn').onclick = async () => {
     if (!currentAppId) {
       showToast('Select an application first', 'error');
@@ -579,24 +850,54 @@ function attachEventListeners() {
     }
     const app = applications.find(a => a.id === currentAppId);
     const appName = app ? app.name : 'unknown';
-    if (!confirm(`Archive all logs for "${appName}"?\n\nLogs will be moved to the archives folder and removed from the active logs.`)) {
+    const periodDropdown = document.getElementById('period-dropdown');
+    const periodVal = periodDropdown?.value || 'latest';
+    const isDate = !['latest', 'today', 'yesterday', '7d', '30d', 'all'].includes(periodVal);
+
+    let promptText = '';
+    const archivePayload = { appId: currentAppId, appName };
+
+    if (isDate) {
+      promptText = `Archive logs for "${appName}" for date ${periodVal}?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+      archivePayload.date = periodVal;
+    } else if (periodVal === 'today' || periodVal === 'latest') {
+      promptText = `Archive today's logs for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+      archivePayload.period = 'today';
+    } else if (periodVal === 'yesterday') {
+      promptText = `Archive yesterday's logs for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+      archivePayload.period = 'yesterday';
+    } else if (periodVal === '7d') {
+      promptText = `Archive logs from the last 7 days for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+      archivePayload.period = '7d';
+    } else if (periodVal === '30d') {
+      promptText = `Archive logs from the last 30 days for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+      archivePayload.period = '30d';
+    } else {
+      promptText = `Archive ALL historical logs across all dates for "${appName}"?\n\nLogs will be moved to the archives folder preserving date partitions.`;
+    }
+
+    if (!confirm(promptText)) {
       return;
     }
+
     try {
       const res = await trackedFetch('/dashboard-api/logs/archive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appId: currentAppId, appName })
+        body: JSON.stringify(archivePayload)
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to archive logs');
 
-      logsList = [];
-      selectedIds.clear();
-      updateSelectionToolbar();
-      renderLogs([]);
-      clearLogDetailsView();
-      showToast(data.message || 'Logs archived', 'success');
+      showToast(
+        data.message || `${data.archived} log(s) archived!`,
+        'success',
+        'View in Archives',
+        () => { window.location.href = '/archives'; }
+      );
+
+      await loadAvailableDates(currentAppId);
+      await loadLogsForApp(currentAppId);
     } catch (err) {
       showToast(err.message || 'Failed to archive logs', 'error');
     }
@@ -611,6 +912,14 @@ function attachEventListeners() {
   document.getElementById('done-selection-btn').onclick = () => {
     if (selectMode) toggleSelectMode();
   };
+
+  // Archive selected logs (multi-select)
+  const archiveSelectedBtn = document.getElementById('archive-selected-logs-btn');
+  if (archiveSelectedBtn) {
+    archiveSelectedBtn.onclick = () => {
+      archiveSelectedLogs();
+    };
+  }
 
   // Remove selected logs (multi-select)
   document.getElementById('remove-selected-logs-btn').onclick = () => {
@@ -804,7 +1113,7 @@ function attachEventListeners() {
         showToast(err.message, 'error');
       } finally {
         saveStorageBtn.disabled = false;
-        saveStorageBtn.textContent = '💾 Save Storage Settings';
+        saveStorageBtn.innerHTML = `${SVG_ICONS.save} Save Storage Settings`;
       }
     };
   }
@@ -860,9 +1169,9 @@ function attachEventListeners() {
       sidebar.classList.toggle('collapsed');
       const icon = toggleSidebarBtn.querySelector('.collapse-icon');
       if (sidebar.classList.contains('collapsed')) {
-        if (icon) icon.textContent = '▶';
+        if (icon) icon.innerHTML = SVG_ICONS.chevronRight;
       } else {
-        if (icon) icon.textContent = '◀';
+        if (icon) icon.innerHTML = SVG_ICONS.chevronLeft;
       }
     };
   }
@@ -873,10 +1182,10 @@ function attachEventListeners() {
     const text = btn.querySelector('.collapse-text');
 
     if (isCollapsed) {
-      if (icon) icon.textContent = '▼';
+      if (icon) icon.innerHTML = SVG_ICONS.chevronDown;
       if (text) text.textContent = 'Expand';
     } else {
-      if (icon) icon.textContent = '▲';
+      if (icon) icon.innerHTML = SVG_ICONS.chevronUp;
       if (text) text.textContent = 'Collapse';
     }
 
@@ -949,7 +1258,7 @@ function renderAppManagerList() {
     const redirects = (app.redirectUrls || []);
     const redLines = redirects.map(r => {
       const portText = r.port ? `http://localhost:${r.port}` : 'auto-assigned on save';
-      return `<li style="font-size:0.78rem; color:var(--text-muted);"><span style="color:#eab308;">🔀 ${escapeHtml(r.name)}</span> → <code style="color:var(--accent-color);">${portText}</code> → ${escapeHtml(r.targetUrl)}</li>`;
+      return `<li style="font-size:0.78rem; color:var(--text-muted);"><span style="color:#eab308; display:inline-flex; align-items:center;">${SVG_ICONS.fork}${escapeHtml(r.name)}</span> → <code style="color:var(--accent-color);">${portText}</code> → ${escapeHtml(r.targetUrl)}</li>`;
     }).join('');
 
     item.innerHTML = `
@@ -1229,7 +1538,7 @@ function addRedirectRow(red = { name: '', targetUrl: '', port: null, id: '' }) {
 
   row.innerHTML = `
     <div class="backend-row-header">
-      <span class="backend-row-title" style="color:#eab308;">🔀 Redirection #${idx + 1}</span>
+      <span class="backend-row-title" style="color:#eab308; display:inline-flex; align-items:center;">${SVG_ICONS.fork}Redirection #${idx + 1}</span>
       <button type="button" class="backend-row-remove">Remove</button>
     </div>
     <div class="backend-row-fields">
@@ -1262,7 +1571,7 @@ function addRedirectRow(red = { name: '', targetUrl: '', port: null, id: '' }) {
 function reindexRedirectRows() {
   const list = document.getElementById('redirect-services-list');
   Array.from(list.children).forEach((row, i) => {
-    row.querySelector('.backend-row-title').textContent = `🔀 Redirection #${i + 1}`;
+    row.querySelector('.backend-row-title').innerHTML = `${SVG_ICONS.fork}Redirection #${i + 1}`;
   });
 }
 

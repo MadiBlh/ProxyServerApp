@@ -1,6 +1,6 @@
 {
   "name": "proxy-server-log",
-  "version": "1.4.0",
+  "version": "2.0.1",
   "description": "Local proxy server tool to intercept, log, and inspect web application requests and responses.",
   "main": "dist/server.js",
   "scripts": {

@@ -1,21 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Proxy Server Log Dashboard</title>
-  <meta name="description" content="Local proxy server tool to intercept, log, inspect, and replay web application requests and responses.">
+  <meta name="description"
+    content="Local proxy server tool to intercept, log, inspect, and replay web application requests and responses.">
   <link rel="icon" type="image/svg" href="/dashboard-static/img/network.svg">
   <link rel="stylesheet" href="/dashboard-static/css/styles.css">
 
   <!-- Apply saved theme before first paint to prevent FOUC -->
   <script>
-    (function() {
+    (function () {
       var theme = localStorage.getItem('proxy_theme') || 'dark';
       document.documentElement.setAttribute('data-theme', theme);
     })();
   </script>
 </head>
+
 <body>
 
   <!-- GLOBAL LOADING BAR -->
@@ -30,20 +33,36 @@
 
     <div class="nav-controls">
       <!-- Application Selector Dropdown -->
-      <div class="app-select-container">
-        <span class="app-select-label">Application:</span>
-        <select id="app-dropdown" class="app-dropdown">
+      <div class="app-select-container" title="Select Application">
+        <span class="app-select-icon" style="display:flex; align-items:center; color:var(--text-muted);"
+          aria-hidden="true">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        </span>
+        <select id="app-dropdown" class="app-dropdown" title="Select Application" aria-label="Select Application">
           <option value="">Loading applications...</option>
         </select>
       </div>
 
       <!-- Period Selector Dropdown -->
-      <div class="app-select-container" id="period-select-container">
-        <span class="app-select-label" style="display:flex; align-items:center; gap:4px;">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-          Period:
+      <div class="app-select-container" id="period-select-container"
+        title="Filter logs by time period or specific date">
+        <span class="app-select-icon" style="display:flex; align-items:center; color:var(--text-muted);"
+          aria-hidden="true">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
         </span>
-        <select id="period-dropdown" class="app-dropdown" title="Filter logs by time period or specific date">
+        <select id="period-dropdown" class="app-dropdown" title="Filter logs by time period or specific date"
+          aria-label="Filter logs by period or date">
           <option value="latest">Latest Day</option>
           <option value="today">Today</option>
           <option value="yesterday">Yesterday</option>
@@ -57,26 +76,76 @@
       </div>
 
       <nav class="nav-links">
+        <a href="/mocking" class="nav-btn" title="Manage request/response mock rules & interception">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+          Mocking <span id="nav-mock-badge" class="badge"
+            style="display:none; background:var(--accent-mauve, #cba6f7); color:#11111b; font-weight:700; border-radius:10px; padding:1px 6px; font-size:0.68rem; margin-left:2px;"></span>
+        </a>
         <a href="/archives" class="nav-btn" title="View historical archived logs">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="21 8 21 21 3 21 3 8"></polyline>
+            <rect x="1" y="3" width="22" height="5"></rect>
+            <line x1="10" y1="12" x2="14" y2="12"></line>
+          </svg>
           Archives
         </a>
         <button id="manage-apps-btn" class="nav-btn">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+            </path>
+          </svg>
           Settings
         </button>
         <a href="/doc" target="_blank" class="nav-btn" title="Open documentation">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
           Docs
         </a>
+        <button id="shortcuts-btn" class="nav-btn" title="Keyboard Shortcuts (?)">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+            <line x1="6" y1="8" x2="6" y2="8"></line>
+            <line x1="10" y1="8" x2="10" y2="8"></line>
+            <line x1="14" y1="8" x2="14" y2="8"></line>
+            <line x1="18" y1="8" x2="18" y2="8"></line>
+            <line x1="6" y1="12" x2="6" y2="12"></line>
+            <line x1="10" y1="12" x2="10" y2="12"></line>
+            <line x1="14" y1="12" x2="14" y2="12"></line>
+            <line x1="18" y1="12" x2="18" y2="12"></line>
+            <line x1="7" y1="16" x2="17" y2="16"></line>
+          </svg>
+          Shortcuts
+        </button>
         <button id="theme-toggle-btn" class="theme-toggle" title="Toggle Theme">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
         </button>
       </nav>
     </div>
   </header>
 
-  <!-- MANAGE CURRENT LOGS TOOLBAR -->
+  <!-- PRIMARY ACTION TOOLBAR -->
   <section class="toolbar">
     <div class="action-buttons">
       <!-- Reload all logs -->
@@ -94,37 +163,114 @@
         Replay Request
       </button>
 
-      <!-- Archive all logs for selected app -->
-      <button id="archive-logs-btn" class="btn btn-info">Archive App Logs</button>
+      <!-- Mock selected request -->
+      <button id="mock-req-btn" class="btn btn-secondary-outline" title="Create a mock rule from this request">
+        Mock Request
+      </button>
+    </div>
 
-      <!-- Remove all logs for selected app -->
-      <button id="remove-logs-btn" class="btn btn-danger">Remove App Logs</button>
+    <div class="action-buttons">
+      <!-- Archive logs for selected app -->
+      <button id="archive-logs-btn" class="btn btn-info">Archive Logs</button>
+
+      <!-- Remove logs for selected app -->
+      <button id="remove-logs-btn" class="btn btn-danger">Remove Logs</button>
+    </div>
+  </section>
+
+  <!-- FILTERS & SEARCH SUB-TOOLBAR -->
+  <section class="sub-toolbar">
+    <!-- Quick Filter Preset Pills -->
+    <div class="filter-presets" id="filter-presets-container">
+      <button type="button" class="preset-pill active" data-preset="all" title="Show all requests">All</button>
+      <button type="button" class="preset-pill preset-errors" data-preset="errors" title="Filter 4xx and 5xx errors">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5"
+          fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        Errors
+      </button>
+      <button type="button" class="preset-pill preset-mocks" data-preset="mocks" title="Filter mock intercepted calls">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5"
+          fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+        Mocks
+      </button>
+      <button type="button" class="preset-pill preset-redirects" data-preset="redirects"
+        title="Filter redirect proxy calls">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5"
+          fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="16 3 21 3 21 8"></polyline>
+          <line x1="4" y1="20" x2="21" y2="3"></line>
+          <polyline points="21 16 21 21 16 21"></polyline>
+          <line x1="15" y1="15" x2="21" y2="21"></line>
+          <line x1="4" y1="4" x2="9" y2="9"></line>
+        </svg>
+        Redirects
+      </button>
+      <button type="button" class="preset-pill preset-slow" data-preset="slow" title="Filter slow calls (>500ms)">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5"
+          fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        Slow
+      </button>
     </div>
 
     <!-- Search fields -->
-    <div class="search-box">
-      <span class="search-icon">
-        <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-      </span>
-      <input type="text" id="search-input" class="search-input" placeholder="Search endpoint, method, status... (/)" title="Search by path, HTTP method (POST, GET), status (200, 500), or backend name. Press / to focus.">
-      <button type="button" id="clear-endpoint-search" class="search-clear-btn" aria-label="Clear endpoint search" title="Clear search">
-        <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
-    </div>
-    <div class="search-box">
-      <span class="search-icon">
-        <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-      </span>
-      <input type="text" id="advanced-search-input" class="search-input" placeholder="Search headers &amp; body content..." title="Deep search across request headers, response headers, request body, and response body.">
-      <button type="button" id="clear-body-search" class="search-clear-btn" aria-label="Clear body search" title="Clear search">
-        <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-      </button>
+    <div class="search-fields-group">
+      <div class="search-box">
+        <span class="search-icon">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </span>
+        <input type="text" id="search-input" class="search-input" placeholder="Search endpoint, method, status... (/)"
+          title="Search by path, HTTP method (POST, GET), status (200, 500), or backend name. Press / to focus.">
+        <button type="button" id="clear-endpoint-search" class="search-clear-btn" aria-label="Clear endpoint search"
+          title="Clear search">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="search-box">
+        <span class="search-icon">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </span>
+        <input type="text" id="advanced-search-input" class="search-input"
+          placeholder="Search headers &amp; body content..."
+          title="Deep search across request headers, response headers, request body, and response body.">
+        <button type="button" id="clear-body-search" class="search-clear-btn" aria-label="Clear body search"
+          title="Clear search">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
     </div>
   </section>
 
   <!-- LOG VIEWER MAIN CONTENT (SPLIT UI) -->
   <main class="main-content">
-    
+
     <!-- FIRST SECTION (LEFT): LIST OF CALLS -->
     <aside id="log-sidebar" class="log-sidebar">
       <div class="sidebar-header">
@@ -134,7 +280,10 @@
           <span id="log-count-badge" class="method-badge">LOGS</span>
           <button type="button" class="btn-collapse-pane" id="toggle-sidebar-btn" title="Collapse / Expand Sidebar">
             <span class="collapse-icon">
-              <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor"
+                stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
             </span>
           </button>
         </span>
@@ -142,7 +291,8 @@
       <div id="selection-toolbar" class="selection-toolbar" style="display:none;">
         <span id="selection-count" class="selection-count">0 selected</span>
         <div style="display:flex; gap:8px;">
-          <button id="archive-selected-logs-btn" class="btn btn-secondary btn-sm" title="Archive selected logs">Archive selected</button>
+          <button id="archive-selected-logs-btn" class="btn btn-secondary btn-sm" title="Archive selected logs">Archive
+            selected</button>
           <button id="remove-selected-logs-btn" class="btn btn-danger btn-sm">Remove selected</button>
           <button id="clear-selection-btn" class="btn btn-sm">Clear</button>
           <button id="done-selection-btn" class="btn btn-sm">Done</button>
@@ -158,7 +308,13 @@
         <ul id="logs-list-container" class="logs-list">
           <div class="empty-state">
             <div class="empty-state-icon">
-              <svg class="svg-icon empty-state-svg" viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.75" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4.93 4.93a10 10 0 0 1 14.14 0"></path><path d="M7.76 7.76a6 6 0 0 1 8.48 0"></path><circle cx="12" cy="12" r="2"></circle><path d="M12 14v8"></path></svg>
+              <svg class="svg-icon empty-state-svg" viewBox="0 0 24 24" width="48" height="48" stroke="currentColor"
+                stroke-width="1.75" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4.93 4.93a10 10 0 0 1 14.14 0"></path>
+                <path d="M7.76 7.76a6 6 0 0 1 8.48 0"></path>
+                <circle cx="12" cy="12" r="2"></circle>
+                <path d="M12 14v8"></path>
+              </svg>
             </div>
             <p>Listening for HTTP & SOAP proxy calls...</p>
           </div>
@@ -181,14 +337,19 @@
           <div class="pane-title">
             <span class="uppercase">REQUEST</span>
             <span id="req-method-badge" class="method-badge method-GET uppercase">GET</span>
-            <span id="req-url-text" style="font-family: 'Fira Code', monospace; font-size: 0.70rem;">Select a request call from the left list</span>
+            <span id="req-url-text" style="font-family: 'Fira Code', monospace; font-size: 0.70rem;">Select a request
+              call from the left list</span>
           </div>
           <div class="pane-controls">
             <button class="tab-btn active" data-tab="body">Body (Monaco)</button>
             <button class="tab-btn" data-tab="headers">Headers</button>
-            <button type="button" class="btn-collapse-pane" id="toggle-request-pane-btn" title="Collapse / Expand Request Panel">
+            <button type="button" class="btn-collapse-pane" id="toggle-request-pane-btn"
+              title="Collapse / Expand Request Panel">
               <span class="collapse-icon">
-                <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor"
+                  stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
               </span>
               <span class="collapse-text">Collapse</span>
             </button>
@@ -210,9 +371,13 @@
           <div class="pane-controls">
             <button class="tab-btn active" data-tab="body">Body (Monaco)</button>
             <button class="tab-btn" data-tab="headers">Headers</button>
-            <button type="button" class="btn-collapse-pane" id="toggle-response-pane-btn" title="Collapse / Expand Response Panel">
+            <button type="button" class="btn-collapse-pane" id="toggle-response-pane-btn"
+              title="Collapse / Expand Response Panel">
               <span class="collapse-icon">
-                <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                <svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor"
+                  stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
               </span>
               <span class="collapse-text">Collapse</span>
             </button>
@@ -232,7 +397,11 @@
       <div class="modal-header">
         <h3 class="modal-title">Export Selected Request</h3>
         <button class="modal-close" onclick="closeModal('export-modal')">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
         </button>
       </div>
       <div class="modal-body">
@@ -240,7 +409,8 @@
           <label class="form-label">File Prefix Name:</label>
           <input type="text" id="export-filename-input" class="form-control" placeholder="e.g. login_request_test">
           <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">
-            Files will be saved into your user Downloads directory as <code>{name}_request.{ext}</code> and <code>{name}_response.{ext}</code>
+            Files will be saved into your user Downloads directory as <code>{name}_request.{ext}</code> and
+            <code>{name}_response.{ext}</code>
           </small>
         </div>
       </div>
@@ -256,17 +426,25 @@
     <div class="modal-card" style="max-width: 650px;">
       <div class="modal-header">
         <h3 class="modal-title" style="display:flex; align-items:center; gap:8px;">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warning-color);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warning-color);">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
           Replay Request
         </h3>
         <button class="modal-close" onclick="closeModal('replay-modal')">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
         </button>
       </div>
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Target URL / Host:</label>
-          <input type="text" id="replay-url-input" class="form-control" placeholder="http://localhost:5000/api/endpoint">
+          <input type="text" id="replay-url-input" class="form-control"
+            placeholder="http://localhost:5000/api/endpoint">
         </div>
         <div class="form-group">
           <label class="form-label">HTTP Method:</label>
@@ -282,11 +460,13 @@
         </div>
         <div class="form-group">
           <label class="form-label">Custom Request Headers (JSON format):</label>
-          <textarea id="replay-headers-input" class="form-control" rows="4" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+          <textarea id="replay-headers-input" class="form-control" rows="4"
+            style="font-family: monospace; font-size: 0.8rem;"></textarea>
         </div>
         <div class="form-group">
           <label class="form-label">Custom Request Body:</label>
-          <textarea id="replay-body-input" class="form-control" rows="5" style="font-family: monospace; font-size: 0.8rem;"></textarea>
+          <textarea id="replay-body-input" class="form-control" rows="5"
+            style="font-family: monospace; font-size: 0.8rem;"></textarea>
         </div>
 
         <div class="form-group" style="position:relative;">
@@ -297,13 +477,17 @@
               <span>Executing replay...</span>
             </div>
           </div>
-          <pre id="replay-response-output" style="background: var(--bg-input); padding: 12px; border-radius: 8px; font-size: 0.8rem; max-height: 180px; overflow: auto; border: 1px solid var(--border-color);"></pre>
+          <pre id="replay-response-output"
+            style="background: var(--bg-input); padding: 12px; border-radius: 8px; font-size: 0.8rem; max-height: 180px; overflow: auto; border: 1px solid var(--border-color);"></pre>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-error-outline" onclick="closeModal('replay-modal')">Close</button>
         <button id="execute-replay-btn" class="btn btn-primary" style="display:flex; align-items:center; gap:6px;">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
           Send Replay
         </button>
       </div>
@@ -315,20 +499,33 @@
     <div class="modal-card settings-modal-card" style="max-width: 900px; max-height: 92vh;">
       <div class="modal-header">
         <h3 class="modal-title" style="display:flex; align-items:center; gap:8px;">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-color);"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-color);">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+            </path>
+          </svg>
           Settings
         </h3>
         <button class="modal-close" onclick="closeModal('settings-modal')">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
         </button>
       </div>
 
       <!-- Settings Tabs -->
-      <div style="display: flex; gap: 8px; padding: 0 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-card-header, transparent);">
-        <button id="tab-settings-apps" class="settings-tab-btn active" style="background: none; border: none; padding: 10px 16px; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--accent-color); border-bottom: 2px solid var(--accent-color);">
+      <div
+        style="display: flex; gap: 8px; padding: 0 20px; border-bottom: 1px solid var(--border-color); background: var(--bg-card-header, transparent);">
+        <button id="tab-settings-apps" class="settings-tab-btn active"
+          style="background: none; border: none; padding: 10px 16px; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--accent-color); border-bottom: 2px solid var(--accent-color);">
           Web Applications
         </button>
-        <button id="tab-settings-paths" class="settings-tab-btn" style="background: none; border: none; padding: 10px 16px; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--text-secondary); border-bottom: 2px solid transparent;">
+        <button id="tab-settings-paths" class="settings-tab-btn"
+          style="background: none; border: none; padding: 10px 16px; font-weight: 600; font-size: 0.88rem; cursor: pointer; color: var(--text-secondary); border-bottom: 2px solid transparent;">
           Storage & Paths
         </button>
       </div>
@@ -337,7 +534,8 @@
         <!-- TAB 1: WEB APPLICATIONS -->
         <div id="settings-section-apps">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">Configured Web Applications and Backend Services:</p>
+            <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 0;">Configured Web Applications and
+              Backend Services:</p>
             <button id="add-new-app-btn" class="btn btn-primary-outline">+ Add Application</button>
           </div>
           <div id="app-manager-list" style="margin-top: 10px; position:relative;">
@@ -352,16 +550,184 @@
 
         <!-- TAB 2: STORAGE & PATHS -->
         <div id="settings-section-paths" style="display: none;">
-          <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
-            Configure where the Proxy Server stores application definitions (<code>applications.json</code>) and captured request/response logs.
-          </p>
+          <!-- Storage Usage & Health Overview -->
+          <div class="storage-overview-card"
+            style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div>
+                <h4 style="margin: 0; font-size: 0.92rem; font-weight: 700; display:flex; align-items:center; gap:6px;">
+                  <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor"
+                    stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"
+                    style="color:var(--accent-color);">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                  </svg>
+                  Storage Usage &amp; Disk Health
+                </h4>
+                <p style="margin: 2px 0 0; font-size: 0.76rem; color: var(--text-muted);">Real-time breakdown of proxy
+                  server disk consumption.</p>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" id="refresh-storage-stats-btn" class="btn"
+                  style="padding: 4px 10px; font-size: 0.75rem; background: var(--bg-hover);"
+                  title="Refresh Storage Metrics">
+                  <svg class="svg-icon" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor"
+                    stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                  Refresh
+                </button>
+                <button type="button" id="vacuum-storage-btn" class="btn btn-secondary"
+                  style="padding: 4px 12px; font-size: 0.75rem; display:flex; align-items:center; gap:5px;"
+                  title="Prune empty directories and orphaned metadata">
+                  <svg class="svg-icon" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor"
+                    stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18"></path>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                  </svg>
+                  Vacuum Storage
+                </button>
+              </div>
+            </div>
+
+            <!-- Visual segmented bar -->
+            <div class="storage-meter-container" style="margin-bottom: 12px;">
+              <div class="storage-meter" id="storage-meter-bar"
+                style="height: 10px; border-radius: 5px; background: var(--border-color); display: flex; overflow: hidden;">
+                <div id="meter-logs" class="storage-meter-seg seg-logs"
+                  style="width: 0%; background: var(--accent-color);" title="Active Logs"></div>
+                <div id="meter-headers" class="storage-meter-seg seg-headers" style="width: 0%; background: #38bdf8;"
+                  title="Headers Metadata"></div>
+                <div id="meter-archives" class="storage-meter-seg seg-archives" style="width: 0%; background: #cba6f7;"
+                  title="Archived Logs"></div>
+              </div>
+            </div>
+
+            <!-- Stats breakdown grid -->
+            <div class="storage-grid"
+              style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
+              <div class="storage-stat-box"
+                style="background: var(--bg-card); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.70rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                  Active Logs</div>
+                <div id="stat-logs-size"
+                  style="font-size: 1.05rem; font-weight: 700; color: var(--text-color); margin-top: 2px;">--</div>
+                <div id="stat-logs-count" style="font-size: 0.68rem; color: var(--text-muted);">0 transactions</div>
+              </div>
+              <div class="storage-stat-box"
+                style="background: var(--bg-card); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.70rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                  Headers Metadata</div>
+                <div id="stat-headers-size"
+                  style="font-size: 1.05rem; font-weight: 700; color: #38bdf8; margin-top: 2px;">--</div>
+                <div style="font-size: 0.68rem; color: var(--text-muted);">index headers</div>
+              </div>
+              <div class="storage-stat-box"
+                style="background: var(--bg-card); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.70rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                  Archives</div>
+                <div id="stat-archives-size"
+                  style="font-size: 1.05rem; font-weight: 700; color: #cba6f7; margin-top: 2px;">--</div>
+                <div style="font-size: 0.68rem; color: var(--text-muted);">cold storage</div>
+              </div>
+              <div class="storage-stat-box"
+                style="background: var(--bg-card); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.70rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                  Total App Size</div>
+                <div id="stat-total-size"
+                  style="font-size: 1.05rem; font-weight: 700; color: var(--accent-color); margin-top: 2px;">--</div>
+                <div style="font-size: 0.68rem; color: var(--text-muted);">all storage</div>
+              </div>
+              <div class="storage-stat-box"
+                style="background: var(--bg-card); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <div style="font-size: 0.70rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">
+                  Free Disk Space</div>
+                <div id="stat-free-space"
+                  style="font-size: 1.05rem; font-weight: 700; color: var(--success-color, #22c55e); margin-top: 2px;">
+                  --</div>
+                <div style="font-size: 0.68rem; color: var(--text-muted);">host drive</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Automated Retention Policy Section -->
+          <div class="storage-retention-card"
+            style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div>
+                <h4 style="margin: 0; font-size: 0.92rem; font-weight: 700; display:flex; align-items:center; gap:6px;">
+                  <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor"
+                    stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"
+                    style="color:var(--warning-color);">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                  Automated Storage Retention Policy
+                </h4>
+                <p style="margin: 2px 0 0; font-size: 0.76rem; color: var(--text-muted);">Automatically archive or prune
+                  old logs exceeding the specified age threshold.</p>
+              </div>
+              <button type="button" id="apply-retention-now-btn" class="btn btn-warning"
+                style="padding: 4px 12px; font-size: 0.75rem; display:flex; align-items:center; gap:5px;"
+                title="Run retention policy immediately">
+                <svg class="svg-icon" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2"
+                  fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+                Apply Retention Now
+              </button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              <div class="form-group">
+                <label class="form-label" style="font-weight: 600;">Retention Age Threshold:</label>
+                <select id="setting-retention-days" class="form-control">
+                  <option value="0">Disabled (Keep logs indefinitely)</option>
+                  <option value="7">7 Days</option>
+                  <option value="14">14 Days</option>
+                  <option value="30">30 Days (Recommended)</option>
+                  <option value="60">60 Days</option>
+                  <option value="90">90 Days</option>
+                </select>
+                <small style="font-size: 0.74rem; color: var(--text-muted); margin-top: 4px; display: block;">
+                  Logs older than this threshold will be processed automatically on startup &amp; on-demand.
+                </small>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" style="font-weight: 600;">Action for Expired Logs:</label>
+                <select id="setting-retention-action" class="form-control">
+                  <option value="archive">Archive (Move into Archives folder)</option>
+                  <option value="delete">Delete Permanently</option>
+                </select>
+                <small style="font-size: 0.74rem; color: var(--text-muted); margin-top: 4px; display: block;">
+                  Whether to preserve expired logs as archive zip/bundles or purge them to free disk space.
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Directory Paths Configuration -->
+          <div style="margin-bottom: 12px;">
+            <h4 style="margin: 0 0 6px 0; font-size: 0.92rem; font-weight: 700;">Storage Paths</h4>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0 0 14px 0;">
+              Configure custom directory locations for configurations, active logs, and archives.
+            </p>
+          </div>
 
           <div class="form-group" style="margin-bottom: 14px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <label class="form-label" style="font-weight: 600;">Configuration Directory:</label>
-              <button type="button" id="reset-config-path-btn" class="btn" style="padding: 2px 8px; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-hover);">Reset to Default</button>
+              <button type="button" id="reset-config-path-btn" class="btn"
+                style="padding: 2px 8px; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-hover);">Reset
+                to Default</button>
             </div>
-            <input type="text" id="setting-config-dir" class="form-control" placeholder="e.g. D:/ProxyServerApp/config or leave empty for default">
+            <input type="text" id="setting-config-dir" class="form-control"
+              placeholder="e.g. D:/ProxyServerApp/config or leave empty for default">
             <small style="font-size: 0.74rem; color: var(--text-muted); margin-top: 4px; display: block;">
               Directory containing <code>applications.json</code>.
             </small>
@@ -369,26 +735,52 @@
 
           <div class="form-group" style="margin-bottom: 14px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <label class="form-label" style="font-weight: 600;">Logs & Capture Directory:</label>
-              <button type="button" id="reset-logs-path-btn" class="btn" style="padding: 2px 8px; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-hover);">Reset to Default</button>
+              <label class="form-label" style="font-weight: 600;">Logs &amp; Capture Directory:</label>
+              <button type="button" id="reset-logs-path-btn" class="btn"
+                style="padding: 2px 8px; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-hover);">Reset
+                to Default</button>
             </div>
-            <input type="text" id="setting-logs-dir" class="form-control" placeholder="e.g. D:/ProxyServerApp/data or leave empty for default">
+            <input type="text" id="setting-logs-dir" class="form-control"
+              placeholder="e.g. D:/ProxyServerApp/data or leave empty for default">
             <small style="font-size: 0.74rem; color: var(--text-muted); margin-top: 4px; display: block;">
               Base directory where <code>logs/</code> (payloads) and <code>headers/</code> (metadata) are saved.
             </small>
           </div>
 
-          <div class="form-group" style="flex-direction: row; align-items: center; gap: 10px; margin-top: 16px; padding: 10px; background: var(--bg-hover); border-radius: 6px;">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label class="form-label" style="font-weight: 600;">Archives Directory:</label>
+              <button type="button" id="reset-archives-path-btn" class="btn"
+                style="padding: 2px 8px; font-size: 0.72rem; color: var(--text-muted); background: var(--bg-hover);">Reset
+                to Default</button>
+            </div>
+            <input type="text" id="setting-archives-dir" class="form-control"
+              placeholder="e.g. D:/ProxyServerApp/archives or leave empty for default">
+            <small style="font-size: 0.74rem; color: var(--text-muted); margin-top: 4px; display: block;">
+              Directory where archived request/response logs and manifests are stored.
+            </small>
+          </div>
+
+          <div class="form-group"
+            style="flex-direction: row; align-items: center; gap: 10px; margin-top: 16px; padding: 10px; background: var(--bg-hover); border-radius: 6px;">
             <input type="checkbox" id="setting-migrate-config" style="width: 16px; height: 16px;">
-            <label for="setting-migrate-config" class="form-label" style="margin: 0; font-size: 0.82rem; cursor: pointer;">
-              Copy existing application configurations (<code>applications.json</code>) to the new configuration directory
+            <label for="setting-migrate-config" class="form-label"
+              style="margin: 0; font-size: 0.82rem; cursor: pointer;">
+              Copy existing application configurations (<code>applications.json</code>) to the new configuration
+              directory
             </label>
           </div>
 
           <div style="display: flex; justify-content: flex-end; margin-top: 18px;">
-            <button id="save-storage-settings-btn" class="btn btn-primary" style="display:flex; align-items:center; gap:6px;">
-              <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-              Save Storage Settings
+            <button id="save-storage-settings-btn" class="btn btn-primary"
+              style="display:flex; align-items:center; gap:6px;">
+              <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+                fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+              </svg>
+              Save Storage &amp; Retention Settings
             </button>
           </div>
         </div>
@@ -406,7 +798,11 @@
       <div class="modal-header">
         <h3 class="modal-title">Application Configuration</h3>
         <button class="modal-close" onclick="closeModal('edit-app-modal')">
-          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
         </button>
       </div>
       <div class="modal-body">
@@ -426,7 +822,8 @@
         <div class="form-group">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <label class="form-label" style="margin: 0;">Backend Services</label>
-            <button type="button" id="add-backend-btn" class="btn btn-primary" style="padding: 5px 12px; font-size: 0.8rem;">
+            <button type="button" id="add-backend-btn" class="btn btn-primary"
+              style="padding: 5px 12px; font-size: 0.8rem;">
               + Add Backend
             </button>
           </div>
@@ -436,18 +833,36 @@
         <!-- API Redirections / Forwarding section -->
         <div class="form-group" style="margin-top: 16px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <label class="form-label" style="margin: 0; color: var(--accent-color); display:flex; align-items:center; gap:6px;">
-              <svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warning-color);"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+            <label class="form-label"
+              style="margin: 0; color: var(--accent-color); display:flex; align-items:center; gap:6px;">
+              <svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2"
+                fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warning-color);">
+                <polyline points="16 3 21 3 21 8"></polyline>
+                <line x1="4" y1="20" x2="21" y2="3"></line>
+                <polyline points="21 16 21 21 16 21"></polyline>
+                <line x1="15" y1="15" x2="21" y2="21"></line>
+                <line x1="4" y1="4" x2="9" y2="9"></line>
+              </svg>
               API Redirections / Forwarding (Backend to External APIs)
             </label>
-            <button type="button" id="add-redirect-btn" class="btn btn-secondary" style="padding: 5px 12px; font-size: 0.8rem;">
+            <button type="button" id="add-redirect-btn" class="btn btn-secondary"
+              style="padding: 5px 12px; font-size: 0.8rem;">
               + Add Redirection
             </button>
           </div>
           <div id="redirect-services-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
-          <p style="font-size: 0.76rem; color: var(--text-muted); margin-top: 6px; display:flex; align-items:center; gap:4px;">
-            <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warning-color);"><line x1="9" y1="18" x2="15" y2="18"></line><line x1="10" y1="22" x2="14" y2="22"></line><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path></svg>
-            Configure external API redirections. Each redirection runs on its own dedicated proxy port (e.g. <code>http://localhost:4001</code>) and captures request/response logs.
+          <p
+            style="font-size: 0.76rem; color: var(--text-muted); margin-top: 6px; display:flex; align-items:center; gap:4px;">
+            <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2"
+              fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--warning-color);">
+              <line x1="9" y1="18" x2="15" y2="18"></line>
+              <line x1="10" y1="22" x2="14" y2="22"></line>
+              <path
+                d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14">
+              </path>
+            </svg>
+            Configure external API redirections. Each redirection runs on its own dedicated proxy port (e.g.
+            <code>http://localhost:4001</code>) and captures request/response logs.
           </p>
         </div>
 
@@ -463,9 +878,107 @@
     </div>
   </div>
 
+  <!-- MODAL: KEYBOARD SHORTCUTS -->
+  <div id="shortcuts-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display:flex; align-items:center; gap:8px;">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2"
+            fill="none" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-color);">
+            <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+            <line x1="6" y1="8" x2="6" y2="8"></line>
+            <line x1="10" y1="8" x2="10" y2="8"></line>
+            <line x1="14" y1="8" x2="14" y2="8"></line>
+            <line x1="18" y1="8" x2="18" y2="8"></line>
+            <line x1="6" y1="12" x2="6" y2="12"></line>
+            <line x1="10" y1="12" x2="10" y2="12"></line>
+            <line x1="14" y1="12" x2="14" y2="12"></line>
+            <line x1="18" y1="12" x2="18" y2="12"></line>
+            <line x1="7" y1="16" x2="17" y2="16"></line>
+          </svg>
+          Keyboard Shortcuts
+        </h3>
+        <button class="modal-close" onclick="closeModal('shortcuts-modal')">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5"
+            fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="shortcuts-group" style="margin-bottom: 16px;">
+          <h4
+            style="margin: 0 0 10px 0; font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.5px;">
+            Navigation &amp; Views</h4>
+          <div class="shortcut-row"
+            style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px solid var(--border-color);">
+            <span style="font-size: 0.86rem; color: var(--text-color);">Focus Endpoint Search</span>
+            <span class="shortcut-keys"><kbd class="kbd-key">/</kbd></span>
+          </div>
+          <div class="shortcut-row"
+            style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px solid var(--border-color);">
+            <span style="font-size: 0.86rem; color: var(--text-color);">Reload Logs</span>
+            <span class="shortcut-keys"><kbd class="kbd-key">r</kbd></span>
+          </div>
+          <div class="shortcut-row"
+            style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px solid var(--border-color);">
+            <span style="font-size: 0.86rem; color: var(--text-color);">Open Settings</span>
+            <span class="shortcut-keys"><kbd class="kbd-key">s</kbd></span>
+          </div>
+          <div class="shortcut-row"
+            style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px solid var(--border-color);">
+            <span style="font-size: 0.86rem; color: var(--text-color);">Go to Mocking Rules</span>
+            <span class="shortcut-keys"><kbd class="kbd-key">m</kbd></span>
+          </div>
+          <div class="shortcut-row"
+            style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px solid var(--border-color);">
+            <span style="font-size: 0.86rem; color: var(--text-color);">Go to Archives</span>
+            <span class="shortcut-keys"><kbd class="kbd-key">a</kbd></span>
+          </div>
+          <div class="shortcut-row"
+            style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px solid var(--border-color);">
+            <span style="font-size: 0.86rem; color: var(--text-color);">Toggle Theme</span>
+            <span class="shortcut-keys"><kbd class="kbd-key">t</kbd></span>
+          </div>
+        </div>
+
+        <div class="shortcuts-group">
+          <h4
+            style="margin: 0 0 10px 0; font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.5px;">
+            Actions &amp; Modals</h4>
+          <div class="shortcut-row"
+            style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px solid var(--border-color);">
+            <span style="font-size: 0.86rem; color: var(--text-color);">Export Selected Request</span>
+            <span class="shortcut-keys"><kbd class="kbd-key">e</kbd></span>
+          </div>
+          <div class="shortcut-row"
+            style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px solid var(--border-color);">
+            <span style="font-size: 0.86rem; color: var(--text-color);">Replay Selected Request</span>
+            <span class="shortcut-keys"><kbd class="kbd-key">p</kbd></span>
+          </div>
+          <div class="shortcut-row"
+            style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px solid var(--border-color);">
+            <span style="font-size: 0.86rem; color: var(--text-color);">Close Open Modal / Clear Selection</span>
+            <span class="shortcut-keys"><kbd class="kbd-key">Esc</kbd></span>
+          </div>
+          <div class="shortcut-row"
+            style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0;">
+            <span style="font-size: 0.86rem; color: var(--text-color);">Open Shortcuts Helper</span>
+            <span class="shortcut-keys"><kbd class="kbd-key">?</kbd></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeModal('shortcuts-modal')">Got it</button>
+      </div>
+    </div>
+  </div>
+
   <!-- JS Dependencies -->
   <script src="/dashboard-static/js/monaco-init.js"></script>
   <script src="/dashboard-static/js/app.js"></script>
 
 </body>
+
 </html>

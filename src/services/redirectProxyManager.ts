@@ -9,6 +9,7 @@ import type * as httpModule from 'http';
 import uuidv4 from '../utils/uuid';
 import { extractBodyString } from '../utils/payload';
 import * as logManager from './logManager';
+import * as mockManager from './mockManager';
 import type { RedirectSubscriber, ProxyEntry, SseClient, RunningRedirectProxy } from '../types';
 
 /* ==========================================================================
@@ -229,7 +230,76 @@ export function startRedirectProxy(
       req._redirectRawBuffer = rawReqBuffer;
       req._redirectRequestId = uuidv4();
       req._redirectStartTime = Date.now();
-      req._redirectSubscriber = resolveSubscriber(subscribers, req);
+      const subscriber = resolveSubscriber(subscribers, req);
+      req._redirectSubscriber = subscriber;
+
+      // Check for matching mock interception rules
+      const mockRule = mockManager.findMatchingMockRule({
+        appId: subscriber.app.id,
+        method: req.method,
+        url: req.url || '/',
+        targetUrl
+      });
+
+      if (mockRule) {
+        const executeMock = async () => {
+          if (mockRule.delayMs && mockRule.delayMs > 0) {
+            await new Promise(r => setTimeout(r, mockRule.delayMs));
+          }
+
+          const durationMs = Date.now() - (req._redirectStartTime || Date.now());
+          const mockStatusCode = mockRule.statusCode || 200;
+          const mockHeaders = mockRule.headers || { 'content-type': mockRule.contentType || 'application/json' };
+          const mockBodyStr = mockRule.body || '';
+
+          const { reqMeta, resMeta } = logManager.saveLogEntry({
+            id: req._redirectRequestId!,
+            appId: subscriber.app.id,
+            appName: subscriber.app.name,
+            backendName: `[MOCK] ${subscriber.redirect.name}`,
+            routeType: 'mock',
+            targetUrl,
+            method: req.method || 'GET',
+            endpoint: req.url || '/',
+            requestHeaders: req.headers,
+            requestBody: req._redirectRawBodyStr || '',
+            statusCode: mockStatusCode,
+            responseHeaders: mockHeaders as Record<string, string | string[] | undefined>,
+            responseBody: mockBodyStr,
+            durationMs
+          });
+
+          broadcastLogEvent({
+            id: req._redirectRequestId!,
+            appId: subscriber.app.id,
+            appName: subscriber.app.name,
+            backendName: `[MOCK] ${mockRule.name}`,
+            routeType: 'mock',
+            timestamp: reqMeta.timestamp,
+            method: req.method,
+            endpoint: req.url,
+            statusCode: mockStatusCode,
+            status: resMeta.statusText || 'MOCK',
+            durationMs
+          });
+
+          res.status(mockStatusCode);
+          Object.keys(mockHeaders).forEach(key => {
+            try {
+              res.setHeader(key, mockHeaders[key] as string);
+            } catch { /* ignore */ }
+          });
+          res.send(mockBodyStr);
+        };
+
+        executeMock().catch(err => {
+          console.error(`[RedirectProxy :${port}] Mock execution error:`, err);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Mock Rule Execution Error', details: (err as Error).message });
+          }
+        });
+        return;
+      }
 
       const bufferStream = new PassThrough();
       bufferStream.end(rawReqBuffer);

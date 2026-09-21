@@ -180,6 +180,13 @@ body {
   text-transform: uppercase;
 }
 
+.app-select-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
 select.app-dropdown {
   background: transparent;
   border: none;
@@ -260,14 +267,35 @@ select.app-dropdown optgroup {
    ========================================================================== */
 
 .toolbar {
-  height: 56px;
+  height: 48px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 20px;
   gap: 16px;
+}
+
+.sub-toolbar {
+  min-height: 46px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.search-fields-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 680px;
+  justify-content: flex-end;
 }
 
 .action-buttons {
@@ -376,6 +404,7 @@ select.app-dropdown optgroup {
 .search-box {
   position: relative;
   flex: 1;
+  min-width: 200px;
   max-width: 320px;
 }
 
@@ -897,12 +926,16 @@ select.app-dropdown optgroup {
 }
 
 .form-label {
+  display: block;
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-secondary);
 }
 
 .form-control {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
   background: var(--bg-input);
   border: 1px solid var(--border-color);
   padding: 10px 14px;
@@ -914,6 +947,13 @@ select.app-dropdown optgroup {
 
 .form-control:focus {
   border-color: var(--accent-color);
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
 }
 
 .modal-footer {
@@ -1156,3 +1196,141 @@ select.app-dropdown optgroup {
   color: var(--accent-color);
   border-radius: 4px;
 }
+
+/* ==========================================================================
+   QUICK FILTER PRESET PILLS
+   ========================================================================== */
+
+.preset-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.preset-pill {
+  padding: 4px 11px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.preset-pill .svg-icon {
+  flex-shrink: 0;
+}
+
+.preset-pill:hover {
+  background: var(--bg-hover);
+  color: var(--text-color);
+  border-color: var(--text-muted);
+}
+
+.preset-pill.preset-errors {
+  color: var(--error-color, #ef4444);
+}
+
+.preset-pill.preset-mocks {
+  color: var(--accent-mauve, #cba6f7);
+}
+
+.preset-pill.preset-redirects {
+  color: #eab308;
+}
+
+.preset-pill.preset-slow {
+  color: #38bdf8;
+}
+
+.preset-pill.active {
+  background: var(--accent-color);
+  color: #ffffff;
+  border-color: var(--accent-color);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.preset-pill.preset-errors.active {
+  background: var(--error-color, #ef4444);
+  border-color: var(--error-color, #ef4444);
+  color: #ffffff;
+}
+
+.preset-pill.preset-mocks.active {
+  background: var(--accent-mauve, #cba6f7);
+  border-color: var(--accent-mauve, #cba6f7);
+  color: #11111b;
+}
+
+.preset-pill.preset-redirects.active {
+  background: #eab308;
+  border-color: #eab308;
+  color: #11111b;
+}
+
+.preset-pill.preset-slow.active {
+  background: #38bdf8;
+  border-color: #38bdf8;
+  color: #11111b;
+}
+
+/* ==========================================================================
+   STORAGE BREAKDOWN & METRICS WIDGET
+   ========================================================================== */
+
+.storage-overview-card {
+  transition: border-color 0.2s ease;
+}
+
+.storage-meter-container {
+  width: 100%;
+}
+
+.storage-meter-seg {
+  transition: width 0.4s ease-in-out;
+}
+
+.storage-stat-box {
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.storage-stat-box:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-color);
+}
+
+/* ==========================================================================
+   KEYBOARD SHORTCUTS & KBD TAGS
+   ========================================================================== */
+
+.kbd-key {
+  display: inline-block;
+  padding: 3px 7px;
+  font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-color);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-bottom: 2px solid var(--border-color);
+  border-radius: 5px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.shortcut-row {
+  transition: background-color 0.15s ease;
+}
+
+.shortcut-row:hover {
+  background-color: var(--bg-hover);
+  border-radius: 4px;
+}
+

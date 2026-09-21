@@ -54,6 +54,11 @@ app.get(['/archives', '/archives/*'], (_req: Request, res: Response) => {
   res.sendFile(path.join(PUBLIC_DIR, 'archives.html'));
 });
 
+// 3d. Dedicated Mocking & Interception Page: http://localhost:4000/mocking
+app.get(['/mocking', '/mocking/*'], (_req: Request, res: Response) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'mocking.html'));
+});
+
 // 4. Redirect browser navigation at root GET / to /dashboard
 app.get('/', (req: Request, res: Response, next: NextFunction) => {
   const accept = req.headers['accept'] || '';

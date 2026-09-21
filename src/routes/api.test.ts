@@ -36,6 +36,7 @@ describe('API Routes (src/routes/api.ts)', () => {
         archivesDir: '/app/archives',
         isDefaultConfig: true,
         isDefaultLogs: true,
+        isDefaultArchives: true,
         defaults: {
           configDir: '/app/config',
           logsBaseDir: '/app',
@@ -52,13 +53,13 @@ describe('API Routes (src/routes/api.ts)', () => {
     });
 
     it('PUT /dashboard-api/settings should update settings and sync proxies', async () => {
-      const updated = { configDir: '/new/config', logsDir: '/new/logs' };
+      const updated = { configDir: '/new/config', logsDir: '/new/logs', archivesDir: '/new/archives' };
       (settingsManager.updateSettings as jest.Mock).mockReturnValue(updated);
       (configManager.getApplications as jest.Mock).mockReturnValue([]);
 
       const res = await request(app)
         .put('/dashboard-api/settings')
-        .send({ configDir: '/new/config', logsDir: '/new/logs', migrateExistingConfig: true });
+        .send({ configDir: '/new/config', logsDir: '/new/logs', archivesDir: '/new/archives', migrateExistingConfig: true });
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual(updated);

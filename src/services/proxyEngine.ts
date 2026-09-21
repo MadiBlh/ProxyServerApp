@@ -7,6 +7,7 @@ import uuidv4 from '../utils/uuid';
 import { extractBodyString } from '../utils/payload';
 import * as configManager from './configManager';
 import * as logManager from './logManager';
+import * as mockManager from './mockManager';
 import type { SseClient, Application } from '../types';
 
 // Create http-proxy instance with selfHandleResponse set to true and cookie rewrite support
@@ -288,12 +289,79 @@ export function proxyMiddleware(req: Request, res: Response, next: NextFunction)
     }
 
     const targetBackendUrl = selectedBackend.url;
-
     req._proxyRequestId = uuidv4();
     req._proxyStartTime = Date.now();
     req._proxyApp = targetApp;
     req._proxyBackendService = selectedBackend;
     req._proxyTargetUrl = targetBackendUrl;
+
+    // Check for matching mock interception rules
+    const mockRule = mockManager.findMatchingMockRule({
+      appId: targetApp.id,
+      method: req.method,
+      url: requestPath,
+      targetUrl: targetBackendUrl
+    });
+
+    if (mockRule) {
+      const executeMock = async () => {
+        if (mockRule.delayMs && mockRule.delayMs > 0) {
+          await new Promise(r => setTimeout(r, mockRule.delayMs));
+        }
+
+        const durationMs = Date.now() - (req._proxyStartTime || Date.now());
+        const mockStatusCode = mockRule.statusCode || 200;
+        const mockHeaders = mockRule.headers || { 'content-type': mockRule.contentType || 'application/json' };
+        const mockBodyStr = mockRule.body || '';
+
+        const { reqMeta, resMeta } = logManager.saveLogEntry({
+          id: req._proxyRequestId!,
+          appId: targetApp.id,
+          appName: targetApp.name,
+          backendName: selectedBackend ? `[MOCK] ${selectedBackend.name}` : `[MOCK] ${mockRule.name}`,
+          routeType: 'mock',
+          targetUrl: targetBackendUrl,
+          method: req.method || 'GET',
+          endpoint: requestPath,
+          requestHeaders: req.headers,
+          requestBody: req._proxyRawBodyStr || '',
+          statusCode: mockStatusCode,
+          responseHeaders: mockHeaders as Record<string, string | string[] | undefined>,
+          responseBody: mockBodyStr,
+          durationMs
+        });
+
+        broadcastLogEvent({
+          id: req._proxyRequestId!,
+          appId: targetApp.id,
+          appName: targetApp.name,
+          backendName: `[MOCK] ${mockRule.name}`,
+          routeType: 'mock',
+          timestamp: reqMeta.timestamp,
+          method: req.method,
+          endpoint: requestPath,
+          statusCode: mockStatusCode,
+          status: resMeta.statusText || 'MOCK',
+          durationMs
+        });
+
+        res.status(mockStatusCode);
+        Object.keys(mockHeaders).forEach(key => {
+          try {
+            res.setHeader(key, mockHeaders[key] as string);
+          } catch { /* ignore */ }
+        });
+        res.send(mockBodyStr);
+      };
+
+      executeMock().catch(err => {
+        console.error('[MockEngine] Error executing mock rule:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Mock Rule Execution Error', details: (err as Error).message });
+        }
+      });
+      return;
+    }
 
     // Re-stream buffered body for http-proxy
     const bufferStream = new PassThrough();

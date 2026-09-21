@@ -5,6 +5,8 @@ import * as replayService from '../services/replayService';
 import * as proxyEngine from '../services/proxyEngine';
 import * as redirectProxyManager from '../services/redirectProxyManager';
 import * as settingsManager from '../services/settingsManager';
+import * as storageManager from '../services/storageManager';
+import * as mockManager from '../services/mockManager';
 import type { LogSearchOptions } from '../types';
 
 const router: Router = express.Router();
@@ -32,18 +34,57 @@ router.get('/settings', (_req: Request, res: Response) => {
 // Update storage & paths settings
 router.put('/settings', (req: Request, res: Response) => {
   try {
-    const { configDir, logsDir, migrateExistingConfig } = req.body;
+    const { configDir, logsDir, archivesDir, retentionDays, retentionAction, migrateExistingConfig } = req.body;
     const updated = settingsManager.updateSettings({
       configDir,
       logsDir,
+      archivesDir,
+      retentionDays: retentionDays !== undefined ? Number(retentionDays) : undefined,
+      retentionAction,
       migrateExistingConfig: Boolean(migrateExistingConfig)
     });
     // Invalidate config cache and synchronize redirect proxies with the new configuration
     configManager.clearConfigCache();
+    mockManager.clearMockCache();
     redirectProxyManager.syncRedirectProxies(configManager.getApplications());
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+// --- Storage & Disk Lifecycle Management API ---
+
+// Get detailed storage metrics and disk usage
+router.get('/storage/stats', (_req: Request, res: Response) => {
+  try {
+    res.json(storageManager.getStorageStats());
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Run disk vacuum to prune empty date directories
+router.post('/storage/vacuum', (_req: Request, res: Response) => {
+  try {
+    const result = storageManager.vacuumEmptyDirectories();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Enforce retention policy
+router.post('/storage/retention/apply', (req: Request, res: Response) => {
+  try {
+    const { retentionDays, retentionAction } = req.body || {};
+    const result = storageManager.applyRetentionPolicy(
+      retentionDays !== undefined ? Number(retentionDays) : undefined,
+      retentionAction
+    );
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
   }
 });
 
@@ -91,6 +132,82 @@ router.delete('/applications/:id', (req: Request, res: Response) => {
 // Get active redirect proxy servers status
 router.get('/redirect-proxies', (_req: Request, res: Response) => {
   res.json(redirectProxyManager.getRunningRedirects());
+});
+
+// --- Mocking & Interception API ---
+
+// Get mock statistics
+router.get('/mocks/stats', (_req: Request, res: Response) => {
+  try {
+    res.json(mockManager.getMockStats());
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Get all mock rules (optionally filtered by appId)
+router.get('/mocks', (req: Request, res: Response) => {
+  try {
+    const appId = (req.query.appId as string) || undefined;
+    const rules = mockManager.getMockRules(appId);
+    res.json(rules);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Get single mock rule by ID
+router.get('/mocks/:id', (req: Request, res: Response) => {
+  const id = getParam(req, 'id');
+  const rule = mockManager.getMockRuleById(id);
+  if (!rule) return res.status(404).json({ error: 'Mock rule not found' });
+  res.json(rule);
+});
+
+// Create mock rule
+router.post('/mocks', (req: Request, res: Response) => {
+  try {
+    if (!req.body || !req.body.urlPattern) {
+      return res.status(400).json({ error: 'urlPattern is required' });
+    }
+    const newRule = mockManager.createMockRule(req.body);
+    res.status(201).json(newRule);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Update mock rule
+router.put('/mocks/:id', (req: Request, res: Response) => {
+  try {
+    const id = getParam(req, 'id');
+    const updated = mockManager.updateMockRule(id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Mock rule not found' });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+// Toggle mock rule enabled state
+router.patch('/mocks/:id/toggle', (req: Request, res: Response) => {
+  try {
+    const id = getParam(req, 'id');
+    const enabled = req.body && req.body.enabled !== undefined ? Boolean(req.body.enabled) : undefined;
+    const updated = mockManager.toggleMockRule(id, enabled);
+    if (!updated) return res.status(404).json({ error: 'Mock rule not found' });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+// Delete mock rule
+router.delete('/mocks/:id', (req: Request, res: Response) => {
+  const id = getParam(req, 'id');
+  const deleted = mockManager.deleteMockRule(id);
+  if (!deleted) return res.status(404).json({ error: 'Mock rule not found' });
+  res.json({ success: true });
 });
 
 // --- Logs API ---

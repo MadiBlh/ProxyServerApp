@@ -6,9 +6,9 @@ import type { AppSettings, UpdateSettingsInput } from '../types';
 /* ==========================================================================
    SETTINGS MANAGER
    Manages storage locations for configurations (applications.json)
-   and captured traffic logs/headers.
+   and captured traffic logs/headers/archives, plus retention policies.
    Supports project root defaults, user-customized paths via settings.json,
-   and environment variables (PROXY_CONFIG_DIR, PROXY_LOGS_DIR).
+   and environment variables (PROXY_CONFIG_DIR, PROXY_LOGS_DIR, PROXY_ARCHIVES_DIR).
    ========================================================================== */
 
 const isDist = __dirname.replace(/\\/g, '/').includes('/dist/');
@@ -25,6 +25,9 @@ export const DEFAULT_ARCHIVES_DIR = path.join(PROJECT_ROOT, 'archives');
 interface SettingsFileData {
   configDir?: string;
   logsDir?: string;
+  archivesDir?: string;
+  retentionDays?: number;
+  retentionAction?: 'archive' | 'delete';
 }
 
 /** Reads local settings from settings.json if present. */
@@ -96,11 +99,18 @@ export function getHeadersDir(): string {
 
 /** Returns the effective archives directory path (where archived logs are stored). */
 export function getArchivesDir(): string {
-  const envPath = process.env['PROXY_LOGS_DIR'];
-  if (envPath && envPath.trim()) {
-    return path.join(path.resolve(envPath.trim()), 'archives');
+  const envArchives = process.env['PROXY_ARCHIVES_DIR'];
+  if (envArchives && envArchives.trim()) {
+    return path.resolve(envArchives.trim());
+  }
+  const envLogs = process.env['PROXY_LOGS_DIR'];
+  if (envLogs && envLogs.trim()) {
+    return path.join(path.resolve(envLogs.trim()), 'archives');
   }
   const saved = readSettingsFile();
+  if (saved.archivesDir && saved.archivesDir.trim()) {
+    return path.resolve(saved.archivesDir.trim());
+  }
   if (saved.logsDir && saved.logsDir.trim()) {
     return path.join(path.resolve(saved.logsDir.trim()), 'archives');
   }
@@ -130,6 +140,11 @@ export function getSettings(): AppSettings {
 
   const isDefaultConfig = path.resolve(configDir) === path.resolve(DEFAULT_CONFIG_DIR);
   const isDefaultLogs = path.resolve(logsBaseDir) === path.resolve(PROJECT_ROOT);
+  const isDefaultArchives = path.resolve(archivesDir) === path.resolve(DEFAULT_ARCHIVES_DIR);
+
+  const saved = readSettingsFile();
+  const retentionDays = typeof saved.retentionDays === 'number' ? saved.retentionDays : 0;
+  const retentionAction = saved.retentionAction === 'delete' ? 'delete' : 'archive';
 
   return {
     configDir,
@@ -139,12 +154,17 @@ export function getSettings(): AppSettings {
     archivesDir,
     isDefaultConfig,
     isDefaultLogs,
+    isDefaultArchives,
+    retentionDays,
+    retentionAction,
     defaults: {
       configDir: DEFAULT_CONFIG_DIR,
       logsBaseDir: PROJECT_ROOT,
       logsDir: DEFAULT_LOGS_DIR,
       headersDir: DEFAULT_HEADERS_DIR,
-      archivesDir: DEFAULT_ARCHIVES_DIR
+      archivesDir: DEFAULT_ARCHIVES_DIR,
+      retentionDays: 0,
+      retentionAction: 'archive'
     }
   };
 }
@@ -156,15 +176,42 @@ export function getSettings(): AppSettings {
 export function updateSettings({
   configDir,
   logsDir,
+  archivesDir,
+  retentionDays,
+  retentionAction,
   migrateExistingConfig = false
 }: UpdateSettingsInput): AppSettings {
   const currentConfigFile = getConfigFile();
   const previousConfigDir = getConfigDir();
+  const saved = readSettingsFile();
 
   const newConfigDir =
-    configDir && configDir.trim() ? path.resolve(configDir.trim()) : DEFAULT_CONFIG_DIR;
+    configDir !== undefined && configDir.trim()
+      ? path.resolve(configDir.trim())
+      : configDir === ''
+      ? DEFAULT_CONFIG_DIR
+      : getConfigDir();
+
   const newLogsBase =
-    logsDir && logsDir.trim() ? path.resolve(logsDir.trim()) : PROJECT_ROOT;
+    logsDir !== undefined && logsDir.trim()
+      ? path.resolve(logsDir.trim())
+      : logsDir === ''
+      ? PROJECT_ROOT
+      : getLogsBaseDir();
+
+  const newArchivesDir =
+    archivesDir !== undefined && archivesDir.trim()
+      ? path.resolve(archivesDir.trim())
+      : archivesDir === ''
+      ? (newLogsBase === PROJECT_ROOT ? DEFAULT_ARCHIVES_DIR : path.join(newLogsBase, 'archives'))
+      : getArchivesDir();
+
+  const newRetentionDays =
+    retentionDays !== undefined ? Math.max(0, retentionDays) : saved.retentionDays ?? 0;
+  const newRetentionAction =
+    retentionAction === 'delete' || retentionAction === 'archive'
+      ? retentionAction
+      : saved.retentionAction ?? 'archive';
 
   // Validate and ensure directories can be created
   try {
@@ -182,14 +229,12 @@ export function updateSettings({
       newLogsBase === PROJECT_ROOT ? DEFAULT_LOGS_DIR : path.join(newLogsBase, 'logs');
     const targetHeaders =
       newLogsBase === PROJECT_ROOT ? DEFAULT_HEADERS_DIR : path.join(newLogsBase, 'headers');
-    const targetArchives =
-      newLogsBase === PROJECT_ROOT ? DEFAULT_ARCHIVES_DIR : path.join(newLogsBase, 'archives');
     if (!fs.existsSync(targetLogs)) fs.mkdirSync(targetLogs, { recursive: true });
     if (!fs.existsSync(targetHeaders)) fs.mkdirSync(targetHeaders, { recursive: true });
-    if (!fs.existsSync(targetArchives)) fs.mkdirSync(targetArchives, { recursive: true });
+    if (!fs.existsSync(newArchivesDir)) fs.mkdirSync(newArchivesDir, { recursive: true });
   } catch (err) {
     throw new Error(
-      `Cannot create logs directory "${newLogsBase}": ${(err as Error).message}`
+      `Cannot create logs/archives directories: ${(err as Error).message}`
     );
   }
 
@@ -213,7 +258,10 @@ export function updateSettings({
   // Save to settings.json
   const settingsToSave: SettingsFileData = {
     configDir: newConfigDir === DEFAULT_CONFIG_DIR ? '' : newConfigDir,
-    logsDir: newLogsBase === PROJECT_ROOT ? '' : newLogsBase
+    logsDir: newLogsBase === PROJECT_ROOT ? '' : newLogsBase,
+    archivesDir: newArchivesDir === DEFAULT_ARCHIVES_DIR ? '' : newArchivesDir,
+    retentionDays: newRetentionDays,
+    retentionAction: newRetentionAction
   };
 
   writeSettingsFile(settingsToSave);

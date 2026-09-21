@@ -64,6 +64,12 @@ describe('Server Root & Middleware (server.ts)', () => {
     expect(res.headers['content-type']).toContain('text/html');
   });
 
+  it('should serve mocking.html on GET /mocking', async () => {
+    const res = await request(app).get('/mocking');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/html');
+  });
+
   it('should serve doc.html on GET /doc', async () => {
     const res = await request(app).get('/doc');
     expect(res.status).toBe(200);

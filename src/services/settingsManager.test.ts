@@ -38,6 +38,7 @@ describe('Settings Manager (src/services/settingsManager.ts)', () => {
       const settings = settingsManager.getSettings();
       expect(settings.isDefaultConfig).toBe(true);
       expect(settings.isDefaultLogs).toBe(true);
+      expect(settings.isDefaultArchives).toBe(true);
       expect(settings.configDir).toBe(settingsManager.DEFAULT_CONFIG_DIR);
     });
   });
@@ -63,25 +64,34 @@ describe('Settings Manager (src/services/settingsManager.ts)', () => {
       expect(settingsManager.getHeadersDir()).toBe(path.join(customLogsBase, 'headers'));
       expect(settingsManager.getArchivesDir()).toBe(path.join(customLogsBase, 'archives'));
     });
+
+    it('should prioritize PROXY_ARCHIVES_DIR over PROXY_LOGS_DIR and settings.json', () => {
+      const customArchives = path.resolve('/custom/archives/direct');
+      process.env['PROXY_ARCHIVES_DIR'] = customArchives;
+      process.env['PROXY_LOGS_DIR'] = path.resolve('/custom/logs/base');
+
+      expect(settingsManager.getArchivesDir()).toBe(customArchives);
+    });
   });
 
   describe('settings.json file configuration', () => {
     it('should use paths from settings.json when present', () => {
       const customConfig = path.resolve('/file/config');
       const customLogs = path.resolve('/file/logs');
+      const customArchives = path.resolve('/file/archives');
 
       (fs.existsSync as jest.Mock).mockImplementation((filePath: string) => {
         return filePath.endsWith('settings.json');
       });
       (fs.readFileSync as jest.Mock).mockReturnValue(
-        JSON.stringify({ configDir: customConfig, logsDir: customLogs })
+        JSON.stringify({ configDir: customConfig, logsDir: customLogs, archivesDir: customArchives })
       );
 
       expect(settingsManager.getConfigDir()).toBe(customConfig);
       expect(settingsManager.getLogsBaseDir()).toBe(customLogs);
       expect(settingsManager.getLogsDir()).toBe(path.join(customLogs, 'logs'));
       expect(settingsManager.getHeadersDir()).toBe(path.join(customLogs, 'headers'));
-      expect(settingsManager.getArchivesDir()).toBe(path.join(customLogs, 'archives'));
+      expect(settingsManager.getArchivesDir()).toBe(customArchives);
     });
 
     it('should handle corrupt settings.json gracefully and fall back to defaults', () => {
@@ -107,22 +117,26 @@ describe('Settings Manager (src/services/settingsManager.ts)', () => {
 
       const targetConfig = path.resolve('/new/config');
       const targetLogs = path.resolve('/new/logs');
+      const targetArchives = path.resolve('/new/archives');
 
       const updated = settingsManager.updateSettings({
         configDir: targetConfig,
         logsDir: targetLogs,
+        archivesDir: targetArchives,
         migrateExistingConfig: false
       });
 
       expect(fs.mkdirSync).toHaveBeenCalledWith(targetConfig, { recursive: true });
       expect(fs.mkdirSync).toHaveBeenCalledWith(path.join(targetLogs, 'logs'), { recursive: true });
       expect(fs.mkdirSync).toHaveBeenCalledWith(path.join(targetLogs, 'headers'), { recursive: true });
-      expect(fs.mkdirSync).toHaveBeenCalledWith(path.join(targetLogs, 'archives'), { recursive: true });
+      expect(fs.mkdirSync).toHaveBeenCalledWith(targetArchives, { recursive: true });
       expect(fs.writeFileSync).toHaveBeenCalled();
       expect(updated.configDir).toBe(targetConfig);
       expect(updated.logsBaseDir).toBe(targetLogs);
+      expect(updated.archivesDir).toBe(targetArchives);
       expect(updated.isDefaultConfig).toBe(false);
       expect(updated.isDefaultLogs).toBe(false);
+      expect(updated.isDefaultArchives).toBe(false);
       logSpy.mockRestore();
     });
 

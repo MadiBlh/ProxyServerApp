@@ -12,7 +12,10 @@ const SVG_ICONS = {
   chevronLeft: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>`,
   chevronRight: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>`,
   chevronUp: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>`,
-  chevronDown: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`
+  chevronDown: `<svg class="svg-icon collapse-svg" viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`,
+  zap: `<svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:-1px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`,
+  zapSm: `<svg class="svg-icon" viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px; margin-right:2px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`,
+  trash: `<svg class="svg-icon svg-icon-sm" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:-1px;"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`
 };
 
 // --- Loading State Manager ---
@@ -103,6 +106,7 @@ async function trackedFetch(url, options = {}) {
 let applications = [];
 let currentAppId = localStorage.getItem('proxy_selected_app_id') || null;
 let logsList = [];
+let currentFilterPreset = 'all';
 let selectedLogId = null;
 let selectedLogDetail = null;
 let selectedIds = new Set();
@@ -129,9 +133,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Connect SSE for Real-time Logs Feed
   initSseFeed();
 
+  // Load Mock Rule Badge Count
+  loadMockBadge();
+
   // Attach Event Listeners
   attachEventListeners();
 });
+
+async function loadMockBadge() {
+  try {
+    const res = await fetch('/dashboard-api/mocks/stats');
+    if (!res.ok) return;
+    const stats = await res.json();
+    const badge = document.getElementById('nav-mock-badge');
+    if (badge) {
+      if (stats.activeRules > 0) {
+        badge.textContent = stats.activeRules;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  } catch (e) {
+    // Non-fatal
+  }
+}
 
 // --- Theme Management ---
 function applyTheme(theme) {
@@ -309,26 +335,67 @@ async function loadLogsForApp(appId) {
     LoadingManager.showSection('logs-loading-overlay');
     const res = await trackedFetch(url);
     logsList = await res.json();
-    renderLogs(logsList);
-
-    const logCountBadge = document.getElementById('log-count-badge');
-    if (logCountBadge) {
-      if (endpointSearch || bodySearch) {
-        logCountBadge.textContent = `${logsList.length} MATCHED`;
-      } else {
-        logCountBadge.textContent = `${logsList.length} LOGS`;
-      }
-    }
-
-    if (logsList.length > 0) {
-      selectLog(logsList[0].id);
-    } else {
-      clearLogDetailsView();
-    }
+    applyLogsFilter();
   } catch (err) {
     showToast('Failed to load logs', 'error');
   } finally {
     LoadingManager.hideSection('logs-loading-overlay');
+  }
+}
+
+function getFilteredLogs() {
+  if (!logsList || !Array.isArray(logsList)) return [];
+  if (currentFilterPreset === 'all') return logsList;
+  if (currentFilterPreset === 'errors') {
+    return logsList.filter(l => {
+      const code = typeof l.statusCode === 'number' ? l.statusCode : parseInt(l.statusCode, 10);
+      return l.status === 'ERROR' || l.status === 'FAILED' || (!isNaN(code) && code >= 400);
+    });
+  }
+  if (currentFilterPreset === 'mocks') {
+    return logsList.filter(l => l.routeType === 'mock' || l.backendName === 'mock');
+  }
+  if (currentFilterPreset === 'redirects') {
+    return logsList.filter(l => l.routeType === 'redirect');
+  }
+  if (currentFilterPreset === 'slow') {
+    return logsList.filter(l => {
+      const dur = typeof l.durationMs === 'number' ? l.durationMs : parseInt(l.durationMs, 10);
+      return !isNaN(dur) && dur >= 500;
+    });
+  }
+  return logsList;
+}
+
+function applyLogsFilter(preserveSelection = false) {
+  const filtered = getFilteredLogs();
+  renderLogs(filtered);
+
+  const logCountBadge = document.getElementById('log-count-badge');
+  if (logCountBadge) {
+    const endpointSearch = document.getElementById('search-input')?.value.trim();
+    const bodySearch = document.getElementById('advanced-search-input')?.value.trim();
+    if (currentFilterPreset !== 'all') {
+      logCountBadge.textContent = `${filtered.length} / ${logsList.length} LOGS`;
+    } else if (endpointSearch || bodySearch) {
+      logCountBadge.textContent = `${filtered.length} MATCHED`;
+    } else {
+      logCountBadge.textContent = `${filtered.length} LOGS`;
+    }
+  }
+
+  if (filtered.length > 0) {
+    if (!preserveSelection || !selectedLogId || !filtered.some(l => l.id === selectedLogId)) {
+      selectLog(filtered[0].id);
+    } else {
+      const items = document.querySelectorAll('.log-item');
+      items.forEach(item => {
+        item.classList.toggle('active', item.dataset.id === selectedLogId);
+      });
+    }
+  } else {
+    selectedLogId = null;
+    clearLogDetailsView();
   }
 }
 
@@ -348,7 +415,7 @@ function toggleSelectMode() {
     selectedIds.clear();
   }
   updateSelectionUi();
-  renderLogs(logsList);
+  applyLogsFilter(true);
 }
 
 function toggleLogSelection(logId) {
@@ -363,7 +430,7 @@ function toggleLogSelection(logId) {
 function clearLogSelection() {
   selectedIds.clear();
   updateSelectionToolbar();
-  renderLogs(logsList);
+  applyLogsFilter(true);
 }
 
 function updateSelectionUi() {
@@ -403,7 +470,8 @@ async function removeSelectedLogs() {
 
     selectedIds.clear();
     updateSelectionToolbar();
-    renderLogs(logsList.filter(log => !ids.includes(log.id)));
+    logsList = logsList.filter(log => !ids.includes(log.id));
+    applyLogsFilter(true);
     if (ids.includes(selectedLogId)) {
       selectedLogId = null;
       clearLogDetailsView();
@@ -470,6 +538,7 @@ function renderLogs(logs) {
 
   filteredLogs.forEach(log => {
     const li = document.createElement('li');
+    li.dataset.id = log.id;
     const isSelected = selectedIds.has(log.id);
     li.className = `log-item ${log.id === selectedLogId ? 'active' : ''}`;
     li.onclick = () => selectLog(log.id);
@@ -485,9 +554,17 @@ function renderLogs(logs) {
       String(logDate.getMinutes()).padStart(2, '0') + ':' +
       String(logDate.getSeconds()).padStart(2, '0');
     const isRedirect = log.routeType === 'redirect';
-    const badgeStyle = isRedirect
-      ? 'background:rgba(234, 179, 8, 0.15); color:#eab308; border: 1px solid rgba(234, 179, 8, 0.3);'
-      : 'background:var(--accent-light); color:var(--accent-color);';
+    const isMock = log.routeType === 'mock';
+    let badgeStyle = 'background:var(--accent-light); color:var(--accent-color);';
+    if (isRedirect) {
+      badgeStyle = 'background:rgba(234, 179, 8, 0.15); color:#eab308; border: 1px solid rgba(234, 179, 8, 0.3);';
+    } else if (isMock) {
+      badgeStyle = 'background:rgba(203, 166, 247, 0.2); color:#cba6f7; border: 1px solid rgba(203, 166, 247, 0.4);';
+    }
+
+    const mockPill = isMock
+      ? `<span style="font-size:0.68rem; padding:1px 6px; border-radius:4px; ${badgeStyle} font-weight:700; display:inline-flex; align-items:center; gap:2px;">${SVG_ICONS.zapSm}MOCK</span>`
+      : '';
 
     const backendPill = log.backendName
       ? `<span style="font-size:0.68rem; padding:1px 6px; border-radius:4px; ${badgeStyle} font-weight:600; display:inline-flex; align-items:center;">${isRedirect ? SVG_ICONS.fork : ''}${escapeHtml(log.backendName)}</span>`
@@ -504,6 +581,7 @@ function renderLogs(logs) {
           <span>${formattedTime}</span>
           <span>•</span>
           <span>${log.durationMs}ms</span>
+          ${mockPill}
           ${backendPill}
         </div>
       </div>
@@ -533,16 +611,20 @@ function renderLogs(logs) {
 async function selectLog(logId) {
   selectedLogId = logId;
 
-  // Highlight active list item
+  // Highlight active list item in place without wiping filtered DOM
   const items = document.querySelectorAll('.log-item');
-  items.forEach(item => item.classList.remove('active'));
-
-  // Re-render list to ensure selection state matches
-  renderLogs(logsList);
+  items.forEach(item => {
+    item.classList.toggle('active', item.dataset.id === logId);
+  });
 
   try {
     LoadingManager.showSection('detail-loading-overlay');
-    const res = await trackedFetch(`/dashboard-api/logs/${logId}`);
+    const periodVal = document.getElementById('period-dropdown')?.value;
+    let url = `/dashboard-api/logs/${logId}`;
+    if (periodVal && !['today', 'yesterday', '7d', '30d', 'all', 'latest'].includes(periodVal)) {
+      url += `?date=${encodeURIComponent(periodVal)}`;
+    }
+    const res = await trackedFetch(url);
     selectedLogDetail = await res.json();
     renderLogDetail(selectedLogDetail);
   } catch (err) {
@@ -686,7 +768,7 @@ function flushSseBatch() {
   }
 
   if (hasAppLogs) {
-    renderLogs(logsList);
+    applyLogsFilter(true);
     if (shouldAutoSelect && firstNewLogId) {
       selectLog(firstNewLogId);
     }
@@ -774,20 +856,57 @@ function attachEventListeners() {
     };
   }
 
-  // Global Keyboard Shortcuts for Search
-  window.addEventListener('keydown', (e) => {
-    // Press '/' to focus Endpoint Search when not in an active text input or modal
-    if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) && !document.activeElement?.classList.contains('monaco-editor') && !document.querySelector('.modal.active')) {
-      e.preventDefault();
-      const input = document.getElementById('search-input');
-      if (input) {
-        input.focus();
-        input.select();
-      }
-    }
+  // Quick Filter Presets
+  document.querySelectorAll('.preset-pill').forEach(pill => {
+    pill.onclick = () => {
+      document.querySelectorAll('.preset-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentFilterPreset = pill.dataset.preset || 'all';
+      applyLogsFilter();
+    };
+  });
 
-    // Press Escape to clear active search input
+  // Shortcuts Modal Button
+  const shortcutsBtn = document.getElementById('shortcuts-btn');
+  if (shortcutsBtn) {
+    shortcutsBtn.onclick = () => {
+      openModal('shortcuts-modal');
+    };
+  }
+
+  // Storage Stats Actions
+  const refreshStorageBtn = document.getElementById('refresh-storage-stats-btn');
+  if (refreshStorageBtn) {
+    refreshStorageBtn.onclick = () => loadStorageStats();
+  }
+
+  const vacuumStorageBtn = document.getElementById('vacuum-storage-btn');
+  if (vacuumStorageBtn) {
+    vacuumStorageBtn.onclick = () => vacuumStorage();
+  }
+
+  const applyRetentionBtn = document.getElementById('apply-retention-now-btn');
+  if (applyRetentionBtn) {
+    applyRetentionBtn.onclick = () => applyRetentionNow();
+  }
+
+  // Global Keyboard Shortcuts
+  window.addEventListener('keydown', (e) => {
+    const isInputActive = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) ||
+      document.activeElement?.classList?.contains('monaco-editor') ||
+      document.activeElement?.getAttribute('contenteditable') === 'true';
+
+    // Press Escape to close any open modal, selection mode, or clear active search input
     if (e.key === 'Escape') {
+      const activeModal = document.querySelector('.modal-overlay.active');
+      if (activeModal) {
+        activeModal.classList.remove('active');
+        return;
+      }
+      if (selectMode) {
+        toggleSelectMode();
+        return;
+      }
       const activeEl = document.activeElement;
       if (activeEl && (activeEl.id === 'search-input' || activeEl.id === 'advanced-search-input')) {
         if (activeEl.value) {
@@ -796,6 +915,56 @@ function attachEventListeners() {
           if (currentAppId) loadLogsForApp(currentAppId);
         }
         activeEl.blur();
+      }
+      return;
+    }
+
+    if (isInputActive) return;
+
+    // Ignore single-key shortcuts if modifier keys (Ctrl, Cmd/Meta, Alt) are pressed
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    // Check if any modal is active
+    const modalOpen = !!document.querySelector('.modal-overlay.active');
+    if (modalOpen) return;
+
+    if (e.key === '/') {
+      e.preventDefault();
+      const input = document.getElementById('search-input');
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    } else if (e.key === '?' || e.key === 'h') {
+      e.preventDefault();
+      openModal('shortcuts-modal');
+    } else if (e.key === 'r') {
+      e.preventDefault();
+      document.getElementById('reload-logs-btn')?.click();
+    } else if (e.key === 's') {
+      e.preventDefault();
+      openSettingsModal();
+    } else if (e.key === 'm') {
+      e.preventDefault();
+      window.location.href = '/mocking';
+    } else if (e.key === 'a') {
+      e.preventDefault();
+      window.location.href = '/archives';
+    } else if (e.key === 'd') {
+      e.preventDefault();
+      window.open('/doc', '_blank');
+    } else if (e.key === 't') {
+      e.preventDefault();
+      document.getElementById('theme-toggle-btn')?.click();
+    } else if (e.key === 'e') {
+      if (selectedLogId) {
+        e.preventDefault();
+        document.getElementById('export-req-btn')?.click();
+      }
+    } else if (e.key === 'p') {
+      if (selectedLogId) {
+        e.preventDefault();
+        document.getElementById('replay-req-btn')?.click();
       }
     }
   });
@@ -985,6 +1154,33 @@ function attachEventListeners() {
     openModal('replay-modal');
   };
 
+  // Mock Request Button (Prefills /mocking)
+  const mockReqBtn = document.getElementById('mock-req-btn');
+  if (mockReqBtn) {
+    mockReqBtn.onclick = () => {
+      if (!selectedLogDetail) {
+        showToast('Please select a request log to mock', 'error');
+        return;
+      }
+      const { reqMeta, requestBody, responseBody, resMeta } = selectedLogDetail;
+      const url = reqMeta.endpoint || '/';
+      const method = reqMeta.method || 'GET';
+      const status = (resMeta && resMeta.statusCode) || 200;
+      const appId = currentAppId || '*';
+      const body = responseBody || requestBody || '';
+
+      const params = new URLSearchParams({
+        prefillUrl: url,
+        prefillMethod: method,
+        prefillStatus: String(status),
+        prefillAppId: appId,
+        prefillBody: body
+      });
+
+      window.location.href = `/mocking?${params.toString()}`;
+    };
+  }
+
   document.getElementById('execute-replay-btn').onclick = async () => {
     const url = document.getElementById('replay-url-input').value.trim();
     const method = document.getElementById('replay-method-select').value;
@@ -1083,13 +1279,24 @@ function attachEventListeners() {
     };
   }
 
-  // Save Storage Settings
+  const resetArchivesBtn = document.getElementById('reset-archives-path-btn');
+  if (resetArchivesBtn) {
+    resetArchivesBtn.onclick = () => {
+      const input = document.getElementById('setting-archives-dir');
+      if (input) input.value = '';
+    };
+  }
+
+  // Save Storage & Retention Settings
   const saveStorageBtn = document.getElementById('save-storage-settings-btn');
   if (saveStorageBtn) {
     saveStorageBtn.onclick = async () => {
       const configDir = document.getElementById('setting-config-dir').value.trim();
       const logsDir = document.getElementById('setting-logs-dir').value.trim();
+      const archivesDir = document.getElementById('setting-archives-dir').value.trim();
       const migrateExistingConfig = document.getElementById('setting-migrate-config').checked;
+      const retentionDays = parseInt(document.getElementById('setting-retention-days').value, 10) || 0;
+      const retentionAction = document.getElementById('setting-retention-action').value || 'archive';
 
       try {
         saveStorageBtn.disabled = true;
@@ -1098,22 +1305,31 @@ function attachEventListeners() {
         const res = await trackedFetch('/dashboard-api/settings', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ configDir, logsDir, migrateExistingConfig })
+          body: JSON.stringify({
+            configDir,
+            logsDir,
+            archivesDir,
+            migrateExistingConfig,
+            retentionDays,
+            retentionAction
+          })
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to update storage paths');
+        if (!res.ok) throw new Error(data.error || 'Failed to update storage settings');
 
-        showToast('Storage paths updated successfully', 'success');
+        showToast('Storage and retention settings updated successfully', 'success');
         await loadStorageSettings();
         await loadApplications();
         renderAppManagerList();
-        loadLogsList();
+        if (currentAppId) {
+          loadLogsForApp(currentAppId);
+        }
       } catch (err) {
         showToast(err.message, 'error');
       } finally {
         saveStorageBtn.disabled = false;
-        saveStorageBtn.innerHTML = `${SVG_ICONS.save} Save Storage Settings`;
+        saveStorageBtn.innerHTML = `${SVG_ICONS.save} Save Storage &amp; Retention Settings`;
       }
     };
   }
@@ -1205,6 +1421,9 @@ async function loadStorageSettings() {
 
     const configInput = document.getElementById('setting-config-dir');
     const logsInput = document.getElementById('setting-logs-dir');
+    const archivesInput = document.getElementById('setting-archives-dir');
+    const retentionDaysSelect = document.getElementById('setting-retention-days');
+    const retentionActionSelect = document.getElementById('setting-retention-action');
 
     if (configInput) {
       configInput.value = data.isDefaultConfig ? '' : data.configDir;
@@ -1215,8 +1434,132 @@ async function loadStorageSettings() {
       logsInput.value = data.isDefaultLogs ? '' : data.logsBaseDir;
       logsInput.placeholder = `Default: ${data.defaults?.logsBaseDir || 'project root'}`;
     }
+
+    if (archivesInput) {
+      archivesInput.value = data.isDefaultArchives ? '' : data.archivesDir;
+      archivesInput.placeholder = `Default: ${data.defaults?.archivesDir || 'archives/'}`;
+    }
+
+    if (retentionDaysSelect && typeof data.retentionDays === 'number') {
+      retentionDaysSelect.value = String(data.retentionDays);
+    }
+
+    if (retentionActionSelect && data.retentionAction) {
+      retentionActionSelect.value = data.retentionAction;
+    }
+
+    await loadStorageStats();
   } catch (err) {
     console.error('Failed to load storage settings:', err);
+  }
+}
+
+async function loadStorageStats() {
+  try {
+    const res = await trackedFetch('/dashboard-api/storage/stats');
+    if (!res.ok) return;
+    const stats = await res.json();
+
+    const logsSizeEl = document.getElementById('stat-logs-size');
+    const logsCountEl = document.getElementById('stat-logs-count');
+    const headersSizeEl = document.getElementById('stat-headers-size');
+    const archivesSizeEl = document.getElementById('stat-archives-size');
+    const totalSizeEl = document.getElementById('stat-total-size');
+    const freeSpaceEl = document.getElementById('stat-free-space');
+
+    if (logsSizeEl) logsSizeEl.textContent = stats.logsFormatted || '0 B';
+    if (logsCountEl) logsCountEl.textContent = `${stats.transactionCount || 0} transactions`;
+    if (headersSizeEl) headersSizeEl.textContent = stats.headersFormatted || '0 B';
+    if (archivesSizeEl) archivesSizeEl.textContent = stats.archivesFormatted || '0 B';
+    if (totalSizeEl) totalSizeEl.textContent = stats.totalAppFormatted || '0 B';
+    if (freeSpaceEl) freeSpaceEl.textContent = stats.freeDiskFormatted || 'N/A';
+
+    // Segmented bar
+    const total = stats.totalAppBytes || 0;
+    const meterLogs = document.getElementById('meter-logs');
+    const meterHeaders = document.getElementById('meter-headers');
+    const meterArchives = document.getElementById('meter-archives');
+
+    if (total > 0) {
+      const logsPct = ((stats.logsSizeBytes / total) * 100).toFixed(1);
+      const headersPct = ((stats.headersSizeBytes / total) * 100).toFixed(1);
+      const archivesPct = ((stats.archivesSizeBytes / total) * 100).toFixed(1);
+
+      if (meterLogs) meterLogs.style.width = `${logsPct}%`;
+      if (meterHeaders) meterHeaders.style.width = `${headersPct}%`;
+      if (meterArchives) meterArchives.style.width = `${archivesPct}%`;
+    } else {
+      if (meterLogs) meterLogs.style.width = '0%';
+      if (meterHeaders) meterHeaders.style.width = '0%';
+      if (meterArchives) meterArchives.style.width = '0%';
+    }
+  } catch (err) {
+    console.error('Failed to load storage metrics:', err);
+  }
+}
+
+async function vacuumStorage() {
+  const vacuumBtn = document.getElementById('vacuum-storage-btn');
+  try {
+    if (vacuumBtn) {
+      vacuumBtn.disabled = true;
+      vacuumBtn.textContent = 'Vacuuming...';
+    }
+    const res = await trackedFetch('/dashboard-api/storage/vacuum', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to vacuum storage');
+
+    showToast(`Vacuum complete: pruned ${result.prunedCount} empty folder(s), freed ${result.reclaimedFormatted || '0 B'}`, 'success');
+    await loadStorageStats();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    if (vacuumBtn) {
+      vacuumBtn.disabled = false;
+      vacuumBtn.innerHTML = `${SVG_ICONS.trash} Vacuum Storage`;
+    }
+  }
+}
+
+async function applyRetentionNow() {
+  const daysVal = parseInt(document.getElementById('setting-retention-days').value, 10);
+  const actionVal = document.getElementById('setting-retention-action').value;
+  if (!confirm(`Apply retention policy now? This will ${actionVal === 'archive' ? 'archive' : 'permanently delete'} logs older than ${daysVal > 0 ? daysVal + ' days' : 'configured threshold'}.`)) {
+    return;
+  }
+
+  const applyBtn = document.getElementById('apply-retention-now-btn');
+  try {
+    if (applyBtn) {
+      applyBtn.disabled = true;
+      applyBtn.textContent = 'Processing...';
+    }
+    const res = await trackedFetch('/dashboard-api/storage/retention/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        retentionDays: daysVal,
+        retentionAction: actionVal
+      })
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to apply retention policy');
+
+    showToast(`Retention applied: ${result.action}d ${result.processedDays} date(s), ${result.processedFiles} file(s), reclaimed ${result.reclaimedFormatted || '0 B'}`, 'success');
+    await loadStorageStats();
+    if (currentAppId) {
+      loadLogsForApp(currentAppId);
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    if (applyBtn) {
+      applyBtn.disabled = false;
+      applyBtn.innerHTML = `${SVG_ICONS.zap} Apply Retention Now`;
+    }
   }
 }
 

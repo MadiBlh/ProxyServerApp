@@ -30,23 +30,21 @@
 
     <div class="nav-controls">
       <!-- Archived Application Selector Dropdown -->
-      <div class="app-select-container">
-        <span class="app-select-label" style="display:flex; align-items:center; gap:4px;">
+      <div class="app-select-container" title="Select Archived Application">
+        <span class="app-select-icon" style="display:flex; align-items:center; color:var(--text-muted);" aria-hidden="true">
           <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-          Archived App:
         </span>
-        <select id="archive-app-dropdown" class="app-dropdown">
+        <select id="archive-app-dropdown" class="app-dropdown" title="Select Archived Application" aria-label="Select Archived Application">
           <option value="">Loading archived apps...</option>
         </select>
       </div>
 
       <!-- Preserved Date Folder Dropdown -->
-      <div class="app-select-container" id="archive-date-select-container">
-        <span class="app-select-label" style="display:flex; align-items:center; gap:4px;">
+      <div class="app-select-container" id="archive-date-select-container" title="Select preserved date folder">
+        <span class="app-select-icon" style="display:flex; align-items:center; color:var(--text-muted);" aria-hidden="true">
           <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-          Date:
         </span>
-        <select id="archive-date-dropdown" class="app-dropdown" title="Select historical date folder">
+        <select id="archive-date-dropdown" class="app-dropdown" title="Select historical date folder" aria-label="Select historical date folder">
           <option value="all">All Preserved Dates</option>
         </select>
       </div>
@@ -55,6 +53,10 @@
         <a href="/dashboard" class="nav-btn" title="Return to Live Dashboard">
           <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
           Live Dashboard
+        </a>
+        <a href="/mocking" class="nav-btn" title="Manage request/response mock rules & interception">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          Mocking
         </a>
         <a href="/archives" class="nav-btn active" style="font-weight:700; border-color:var(--accent-color);" title="Archives Explorer">
           <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>

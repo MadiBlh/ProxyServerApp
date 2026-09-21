@@ -13,23 +13,27 @@ with a web UI instead of a desktop app."
 ## Features
 
 - **TypeScript Architecture** — fully typed with strict type safety, shared domain interfaces (`src/types/index.ts`), and Express Request namespace augmentation.
-- **High-Performance Proxy Runtime** — in-memory application config caching and date directory caching to eliminate blocking disk syscalls on the critical request path.
+- **Request & Response Mocking Suite** — intercept HTTP and SOAP requests with customizable mock rules (`src/services/mockManager.ts`, `/mocking`). Supports `prefix`, `exact`, `glob` (e.g. `/api/*/checkout`, `/api/**`), and `regex` matching, custom response status codes, headers, bodies, and network latency simulation (`delayMs` 0-10,000ms).
+- **Automated Storage Retention & Disk Management** — inspect filesystem metrics, vacuum empty date partition folders, and enforce retention thresholds (7, 14, 30, 60, 90 days) with automated archiving or permanent deletion (`src/services/storageManager.ts`).
+- **Dedicated Archives Explorer** — browse, query, inspect, restore, and purge historical date-preserved app logs from a dedicated UI (`public/archives.html`, `/archives`).
+- **High-Performance Proxy Runtime** — in-memory application config caching, mock rule caching, and date directory caching to eliminate blocking disk syscalls on the critical request path.
 - **Asynchronous Non-Blocking Logging** — request and response files are written asynchronously to disk with an in-memory LRU cache (`MAX_RECENT_LOGS = 200`) for sub-millisecond retrieval.
 - **Large Payload Protection** — safety buffer capping (10MB default) prevents memory spikes and crashes on large file transfers while proxying full payloads across the network.
 - **Prefix-based routing** — each configured backend declares a `pathPrefix`; the longest matching prefix wins (`src/services/proxyEngine.ts`).
 - **Date-partitioned storage** — request/response bodies are stored in `logs/YYYY-MM-DD/`, metadata (headers, status, duration) in `headers/YYYY-MM-DD/`, all keyed by one UUID per transaction.
 - **Period & Date Selector** — browse captures by date; defaults to loading only the most recent date folder for optimal startup latency (`/dashboard-api/logs/dates`).
+- **2-Tier Toolbar & Quick Filter Preset Pills** — dedicated primary actions bar (`.toolbar`) and filters/search sub-bar (`.sub-toolbar`) with quick filter pills (`All`, `Errors`, `Mocks`, `Redirects`, `Slow`).
+- **Keyboard Shortcuts Engine** — global hotkeys (`/`, `?`/`h`, `r`, `s`, `m`, `a`, `d`, `t`, `e`, `p`, `Esc`) with non-blocking modifier key safeguards preserving browser native shortcuts.
 - **Real-Time Live Feed with Frame Batching** — newly captured transactions are pushed instantly to open dashboard tabs via Server-Sent Events (`/dashboard-api/events`) and batch-rendered on `requestAnimationFrame`.
 - **Response Compression** — built-in gzip/deflate compression for static assets and REST API endpoints.
 - **Graceful Process Shutdown** — handles `SIGINT` and `SIGTERM` to close active SSE clients, terminate redirect proxy servers, and close the HTTP server cleanly.
 - **Inspect** — Monaco editor panes auto-detect JSON/XML and pretty-print; cookie headers get special handling.
 - **Replay** — re-fire any captured call with edited URL, method, headers and body (`src/services/replayService.ts`).
 - **Export** — save a request/response pair straight into your Downloads folder.
-- **Archive** — move captured logs for an application into an `archives/` directory organized by app name, preserving them without deletion (`src/services/logManager.ts`).
 - **Redirect proxy servers** — apps can declare external API forwarding rules (e.g. a payment gateway). Each external target gets its own dedicated proxy server on an auto-assigned port, fully logged and streamed to the same dashboard feed (`src/services/redirectProxyManager.ts`).
 - **Configurable storage paths** — override where `config/`, `logs/`, `headers/` and `archives/` live via `settings.json`, the dashboard Settings API, or environment variables (`src/services/settingsManager.ts`).
 - **Loading indicator system** — visual feedback for all dashboard API operations: a global shimmer bar, section-level blur overlays, button spinners, and error toasts driven by a `LoadingManager` singleton and `trackedFetch()` wrapper (`public/js/app.js`).
-- **Vector SVG Icons** — crisp, theme-aware inline SVGs throughout the dashboard and docs for dark & light modes.
+- **Vector SVG Icons** — crisp, theme-aware inline SVGs throughout the dashboard, mocking hub, archives explorer, and docs for dark & light modes.
 
 ---
 
@@ -53,8 +57,10 @@ The server listens on `0.0.0.0:4000` by default (override with the `PORT` env va
 
 | URL | Purpose |
 | --- | --- |
-| `http://localhost:4000/dashboard` | Web dashboard UI |
-| `http://localhost:4000/doc` | Full code documentation |
+| `http://localhost:4000/dashboard` | Main Live Inspection Dashboard |
+| `http://localhost:4000/mocking` | Interactive Mock Rules & Latency Hub |
+| `http://localhost:4000/archives` | Historical Archives Explorer & Batch Restore |
+| `http://localhost:4000/doc` | Comprehensive Code & Architecture Documentation |
 | `http://localhost:4000/dashboard-api/...` | Admin REST API + SSE feed |
 | `http://localhost:4000` | Main proxy entry point (Vite proxy target etc.) |
 
@@ -81,7 +87,7 @@ Browser navigations to `http://localhost:4000` are redirected to `/dashboard`
 
 Applications are defined in `config/applications.json` (auto-seeded with two sample
 apps on first run). The dashboard's **Settings** dialog (Web Applications tab) edits this file
-through the admin API.
+through the admin API. Mock rules are defined in `config/mocks.json`.
 
 Shape of an application entry:
 
@@ -122,12 +128,12 @@ Shape of an application entry:
 | --- | --- |
 | `PORT` | Main server port (default `4000`) |
 | `REDIRECT_BASE_PORT` | First redirect proxy port (default `4001`) |
-| `PROXY_CONFIG_DIR` | Config directory holding `applications.json` |
-| `PROXY_LOGS_DIR` | Base directory containing `logs/`, `headers/`, and `archives/` |
+| `PROXY_CONFIG_DIR` | Config directory holding `applications.json` and `mocks.json` |
+| `PROXY_LOGS_DIR` | Base directory containing `logs/` and `headers/` |
+| `PROXY_ARCHIVES_DIR` | Dedicated directory for archived logs and manifests (default `archives/` or under `PROXY_LOGS_DIR/archives`) |
 
 If no env var is set, the values stored in `settings.json` (editable via
-`PUT /dashboard-api/settings`) are used; otherwise the project-root defaults apply.
-Archives are stored in `archives/` under the same base directory as `logs/` and `headers/`.
+`PUT /dashboard-api/settings` or the Dashboard UI Settings modal) are used; otherwise the project-root defaults apply.
 
 ---
 
@@ -137,8 +143,17 @@ All endpoints are JSON, mounted under `/dashboard-api`, and CORS-enabled.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| GET | `/settings` | Current storage & path settings |
-| PUT | `/settings` | Update storage paths; optionally migrate `applications.json` |
+| GET | `/settings` | Current storage paths, retention policies, and defaults |
+| PUT | `/settings` | Update storage paths and retention rules; optionally migrate `applications.json` |
+| GET | `/storage/stats` | Storage breakdown (logs, headers, archives), active/archived date partitions, disk metrics |
+| POST | `/storage/vacuum` | Clean empty date partition folders across `logs/` and `headers/` |
+| POST | `/storage/retention/apply` | Execute automated retention policy (archive or purge expired partitions) |
+| GET | `/mocks` | List mock rules (supports optional `appId` filter) |
+| POST | `/mocks` | Create new mock rule (exact, prefix, glob, regex matching + latency simulation) |
+| PUT | `/mocks/:id` | Update mock rule by ID |
+| DELETE | `/mocks/:id` | Delete mock rule by ID |
+| PATCH | `/mocks/:id/toggle` | Toggle mock rule enabled/disabled state |
+| GET | `/mocks/stats` | Mock rules statistics (total, active, inactive count) |
 | GET | `/applications` | List configured applications |
 | POST | `/applications` | Create an application |
 | PUT | `/applications/:id` | Update an application |
@@ -151,7 +166,12 @@ All endpoints are JSON, mounted under `/dashboard-api`, and CORS-enabled.
 | DELETE | `/logs/:id` | Delete a single log transaction by ID |
 | POST | `/logs/:id/export` | Export request/response pair to `~/Downloads` (body: `{ "fileName": "prefix", "date": "YYYY-MM-DD" }`) |
 | POST | `/logs/:id/replay` | Re-play a request with optional overrides |
-| POST | `/logs/archive` | Archive all logs for an app to `archives/<appName>/` (body: `{ "appId", "appName" }`) |
+| POST | `/logs/archive` | Archive logs for an app (supports selective `ids`, `date`, or `period`) |
+| GET | `/archives` | List all archived applications with date partitions, transaction counts, and manifests |
+| GET | `/archives/:appName/logs` | Query archived logs for an application with date, method, status, and deep search filters |
+| GET | `/archives/:appName/logs/:id` | Fetch full archived transaction payload (headers + request/response body) |
+| POST | `/archives/:appName/restore` | Restore archived transaction files back into active date-partitioned storage |
+| DELETE | `/archives/:appName` | Permanently delete an application archive directory from disk |
 | GET | `/events` | Server-Sent Events stream of new captures |
 
 ---
@@ -370,17 +390,46 @@ The replayed transaction is immediately logged as a fresh entry and streamed liv
 
 ---
 
+### 6. Mocking API Responses & Simulating Network Latency
+
+ProxyServerApp allows you to synthesize backend responses or simulate network degradation without touching backend servers.
+
+You can configure mock rules visually in `/mocking` or programmatically via `POST /dashboard-api/mocks`:
+
+```bash
+curl -X POST http://localhost:4000/dashboard-api/mocks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Simulate Payment Failure & Latency",
+    "appId": "*",
+    "enabled": true,
+    "method": "POST",
+    "urlPattern": "/api/*/checkout",
+    "matchType": "glob",
+    "responseType": "mock",
+    "statusCode": 402,
+    "delayMs": 1500,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": "{\n  \"error\": \"card_declined\",\n  \"message\": \"Insufficient funds on test account\"\n}"
+  }'
+```
+
+- When matching requests hit `:4000` (or redirect ports), ProxyServerApp pauses for `1500ms`, then returns `402 Payment Required` with the synthetic JSON payload.
+- The mock transaction is marked with a distinctive purple `⚡ MOCK` pill in the dashboard and recorded for full inspection.
+
+---
+
 ## How Request Routing Works
 
 For every unmatched request on the main port, `proxyMiddleware` selects a target:
 
-1. An explicit app id from the URL path (`/proxy/:appId/...`), headers
-   (`x-proxy-app-id` / `x-app-id`) or query (`_appId`) pins a specific application.
-2. Otherwise all active backends across all active apps are matched by **longest
-   `pathPrefix` first**.
-3. Fallback: the app whose `frontEndUrl` appears in the `Referer`/`Origin` header
-   (used for requests with no useful prefix, e.g. `GET /`).
-4. If nothing matches, a 404 lists the configured prefixes.
+1. **Mock Rule Check**: evaluated first against active mock rules (matching by `appId`, HTTP `method`, and `urlPattern` using exact, prefix, glob, or regex). If matched, the synthetic response or simulated latency is executed immediately.
+2. **Explicit Application Target**: an explicit app id from the URL path (`/proxy/:appId/...`), headers (`x-proxy-app-id` / `x-app-id`), or query parameter (`_appId`) pins a specific application.
+3. **Longest Prefix Match**: all active backends across all active apps are matched by **longest `pathPrefix` first**.
+4. **Referer/Origin Fallback**: the app whose `frontEndUrl` appears in the `Referer` or `Origin` header (used for requests with no useful prefix, e.g. `GET /`).
+5. **404 Catch-All**: if nothing matches, a 404 lists the configured prefixes.
 
 Redirect URLs are **not** routed through the main port; each one has its own proxy
 server (see `src/services/redirectProxyManager.ts`).
@@ -395,10 +444,11 @@ ProxyServerApp/
 |-- package.json                  Scripts: build, dev, start, test; deps: express, cors, http-proxy, compression
 |-- tsconfig.json                 TypeScript compiler configuration (target: ES2022, outDir: dist)
 |-- jest.config.js                Jest test runner configured with ts-jest
-|-- optimization.md               Performance optimization roadmap & architectural milestones
-|-- settings.json                 Optional storage-path overrides (gitignored)
+|-- improvements.md               Architecture & improvements roadmap document
+|-- settings.json                 Optional storage-path overrides & retention policies (gitignored)
 |-- config/
-|   '-- applications.json         Persisted app config (auto-created with samples on first run)
+|   |-- applications.json         Persisted app config (auto-created with samples on first run)
+|   '-- mocks.json                Mocking rules and interception configurations
 |-- logs/
 |   '-- YYYY-MM-DD/               Captured request/response BODIES: {uuid}_request.{ext}
 |-- headers/
@@ -406,35 +456,54 @@ ProxyServerApp/
 |-- archives/                     Archived logs organized by app name ({appName}/logs/ + headers/)
 |-- dist/                         Compiled JavaScript output from tsc
 |-- public/
-|   |-- index.html                Dashboard SPA shell (navbar, period selector, loading bar, modals)
-|   |-- doc.html                  Full code documentation (served at /doc)
-|   |-- css/                      styles.css (Catppuccin design system) + doc.css
-|   '-- js/                       app.js (controller + SVG_ICONS + SSE batching), monaco-init.js, doc.js
+|   |-- index.html                Dashboard SPA shell (navbar, 2-tier toolbar, period selector, Monaco panes, modals)
+|   |-- mocking.html              Interactive Mocking Hub (rule editor, match modes, status/headers/body config)
+|   |-- archives.html             Isolated Historical Archives Explorer (date partitions, batch restore/delete)
+|   |-- doc.html                  Full comprehensive code documentation (served at /doc)
+|   |-- css/
+|   |   |-- styles.css            Catppuccin design system, 2-tier toolbar, & SVG icon styling for the dashboard
+|   |   '-- doc.css               Styles for the documentation page
+|   '-- js/
+|       |-- app.js                Dashboard controller: state, filter presets, shortcuts, SSE batching, modals
+|       |-- mocking.js            Mocking Hub controller: rule CRUD, match type configuration, test replay
+|       |-- archives.js           Archives Explorer controller: partition queries, batch restore/purge
+|       |-- monaco-init.js        Monaco loading, Catppuccin themes, 4-space tab + JSON/XML formatting helpers
+|       '-- doc.js                Documentation controller: scroll-spy, search, code copying
 '-- src/
     |-- server.test.ts            Unit tests for server entry point, compression & graceful shutdown
     |-- routes/
-    |   |-- api.ts                All /dashboard-api endpoints (REST + SSE)
-    |   '-- api.test.ts           Unit tests for API routes
+    |   |-- api.ts                All /dashboard-api endpoints (Applications, Logs, Mocks, Storage, Archives, SSE)
+    |   |-- api.test.ts           Unit tests for API routes
+    |   |-- api.mocks.test.ts     Unit tests for Mocking API routes
+    |   '-- api.storage.test.ts   Unit tests for Storage & Retention API routes
     |-- services/
     |   |-- configManager.ts      Applications CRUD with in-memory caching + redirect port assignment
     |   |-- configManager.test.ts Unit tests for configManager
     |   |-- logManager.ts         Write/read/clear/archive/export date-partitioned capture files with async I/O
     |   |-- logManager.test.ts    Unit tests for logManager
-    |   |-- proxyEngine.ts        Main http-proxy wiring, route matching, SSE broadcaster
+    |   |-- mockManager.ts        Mock rules store, pattern matching (prefix/exact/glob/regex), latency simulation
+    |   |-- mockManager.test.ts   Unit tests for mockManager
+    |   |-- storageManager.ts     Disk size analytics, partition vacuum engine, automated retention policy
+    |   |-- storageManager.test.ts Unit tests for storageManager
+    |   |-- proxyEngine.ts        Main http-proxy wiring, route matching, mock evaluation, SSE broadcaster
     |   |-- proxyEngine.test.ts   Unit tests for proxyEngine
-    |   |-- redirectProxyManager.ts Dedicated proxy servers per redirect port
+    |   |-- redirectProxyManager.ts Dedicated proxy servers per redirect port with mock rule evaluation
     |   |-- redirectProxyManager.test.ts Unit tests for redirectProxyManager
+    |   |-- redirectProxyManager.e2e.test.ts End-to-end integration tests for redirect proxies
     |   |-- replayService.ts      Re-fires a captured request via fetch()
     |   |-- replayService.test.ts Unit tests for replayService
-    |   |-- settingsManager.ts    Configurable storage paths including archives
+    |   |-- routingVerification.test.ts Longest prefix match and routing verification suite
+    |   |-- settingsManager.ts    Configurable storage paths, retention policies, and archives management
     |   '-- settingsManager.test.ts Unit tests for settingsManager
     |-- types/
-    |   '-- index.ts              Shared TypeScript interfaces, types & Express Request augmentation
+    |   '-- index.ts              Shared TypeScript interfaces (Application, LogEntry, MockRule, StorageStats, etc.)
     '-- utils/
         |-- bootstrap.ts          util._extend polyfill (silences DEP0060 warning)
         |-- bootstrap.test.ts     Unit tests for bootstrap
         |-- payload.ts            Buffer payload capping & memory protection utility
         |-- payload.test.ts       Unit tests for payload utility
+        |-- portProbe.ts          Port availability and dynamic binding probe
+        |-- portProbe.test.ts     Unit tests for portProbe
         |-- uuid.ts               Dependency-free RFC-4122 UUID v4 generator
         '-- uuid.test.ts          Unit tests for uuid
 ```
@@ -451,7 +520,7 @@ Captured files per transaction (keyed by date `YYYY-MM-DD` and a shared UUID `id
 ## Development & Testing
 
 ```bash
-# Run all unit tests (11 suites, 111 tests)
+# Run all unit and integration tests (18 suites, 197 tests)
 npm test
 
 # Run tests with coverage report

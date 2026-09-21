@@ -308,7 +308,7 @@ body {
 }
 
 .doc-content {
-  max-width: 1080px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -330,7 +330,7 @@ body {
   margin-top: 10px;
   font-size: 0.98rem;
   line-height: 1.55;
-  max-width: 820px;
+  max-width: 1100px;
 }
 
 .hero-meta {

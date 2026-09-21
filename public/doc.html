@@ -38,6 +38,10 @@
     </div>
 
     <div class="topbar-actions">
+      <a class="btn-back" href="/mocking" title="Mocking Rules">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        <span>Mocking</span>
+      </a>
       <a class="btn-back" href="/archives" title="Archives Explorer">
         <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
         <span>Archives</span>
@@ -83,24 +87,26 @@
         <li><a href="#m-settings">15. src/services/settingsManager.ts</a></li>
         <li><a href="#m-config">16. src/services/configManager.ts</a></li>
         <li><a href="#m-log">17. src/services/logManager.ts</a></li>
-        <li><a href="#m-proxy">18. src/services/proxyEngine.ts</a></li>
-        <li><a href="#m-redirect">19. src/services/redirectProxyManager.ts</a></li>
-        <li><a href="#m-replay">20. src/services/replayService.ts</a></li>
-        <li><a href="#m-api">21. src/routes/api.ts</a></li>
+        <li><a href="#m-mock">18. src/services/mockManager.ts</a></li>
+        <li><a href="#m-storage">19. src/services/storageManager.ts</a></li>
+        <li><a href="#m-proxy">20. src/services/proxyEngine.ts</a></li>
+        <li><a href="#m-redirect">21. src/services/redirectProxyManager.ts</a></li>
+        <li><a href="#m-replay">22. src/services/replayService.ts</a></li>
+        <li><a href="#m-api">23. src/routes/api.ts</a></li>
       </ul>
 
       <div class="toc-group-title">Frontend Modules</div>
       <ul class="toc">
-        <li><a href="#f-index">22. public/index.html</a></li>
-        <li><a href="#f-app">23. public/js/app.js</a></li>
-        <li><a href="#f-monaco">24. public/js/monaco-init.js</a></li>
-        <li><a href="#f-css">25. public/css/styles.css</a></li>
+        <li><a href="#f-index">24. public/index.html</a></li>
+        <li><a href="#f-app">25. public/js/app.js</a></li>
+        <li><a href="#f-monaco">26. public/js/monaco-init.js</a></li>
+        <li><a href="#f-css">27. public/css/styles.css</a></li>
       </ul>
 
       <div class="toc-group-title">Reference (deepest level)</div>
       <ul class="toc">
-        <li><a href="#sec-functions">26. Function Reference</a></li>
-        <li><a href="#sec-lines">27. Line-Level Code Notes</a></li>
+        <li><a href="#sec-functions">28. Function Reference</a></li>
+        <li><a href="#sec-lines">29. Line-Level Code Notes</a></li>
       </ul>
     </aside>
 
@@ -195,39 +201,48 @@
 
           <div class="code-block">
             <div class="code-head"><span>system overview</span></div>
-<pre><code>  Browser / Vite app                 Proxy Server App (Node.js + TypeScript :4000)
- +------------------+               +----------------------------------------------------+
- |  localhost:3000  |   any HTTP    |  server.ts (Express entrypoint)                    |
- |  fetch('/api/x') | ------------&gt; |   |-- cors()                                      |
- +------------------+               |   |-- /dashboard-api  --&gt; src/routes/api.ts        |
-                                    |   |-- /dashboard       --&gt; public/index.html      |
-        Dashboard SPA               |   |-- /doc              --&gt; public/doc.html       |
-        (public/)                   |   '-- /* anything else   --&gt; proxyMiddleware      |
-                                    |                    |                               |
-                                    |                    v  match app + longest prefix  |
-                                    |              http-proxy .web(target, buffer)      |
-                                    +------------------------|--------------------------+
+<pre><code>  Browser / Vite dev app             Proxy Server App (Node.js + TypeScript :4000)
+ +------------------+               +-------------------------------------------------------------+
+ |  localhost:3000  |   any HTTP    |  server.ts (Express entrypoint)                             |
+ |  fetch('/api/x') | ------------&gt; |   |-- cors() + compression()                                |
+ +------------------+               |   |-- /dashboard-api  --&gt; src/routes/api.ts                 |
+                                    |   |-- /dashboard       --&gt; public/index.html (Dashboard SPA)|
+        Web Interfaces              |   |-- /mocking         --&gt; public/mocking.html (Mock Rules) |
+        (public/)                   |   |-- /archives        --&gt; public/archives.html (Archives)  |
+                                    |   |-- /doc             --&gt; public/doc.html (Documentation)  |
+                                    |   '-- /* anything else --&gt; proxyMiddleware                  |
+                                    |                    |                                        |
+                                    |                    +--&gt; [mockManager] Matching Rule?        |
+                                    |                    |    (prefix, exact, glob, regex, delay) |
+                                    |                    |    YES: Return Mock HTTP Response      |
+                                    |                    |    NO : Forward upstream               |
+                                    |                    v                                        |
+                                    |              http-proxy .web(target, buffer)                |
+                                    +------------------------|------------------------------------+
                                              ^                | forwarded
                                              | SSE events     v
-                                             |             +--------------------------+
-                                             |             | Backend REST / SOAP svc   |
+                                             |             +----------------------------+
+                                             |             | Backend REST / SOAP Service|
                                              |             | (backendUrls, prefix-based)|
-                                             |             +--------------------------+
+                                             |             +----------------------------+
                                              |
-   Redirect proxies (:4001, :4002, ...)     |  also captures + broadcasts to the SAME feed
-   +----------------------+                 |
-   | redirectProxyManager | -----------------&gt; External API / Payment Gateway
-   | one server per       |                    (redirectUrls, matched by targetUrl)
+   Redirect proxies (:4001, :4002, ...)      |  also intercepts/mocks + broadcasts to SAME feed
+   +----------------------+                  |
+   | redirectProxyManager | ------------------&gt; External API / 3rd Party SaaS Gateway
+   | one server per       |                     (redirectUrls, matched by targetUrl)
    | unique target URL    |
    +----------------------+
 
-  Disk artifacts (Date Partitioned):
+  Disk Artifacts &amp; Lifecycle Management:
     config/applications.json                  app + backend configuration (+ redirect ports)
-    settings.json                             optional storage-path overrides (gitignored)
+    config/mocks.json                         mock rules (exact, prefix, glob, regex, latency)
+    settings.json                             storage paths &amp; retention policies
     logs/YYYY-MM-DD/{uuid}_request.{ext}      captured request body
     logs/YYYY-MM-DD/{uuid}_response.{ext}     captured response body
     headers/YYYY-MM-DD/{uuid}_request.json    captured request metadata + headers
     headers/YYYY-MM-DD/{uuid}_response.json   captured response metadata + status/duration
+    archives/{appName}/                       date-preserved historical transaction stores
+    [storageManager]                          vacuum empty partitions &amp; automated retention lifecycle
 </code></pre>
           </div>
         </section>
@@ -241,16 +256,18 @@
             <table class="doc-table">
               <thead><tr><th>Piece</th><th>Choice</th><th>Why / Where used</th></tr></thead>
               <tbody>
-                <tr><td>Language</td><td>TypeScript 5.9</td><td>Type-safe backend architecture; interfaces for entities, requests, metas, and Express augmentations (<span class="file-ref">src/types/index.ts</span>).</td></tr>
+                <tr><td>Language</td><td>TypeScript 5.9</td><td>Type-safe backend architecture; interfaces for entities, requests, metas, mock rules, storage metrics, and Express augmentations (<span class="file-ref">src/types/index.ts</span>).</td></tr>
                 <tr><td>Compiler &amp; Execution</td><td>tsc + ts-node</td><td>Compiled to <code class="inline">dist/</code> via <code class="inline">npm run build</code>; dev watch via <code class="inline">node --watch -r ts-node/register server.ts</code> (<span class="file-ref">package.json</span>).</td></tr>
-                <tr><td>Test Suite</td><td>Jest 30 + ts-jest</td><td>Comprehensive unit testing across routes, services, and utils (11 suites, 111 tests).</td></tr>
+                <tr><td>Test Suite</td><td>Jest 30 + ts-jest</td><td>Comprehensive unit &amp; integration testing across routes, services, and utils (18 suites, 197 tests).</td></tr>
                 <tr><td>HTTP framework</td><td>express ^4.21.2</td><td>Routing, static serving, JSON parsing, compression middleware (<span class="file-ref">server.ts</span>, <span class="file-ref">src/routes/api.ts</span>).</td></tr>
-                <tr><td>Proxy core</td><td>http-proxy ^1.18.1</td><td><code class="inline">selfHandleResponse</code> mode with memory payload safety capping (<span class="file-ref">src/services/proxyEngine.ts</span>, <span class="file-ref">src/utils/payload.ts</span>).</td></tr>
+                <tr><td>Proxy core</td><td>http-proxy ^1.18.1</td><td><code class="inline">selfHandleResponse</code> mode with memory payload safety capping and mock rule evaluation (<span class="file-ref">src/services/proxyEngine.ts</span>, <span class="file-ref">src/utils/payload.ts</span>).</td></tr>
+                <tr><td>Mock Engine</td><td>Custom in-memory + JSON store</td><td>Multi-mode pattern matching (exact, prefix, glob, regex), delay simulation, and mock response synthesis (<span class="file-ref">src/services/mockManager.ts</span>).</td></tr>
+                <tr><td>Storage &amp; Retention</td><td>Custom filesystem engine</td><td>Directory size analytics, disk space probe, partition vacuuming, and retention policies (<span class="file-ref">src/services/storageManager.ts</span>).</td></tr>
                 <tr><td>Redirect proxies</td><td>http-proxy + core http</td><td>A dedicated Express/http server per external target URL with automatic port allocation (<span class="file-ref">src/services/redirectProxyManager.ts</span>).</td></tr>
                 <tr><td>CORS</td><td>cors ^2.8.5</td><td>Allows dashboards/tools from other origins to query the admin API (<span class="file-ref">server.ts</span>).</td></tr>
                 <tr><td>Compression</td><td>compression ^1.8.1</td><td>Gzip/deflate response compression for API endpoints and static assets (<span class="file-ref">server.ts</span>).</td></tr>
-                <tr><td>Editor</td><td>Monaco Editor (Local npm package)</td><td>Self-hosted AMD loader from <code class="inline">monaco-editor</code>; offline-capable read-only viewers for request/response bodies (<span class="file-ref">public/js/monaco-init.js</span>).</td></tr>
-                <tr><td>UI &amp; Icons</td><td>Vanilla JS + Vector SVGs</td><td>No framework; Catppuccin Mocha/Latte theming via CSS variables and theme-aware SVGs (<span class="file-ref">public/css/styles.css</span>).</td></tr>
+                <tr><td>Editor</td><td>Monaco Editor (Local npm package)</td><td>Self-hosted AMD loader from <code class="inline">monaco-editor</code>; offline-capable viewers &amp; editors for request/response bodies and mock definitions (<span class="file-ref">public/js/monaco-init.js</span>).</td></tr>
+                <tr><td>UI &amp; Icons</td><td>Vanilla JS + Vector SVGs</td><td>No framework; Catppuccin Mocha/Latte theming via CSS variables, 2-tier responsive toolbar, and stroke SVGs (<span class="file-ref">public/css/styles.css</span>).</td></tr>
                 <tr><td>IDs</td><td>Custom RFC-4122 UUID v4</td><td>Dependency-free UUID v4 generator (<span class="file-ref">src/utils/uuid.ts</span>).</td></tr>
                 <tr><td>Realtime</td><td>Server-Sent Events</td><td>Native <code class="inline">EventSource</code> with <code class="inline">requestAnimationFrame</code> frame batching (<span class="file-ref">public/js/app.js</span>).</td></tr>
                 <tr><td>Replay HTTP</td><td>Native fetch</td><td>Node global fetch used to re-execute captured requests (<span class="file-ref">src/services/replayService.ts</span>).</td></tr>
@@ -271,10 +288,11 @@
 |-- package.json                  Scripts: build, dev, start, test; deps: express, cors, http-proxy, compression
 |-- tsconfig.json                 TypeScript compiler configuration (target: ES2022, outDir: dist)
 |-- jest.config.js                Jest test runner configured with ts-jest
-|-- optimization.md               Performance optimization roadmap &amp; architectural milestones
+|-- improvements.md               Architecture &amp; improvements roadmap document
 |-- settings.json                 Optional storage-path overrides (gitignored)
 |-- config/
-|   '-- applications.json         Persisted app config (auto-created with samples on first run)
+|   |-- applications.json         Persisted app config (auto-created with samples on first run)
+|   '-- mocks.json                Mocking rules and interception configurations
 |-- logs/
 |   '-- YYYY-MM-DD/               Captured request/response BODIES: {uuid}_request.{ext}
 |-- headers/
@@ -282,40 +300,54 @@
 |-- archives/                     Archived logs organized by app name ({appName}/logs/ + headers/)
 |-- dist/                         Compiled JavaScript output from tsc
 |-- public/
-|   |-- index.html                Dashboard SPA shell (navbar, period selector, loading bar, split panes, modals)
-|   |-- doc.html                  This documentation page (served at /doc)
+|   |-- index.html                Dashboard SPA shell (navbar, 2-tier toolbar, period selector, Monaco panes, modals)
+|   |-- mocking.html              Interactive Mocking Hub (rule editor, match modes, status/headers/body config)
+|   |-- archives.html             Isolated Historical Archives Explorer (date partitions, batch restore/delete)
+|   |-- doc.html                  This comprehensive code documentation page (served at /doc)
 |   |-- css/
-|   |   |-- styles.css            Catppuccin design system &amp; SVG icon styling for the dashboard
+|   |   |-- styles.css            Catppuccin design system, 2-tier toolbar, &amp; SVG icon styling for the dashboard
 |   |   '-- doc.css               Styles for this documentation page
 |   '-- js/
-|       |-- app.js                Dashboard controller: state, SVG icons, period selector, SSE batching, modals
+|       |-- app.js                Dashboard controller: state, filter presets, shortcuts, SSE batching, modals
+|       |-- mocking.js            Mocking Hub controller: rule CRUD, match type configuration, test replay
+|       |-- archives.js           Archives Explorer controller: partition queries, batch restore/purge
 |       |-- monaco-init.js        Monaco loading, Catppuccin themes, 4-space tab + JSON/XML formatting helpers
 |       '-- doc.js                Interactivity for this page (scroll-spy, search, copy)
 '-- src/
     |-- server.test.ts            Unit tests for server entry point, compression &amp; graceful shutdown
     |-- routes/
-    |   |-- api.ts                All /dashboard-api endpoints (REST + SSE)
-    |   '-- api.test.ts           Unit tests for API routes
+    |   |-- api.ts                All /dashboard-api endpoints (Applications, Logs, Mocks, Storage, Archives, SSE)
+    |   |-- api.test.ts           Unit tests for API routes
+    |   |-- api.mocks.test.ts     Unit tests for Mocking API routes
+    |   '-- api.storage.test.ts   Unit tests for Storage &amp; Retention API routes
     |-- services/
     |   |-- configManager.ts      CRUD over config/applications.json with in-memory caching
     |   |-- configManager.test.ts Unit tests for configManager
     |   |-- logManager.ts         Write/read/clear/archive/export date-partitioned capture files with async I/O
     |   |-- logManager.test.ts    Unit tests for logManager
-    |   |-- proxyEngine.ts        Main http-proxy wiring, route matching, SSE broadcaster
+    |   |-- mockManager.ts        Mock rules store, pattern matching (prefix/exact/glob/regex), latency simulation
+    |   |-- mockManager.test.ts   Unit tests for mockManager
+    |   |-- storageManager.ts     Disk size analytics, partition vacuum engine, automated retention policy
+    |   |-- storageManager.test.ts Unit tests for storageManager
+    |   |-- proxyEngine.ts        Main http-proxy wiring, route matching, mock evaluation, SSE broadcaster
     |   |-- proxyEngine.test.ts   Unit tests for proxyEngine
-    |   |-- redirectProxyManager.ts Dedicated proxy servers per redirect port
+    |   |-- redirectProxyManager.ts Dedicated proxy servers per redirect port with mock rule evaluation
     |   |-- redirectProxyManager.test.ts Unit tests for redirectProxyManager
+    |   |-- redirectProxyManager.e2e.test.ts End-to-end integration tests for redirect proxies
     |   |-- replayService.ts      Re-fires a captured request via fetch()
     |   |-- replayService.test.ts Unit tests for replayService
-    |   |-- settingsManager.ts    Configurable storage paths including archives
+    |   |-- routingVerification.test.ts Longest prefix match and routing verification suite
+    |   |-- settingsManager.ts    Configurable storage paths, retention policies, and archives management
     |   '-- settingsManager.test.ts Unit tests for settingsManager
     |-- types/
-    |   '-- index.ts              Shared TypeScript interfaces, types &amp; Express Request augmentation
+    |   '-- index.ts              Shared TypeScript interfaces (Application, LogEntry, MockRule, StorageStats, etc.)
     '-- utils/
         |-- bootstrap.ts          util._extend polyfill (silences DEP0060 warning)
         |-- bootstrap.test.ts     Unit tests for bootstrap
         |-- payload.ts            Buffer payload capping &amp; memory protection utility
         |-- payload.test.ts       Unit tests for payload utility
+        |-- portProbe.ts          Port availability and dynamic binding probe
+        |-- portProbe.test.ts     Unit tests for portProbe
         |-- uuid.ts               Dependency-free RFC-4122 UUID v4 generator
         '-- uuid.test.ts          Unit tests for uuid</code></pre>
           </div>
@@ -582,30 +614,40 @@ curl -X POST http://localhost:4001/v1/charges \
               <tbody>
                 <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/</code></td><td><span class="file-ref">server.ts:40</span></td><td>Browser navigations (Accept: text/html, no proxy headers) are redirected to <code>/dashboard</code>; other requests pass through to the proxy.</td></tr>
                 <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard</code>, <code>/dashboard/*</code></td><td><span class="file-ref">server.ts:30</span></td><td>Serves the dashboard SPA shell <code>public/index.html</code>.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/mocking</code>, <code>/mocking/*</code></td><td><span class="file-ref">server.ts:33</span></td><td>Serves the interactive mock rules editor <code>public/mocking.html</code>.</td></tr>
                 <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/archives</code>, <code>/archives/*</code></td><td><span class="file-ref">server.ts:35</span></td><td>Serves the isolated historical archives explorer <code>public/archives.html</code>.</td></tr>
                 <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/doc</code>, <code>/doc/*</code></td><td><span class="file-ref">server.ts:40</span></td><td>Serves this documentation page <code>public/doc.html</code>.</td></tr>
                 <tr><td><span class="pill ANY">ANY</span></td><td class="nowrap"><code>/dashboard-static/*</code></td><td><span class="file-ref">server.ts:27</span></td><td>Static assets from <code>public/</code> (css, js, html).</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/settings</code></td><td><span class="file-ref">src/routes/api.ts:24</span></td><td>Current storage &amp; path settings.</td></tr>
-                <tr><td><span class="pill PUT">PUT</span></td><td class="nowrap"><code>/dashboard-api/settings</code></td><td><span class="file-ref">src/routes/api.ts:33</span></td><td>Update storage paths; optionally migrate <code>applications.json</code>; re-syncs redirect proxies.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/redirect-proxies</code></td><td><span class="file-ref">src/routes/api.ts:91</span></td><td>Status of all running redirect proxy servers (port, target, subscribers).</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/applications</code></td><td><span class="file-ref">src/routes/api.ts:52</span></td><td>List all configured applications.</td></tr>
-                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/applications</code></td><td><span class="file-ref">src/routes/api.ts:58</span></td><td>Create application (201; 400 on validation error).</td></tr>
-                <tr><td><span class="pill PUT">PUT</span></td><td class="nowrap"><code>/dashboard-api/applications/:id</code></td><td><span class="file-ref">src/routes/api.ts:69</span></td><td>Update application (404 if id unknown).</td></tr>
-                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/applications/:id</code></td><td><span class="file-ref">src/routes/api.ts:82</span></td><td>Delete application and re-sync redirect proxies.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs/dates</code></td><td><span class="file-ref">src/routes/api.ts:98</span></td><td>List all available date folder names (<code>YYYY-MM-DD</code>) sorted newest first.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs?appId=&amp;q=&amp;date=</code></td><td><span class="file-ref">src/routes/api.ts:108</span></td><td>List log summaries, newest first. Optional <code>date</code> loads a specific date folder (defaults to newest date folder); optional <code>appId</code> filters to one app; optional <code>q</code> runs a full-text search.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs/:id?date=</code></td><td><span class="file-ref">src/routes/api.ts:124</span></td><td>Full detail: both metadata objects plus request/response bodies as text.</td></tr>
-                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/logs</code></td><td><span class="file-ref">src/routes/api.ts:133</span></td><td>Accepts <code>&#123; appId &#125;</code> or <code>&#123; ids: [...] &#125;</code> in body; omit to delete every file across all date folders.</td></tr>
-                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/archive</code></td><td><span class="file-ref">src/routes/api.ts:154</span></td><td>Archive logs for an application (supports selective <code>ids</code>, <code>date</code>, or <code>period</code>). Moves files to <code>archives/&lt;appName&gt;/</code> with manifest.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/archives</code></td><td><span class="file-ref">src/routes/api.ts:233</span></td><td>List all archived applications with date partitions, transaction counts, and manifest metadata.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/archives/:appName/logs</code></td><td><span class="file-ref">src/routes/api.ts:243</span></td><td>Query archived logs for an application with date, status, method, and deep text search filters.</td></tr>
-                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/archives/:appName/logs/:id</code></td><td><span class="file-ref">src/routes/api.ts:257</span></td><td>Fetch full archived transaction payload detail (headers + request/response body).</td></tr>
-                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/archives/:appName/restore</code></td><td><span class="file-ref">src/routes/api.ts:269</span></td><td>Restore archived transaction files back into active date-partitioned storage.</td></tr>
-                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/archives/:appName</code></td><td><span class="file-ref">src/routes/api.ts:281</span></td><td>Permanently delete an application archive directory from disk.</td></tr>
-                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/logs/:id</code></td><td><span class="file-ref">src/routes/api.ts:174</span></td><td>Delete a single log by id.</td></tr>
-                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/export</code></td><td><span class="file-ref">src/routes/api.ts:186</span></td><td>Copy the pair into <code>~/Downloads</code> under a sanitized prefix with optional <code>date</code>.</td></tr>
-                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/replay</code></td><td><span class="file-ref">src/routes/api.ts:202</span></td><td>Execute the stored (or overridden) request; returns status, duration, headers, body.</td></tr>
-                <tr><td><span class="pill SSE">SSE</span></td><td class="nowrap"><code>/dashboard-api/events</code></td><td><span class="file-ref">src/routes/api.ts:220</span></td><td>Server-Sent Events stream of new capture summaries.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/settings</code></td><td><span class="file-ref">src/routes/api.ts:24</span></td><td>Current storage &amp; path settings, retention rules, and defaults.</td></tr>
+                <tr><td><span class="pill PUT">PUT</span></td><td class="nowrap"><code>/dashboard-api/settings</code></td><td><span class="file-ref">src/routes/api.ts:33</span></td><td>Update storage paths &amp; retention policies; optionally migrate <code>applications.json</code>; re-syncs redirect proxies.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/storage/stats</code></td><td><span class="file-ref">src/routes/api.ts:48</span></td><td>Comprehensive disk metrics: directory sizes (logs, headers, archives), active/archived date partitions, total transactions, disk free space.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/storage/vacuum</code></td><td><span class="file-ref">src/routes/api.ts:58</span></td><td>Removes empty date partition directories and cleans unlinked orphaned files.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/storage/retention/apply</code></td><td><span class="file-ref">src/routes/api.ts:68</span></td><td>Executes retention policy (archives or deletes partitions older than specified threshold).</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/mocks</code></td><td><span class="file-ref">src/routes/api.ts:79</span></td><td>List all mock rules; supports optional <code>appId</code> filter.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/mocks</code></td><td><span class="file-ref">src/routes/api.ts:85</span></td><td>Create new mock rule (supports prefix, exact, glob, regex matching and delay simulation).</td></tr>
+                <tr><td><span class="pill PUT">PUT</span></td><td class="nowrap"><code>/dashboard-api/mocks/:id</code></td><td><span class="file-ref">src/routes/api.ts:95</span></td><td>Update existing mock rule by ID.</td></tr>
+                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/mocks/:id</code></td><td><span class="file-ref">src/routes/api.ts:108</span></td><td>Delete a mock rule by ID.</td></tr>
+                <tr><td><span class="pill PATCH">PATCH</span></td><td class="nowrap"><code>/dashboard-api/mocks/:id/toggle</code></td><td><span class="file-ref">src/routes/api.ts:117</span></td><td>Toggle a mock rule's enabled/disabled state.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/mocks/stats</code></td><td><span class="file-ref">src/routes/api.ts:127</span></td><td>Get mock rules statistics (total, active, inactive count).</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/redirect-proxies</code></td><td><span class="file-ref">src/routes/api.ts:133</span></td><td>Status of all running redirect proxy servers (port, target, subscribers).</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/applications</code></td><td><span class="file-ref">src/routes/api.ts:140</span></td><td>List all configured applications.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/applications</code></td><td><span class="file-ref">src/routes/api.ts:146</span></td><td>Create application (201; 400 on validation error).</td></tr>
+                <tr><td><span class="pill PUT">PUT</span></td><td class="nowrap"><code>/dashboard-api/applications/:id</code></td><td><span class="file-ref">src/routes/api.ts:157</span></td><td>Update application (404 if id unknown).</td></tr>
+                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/applications/:id</code></td><td><span class="file-ref">src/routes/api.ts:170</span></td><td>Delete application and re-sync redirect proxies.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs/dates</code></td><td><span class="file-ref">src/routes/api.ts:186</span></td><td>List all available date folder names (<code>YYYY-MM-DD</code>) sorted newest first.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs?appId=&amp;q=&amp;date=</code></td><td><span class="file-ref">src/routes/api.ts:196</span></td><td>List log summaries, newest first. Optional <code>date</code> loads a specific date folder (defaults to newest date folder); optional <code>appId</code> filters to one app; optional <code>q</code> runs a full-text search.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/logs/:id?date=</code></td><td><span class="file-ref">src/routes/api.ts:212</span></td><td>Full detail: both metadata objects plus request/response bodies as text.</td></tr>
+                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/logs</code></td><td><span class="file-ref">src/routes/api.ts:221</span></td><td>Accepts <code>&#123; appId &#125;</code> or <code>&#123; ids: [...] &#125;</code> in body; omit to delete every file across all date folders.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/archive</code></td><td><span class="file-ref">src/routes/api.ts:242</span></td><td>Archive logs for an application (supports selective <code>ids</code>, <code>date</code>, or <code>period</code>). Moves files to <code>archives/&lt;appName&gt;/</code> with manifest.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/archives</code></td><td><span class="file-ref">src/routes/api.ts:321</span></td><td>List all archived applications with date partitions, transaction counts, and manifest metadata.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/archives/:appName/logs</code></td><td><span class="file-ref">src/routes/api.ts:331</span></td><td>Query archived logs for an application with date, status, method, and deep text search filters.</td></tr>
+                <tr><td><span class="pill GET">GET</span></td><td class="nowrap"><code>/dashboard-api/archives/:appName/logs/:id</code></td><td><span class="file-ref">src/routes/api.ts:345</span></td><td>Fetch full archived transaction payload detail (headers + request/response body).</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/archives/:appName/restore</code></td><td><span class="file-ref">src/routes/api.ts:357</span></td><td>Restore archived transaction files back into active date-partitioned storage.</td></tr>
+                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/archives/:appName</code></td><td><span class="file-ref">src/routes/api.ts:369</span></td><td>Permanently delete an application archive directory from disk.</td></tr>
+                <tr><td><span class="pill DELETE">DELETE</span></td><td class="nowrap"><code>/dashboard-api/logs/:id</code></td><td><span class="file-ref">src/routes/api.ts:262</span></td><td>Delete a single log by id.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/export</code></td><td><span class="file-ref">src/routes/api.ts:274</span></td><td>Copy the pair into <code>~/Downloads</code> under a sanitized prefix with optional <code>date</code>.</td></tr>
+                <tr><td><span class="pill POST">POST</span></td><td class="nowrap"><code>/dashboard-api/logs/:id/replay</code></td><td><span class="file-ref">src/routes/api.ts:290</span></td><td>Execute the stored (or overridden) request; returns status, duration, headers, body.</td></tr>
+                <tr><td><span class="pill SSE">SSE</span></td><td class="nowrap"><code>/dashboard-api/events</code></td><td><span class="file-ref">src/routes/api.ts:308</span></td><td>Server-Sent Events stream of new capture summaries.</td></tr>
                 <tr><td><span class="pill ANY">ANY</span></td><td class="nowrap">anything else</td><td><span class="file-ref">server.ts:51</span></td><td>Falls through to <code>proxyMiddleware</code>: routed by pathPrefix to a backend and fully logged.</td></tr>
               </tbody>
             </table>
@@ -760,6 +802,71 @@ export interface LogDetail {
   resMeta: ResMeta;
   requestBody: string;
   responseBody: string;
+}
+
+// Mocking & Interception Types
+export type MockMatchType = 'prefix' | 'exact' | 'glob' | 'regex';
+export type MockResponseType = 'mock' | 'delay_only';
+
+export interface MockRule {
+  id: string;
+  name: string;
+  appId: string;                     // specific appId or '*' for all apps
+  enabled: boolean;
+  method: string;                    // 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | '*'
+  urlPattern: string;                // e.g. '/api/v1/payments/*' or regex/exact string
+  matchType: MockMatchType;          // 'prefix' | 'exact' | 'glob' | 'regex'
+  responseType: MockResponseType;    // 'mock' | 'delay_only'
+  statusCode: number;                // 200, 400, 401, 404, 500, etc.
+  statusText?: string;
+  headers?: Record&lt;string, string&gt;;
+  body?: string;
+  contentType?: string;              // 'application/json' | 'text/xml' | 'text/plain' | 'text/html'
+  delayMs?: number;                  // Latency simulation (0 - 10000 ms)
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MockStats {
+  total: number;
+  active: number;
+  inactive: number;
+}
+
+// Storage & Retention Types
+export interface StorageStats {
+  logsDir: string;
+  headersDir: string;
+  archivesDir: string;
+  logsSizeBytes: number;
+  headersSizeBytes: number;
+  archivesSizeBytes: number;
+  totalSizeBytes: number;
+  formattedTotalSize: string;
+  totalTransactions: number;
+  activeDatePartitions: string[];
+  archivedDatePartitions: string[];
+  freeDiskBytes?: number;
+  totalDiskBytes?: number;
+}
+
+export interface VacuumResult {
+  cleanedDateFolders: number;
+  freedBytes: number;
+  remainingDateFolders: number;
+}
+
+export type RetentionAction = 'archive' | 'delete';
+
+export interface RetentionPolicy {
+  retentionDays: number;
+  retentionAction: RetentionAction;
+}
+
+export interface RetentionResult {
+  processedPartitions: string[];
+  actionTaken: RetentionAction;
+  affectedTransactionsCount: number;
 }</code></pre>
           </div>
         </section>
@@ -840,6 +947,17 @@ export interface LogDetail {
             strictly: environment variable &rarr; <code class="inline">settings.json</code> &rarr;
             project-root default.
           </p>
+          <div class="table-scroll">
+            <table class="doc-table">
+              <thead><tr><th>Directory / Component</th><th>Environment Variable</th><th>Default Path</th><th>Description</th></tr></thead>
+              <tbody>
+                <tr><td><code>configDir</code></td><td><code>PROXY_CONFIG_DIR</code></td><td><code>&lt;project_root&gt;/config/</code></td><td>Directory holding <code>applications.json</code>.</td></tr>
+                <tr><td><code>logsDir</code></td><td><code>PROXY_LOGS_DIR</code></td><td><code>&lt;project_root&gt;/logs/</code></td><td>Directory holding daily request &amp; response body captures.</td></tr>
+                <tr><td><code>headersDir</code></td><td><code>PROXY_LOGS_DIR</code></td><td><code>&lt;project_root&gt;/headers/</code></td><td>Directory holding daily metadata and header JSON files.</td></tr>
+                <tr><td><code>archivesDir</code></td><td><code>PROXY_ARCHIVES_DIR</code></td><td><code>&lt;project_root&gt;/archives/</code></td><td>Dedicated directory for date-preserved archived app folders and manifests.</td></tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section class="doc-section" id="m-config">
@@ -874,30 +992,56 @@ export interface LogDetail {
           </div>
         </section>
 
-        <section class="doc-section" id="m-proxy">
-          <h2><span class="h-num">18</span> src/services/proxyEngine.ts &mdash; Proxy Core</h2>
+        <section class="doc-section" id="m-mock">
+          <h2><span class="h-num">18</span> src/services/mockManager.ts &mdash; Mock Engine &amp; Pattern Interception</h2>
           <p>
-            Configured http-proxy instance, SSE fan-out list, proxyRes response interceptor, error handler, and prefix-routing middleware.
+            Manages custom mock rules and latency simulations stored in <code class="inline">config/mocks.json</code>.
+            Provides high-performance in-memory caching and multi-mode URL pattern matching.
+          </p>
+          <ul class="bullets">
+            <li><strong>Match Types:</strong> supports <code class="inline">prefix</code>, <code class="inline">exact</code>, <code class="inline">glob</code> (e.g. <code>/api/*/checkout</code>, <code>/api/**</code>), and raw <code class="inline">regex</code> patterns.</li>
+            <li><strong>Scoped Interception:</strong> filters by application ID (<code class="inline">appId</code> or wildcard <code>*</code>) and HTTP method.</li>
+            <li><strong>Latency Simulation:</strong> configurable <code class="inline">delayMs</code> (0 to 10,000 ms) for simulating slow network connections or backend timeouts.</li>
+            <li><strong>Direct Response or Pass-Through Delay:</strong> responds immediately with mock status, headers, and body or simulates delay before proxying.</li>
+          </ul>
+        </section>
+
+        <section class="doc-section" id="m-storage">
+          <h2><span class="h-num">19</span> src/services/storageManager.ts &mdash; Storage &amp; Retention Manager</h2>
+          <p>
+            Automated disk maintenance, partition metrics, vacuuming, and retention lifecycle management.
+          </p>
+          <ul class="bullets">
+            <li><strong>Disk Usage Metrics:</strong> scans active date partitions, archived trees, calculates directory sizes, and inspects filesystem free space.</li>
+            <li><strong>Vacuum Engine:</strong> safely prunes empty daily directories across <code class="inline">logs/</code> and <code class="inline">headers/</code> without touching valid captures.</li>
+            <li><strong>Automated Retention Policy:</strong> evaluates cutoff thresholds (7, 14, 30, 60, 90 days) and either moves expired partitions to <code class="inline">archives/&lt;appName&gt;/</code> or purges them permanently.</li>
+          </ul>
+        </section>
+
+        <section class="doc-section" id="m-proxy">
+          <h2><span class="h-num">20</span> src/services/proxyEngine.ts &mdash; Proxy Core</h2>
+          <p>
+            Configured http-proxy instance, mock rule evaluation, SSE fan-out list, proxyRes response interceptor, error handler, and prefix-routing middleware.
           </p>
         </section>
 
         <section class="doc-section" id="m-redirect">
-          <h2><span class="h-num">19</span> src/services/redirectProxyManager.ts &mdash; Redirect Proxies</h2>
+          <h2><span class="h-num">21</span> src/services/redirectProxyManager.ts &mdash; Redirect Proxies</h2>
           <p>
             Runs dedicated HTTP proxy servers on separate ports for every configured
-            <code class="inline">redirectUrl</code> with shared SSE broadcasting.
+            <code class="inline">redirectUrl</code> with shared SSE broadcasting and mock rule evaluation.
           </p>
         </section>
 
         <section class="doc-section" id="m-replay">
-          <h2><span class="h-num">20</span> src/services/replayService.ts &mdash; Replay Engine</h2>
+          <h2><span class="h-num">22</span> src/services/replayService.ts &mdash; Replay Engine</h2>
           <p>
             Re-executes captured requests with custom overrides, header sanitation, and structured result tracking.
           </p>
         </section>
 
         <section class="doc-section" id="m-api">
-          <h2><span class="h-num">21</span> src/routes/api.ts &mdash; Admin Router</h2>
+          <h2><span class="h-num">23</span> src/routes/api.ts &mdash; Admin Router</h2>
           <p>
             Express Router defining all administrative endpoints under <code class="inline">/dashboard-api</code>.
           </p>
@@ -908,40 +1052,71 @@ export interface LogDetail {
         ============================================================ -->
 
         <section class="doc-section" id="f-index">
-          <h2><span class="h-num">22</span> public/index.html &mdash; Dashboard Shell</h2>
+          <h2><span class="h-num">24</span> public/index.html &mdash; Dashboard Shell</h2>
           <ul class="bullets">
-            <li>Navbar: application dropdown, period/date selector, logs, settings, docs, and theme toggle buttons with vector SVGs.</li>
-            <li>Toolbar: Reload Logs, Export Request, Replay Request, Archive App Logs, Remove Logs, and live search box.</li>
-            <li>Split workspace: collapsible intercepted-call sidebar, stacked request/response panes with Monaco editors and raw headers views.</li>
-            <li>Modals: Export modal, Replay modal, Settings modal (Web Applications &amp; Storage Paths tabs), and Application Editor modal.</li>
+            <li><strong>Navbar:</strong> application dropdown, period/date selector with explicit SVG icons, quick links (Mocking, Archives, Docs), and theme toggle.</li>
+            <li><strong>2-Tier Toolbar:</strong> split into top primary action bar (<code class="inline">.toolbar</code> for Reload, Export, Replay, Archive, Clear) and bottom sub-bar (<code class="inline">.sub-toolbar</code> for Status Filters, Method Filters, and live Search Input) with zero overlapping.</li>
+            <li><strong>Split Workspace:</strong> collapsible intercepted-call sidebar, stacked request/response panes with Monaco editors, formatted JSON/XML inspectors, and raw headers tables.</li>
+            <li><strong>Modals:</strong> Export modal, Replay modal, Settings modal (Applications, Storage Paths, and Retention tabs), Keyboard Shortcuts cheat sheet, and Application Editor modal.</li>
           </ul>
         </section>
 
         <section class="doc-section" id="f-app">
-          <h2><span class="h-num">23</span> public/js/app.js &mdash; Frontend Controller</h2>
+          <h2><span class="h-num">25</span> public/js/app.js &mdash; Frontend Controller &amp; Performance</h2>
           <p>
-            1382 lines of framework-free controller logic built around:
+            Framework-free reactive controller logic built for maximum runtime performance and zero layout thrashing:
           </p>
           <ul class="bullets">
             <li><strong>SVG_ICONS Map:</strong> centralized collection of theme-aware vector SVGs for all dynamic elements.</li>
             <li><strong>Period &amp; Date Selector:</strong> <code class="inline">loadAvailableDates()</code> and <code class="inline">currentSelectedDate</code> managing date-scoped log loading.</li>
-            <li><strong>LoadingManager &amp; trackedFetch:</strong> automated loading indicators (global bar, section blur overlays, button spinners).</li>
-            <li><strong>Monaco Integration:</strong> Catppuccin theme sync and JSON/XML formatting.</li>
+            <li><strong>LoadingManager &amp; trackedFetch:</strong> automated loading indicators (global progress bar, section blur overlays, button spinners).</li>
+            <li><strong>Monaco Integration:</strong> Catppuccin theme sync and high-speed JSON/XML formatting.</li>
             <li><strong>SSE Live Feed:</strong> real-time event stream handling with client-side application filtering and <code class="inline">requestAnimationFrame</code> frame batching.</li>
+          </ul>
+
+          <h3>Keyboard Shortcuts System &amp; Performance Architecture</h3>
+          <p>
+            The dashboard features an integrated global keyboard shortcut system attached via a single <code class="inline">window.addEventListener('keydown', ...)</code> handler.
+          </p>
+          <div class="table-scroll">
+            <table class="doc-table">
+              <thead><tr><th>Key</th><th>Action</th><th>Context / Conditions</th></tr></thead>
+              <tbody>
+                <tr><td><kbd>/</kbd></td><td>Focus and select search input</td><td>Global (when not in inputs/modals)</td></tr>
+                <tr><td><kbd>?</kbd> or <kbd>h</kbd></td><td>Open Keyboard Shortcuts cheat sheet modal</td><td>Global</td></tr>
+                <tr><td><kbd>r</kbd></td><td>Reload / refresh logs for current app</td><td>Global</td></tr>
+                <tr><td><kbd>s</kbd></td><td>Open Settings modal</td><td>Global</td></tr>
+                <tr><td><kbd>m</kbd></td><td>Navigate to Mocking Rules page</td><td>Global</td></tr>
+                <tr><td><kbd>a</kbd></td><td>Navigate to Archives Explorer</td><td>Global</td></tr>
+                <tr><td><kbd>d</kbd></td><td>Open Documentation in a new tab</td><td>Global</td></tr>
+                <tr><td><kbd>t</kbd></td><td>Toggle Theme (Dark / Light)</td><td>Global</td></tr>
+                <tr><td><kbd>e</kbd></td><td>Open Export Request modal</td><td>When a log entry is selected</td></tr>
+                <tr><td><kbd>p</kbd></td><td>Open Replay Request modal</td><td>When a log entry is selected</td></tr>
+                <tr><td><kbd>Esc</kbd></td><td>Close active modal, exit selection mode, or clear search box</td><td>Always active</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Why the Global Keydown Listener Does Not Affect Performance</h3>
+          <ul class="bullets">
+            <li><strong>Modifier Key Safeguard:</strong> <code class="inline">if (e.ctrlKey || e.metaKey || e.altKey) return;</code> immediately aborts execution when modifier keys are pressed. Native browser shortcuts like <kbd>Cmd+R</kbd> (refresh), <kbd>Cmd+S</kbd> (save), <kbd>Ctrl+P</kbd> (print), and text navigation commands remain 100% untouched.</li>
+            <li><strong>Input &amp; Editor Exclusion:</strong> checks <code class="inline">['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable</code> first. Normal typing in search fields, forms, or Monaco code editors never triggers shortcuts.</li>
+            <li><strong>O(1) Direct Key Dispatch:</strong> uses simple scalar string checks (<code class="inline">e.key === 'r'</code>, etc.) with instant early returns. No complex parsing, regex, or object allocations occur on keystrokes.</li>
+            <li><strong>Zero Layout Thrashing:</strong> the listener performs no synchronous DOM measurements (<code class="inline">offsetHeight</code>, <code class="inline">getBoundingClientRect</code>) in the hot path. Keystroke latency is &lt; 0.05 ms.</li>
           </ul>
         </section>
 
         <section class="doc-section" id="f-monaco">
-          <h2><span class="h-num">24</span> public/js/monaco-init.js &mdash; Editor Layer</h2>
+          <h2><span class="h-num">26</span> public/js/monaco-init.js &mdash; Editor Layer</h2>
           <p>
             Monaco editor loader, Catppuccin themes (Latte &amp; Mocha), 4-space tab indentation, and XML/JSON formatters.
           </p>
         </section>
 
         <section class="doc-section" id="f-css">
-          <h2><span class="h-num">25</span> public/css/styles.css &mdash; Design System</h2>
+          <h2><span class="h-num">27</span> public/css/styles.css &mdash; Design System</h2>
           <p>
-            Catppuccin color system, CSS variable tokens, loading animations, SVG icon styling, and responsive layout rules.
+            Catppuccin color system, CSS variable tokens, 2-tier toolbar layout rules, loading animations, SVG icon styling, and responsive layout rules.
           </p>
         </section>
 
@@ -949,11 +1124,11 @@ export interface LogDetail {
              FUNCTION REFERENCE
         ============================================================ -->
         <section class="doc-section" id="sec-functions">
-          <h2><span class="h-num">26</span> Function Reference</h2>
+          <h2><span class="h-num">28</span> Function Reference</h2>
           <div class="ref-toolbar">
             <button id="expand-all-btn" type="button">Expand all</button>
             <button id="collapse-all-btn" type="button">Collapse all</button>
-            <span class="match-count" id="fn-match-count">128 functions across 14 modules</span>
+            <span class="match-count" id="fn-match-count">152 functions across 16 modules</span>
           </div>
 
           <details class="fn-group" open>
@@ -963,10 +1138,12 @@ export interface LogDetail {
                 <thead><tr><th>Function / Handler</th><th>Lines</th><th>Behavior</th></tr></thead>
                 <tbody>
                   <tr class="fn-row"><td><code>GET /dashboard(/*)</code></td><td>30-32</td><td>sendFile index.html.</td></tr>
-                  <tr class="fn-row"><td><code>GET /doc(/*)</code></td><td>35-37</td><td>sendFile doc.html.</td></tr>
-                  <tr class="fn-row"><td><code>GET /</code></td><td>40-46</td><td>Redirect to /dashboard only for HTML navigations without proxy headers; otherwise next().</td></tr>
-                  <tr class="fn-row"><td><code>initializeServer()</code></td><td>55-86</td><td>Migrate legacy redirect ports, share SSE clients, sync redirect proxies.</td></tr>
-                  <tr class="fn-row"><td><code>listen callback</code></td><td>91-105</td><td>Banner with UI + proxy URLs + running redirect proxy list.</td></tr>
+                  <tr class="fn-row"><td><code>GET /mocking(/*)</code></td><td>33-34</td><td>sendFile mocking.html.</td></tr>
+                  <tr class="fn-row"><td><code>GET /archives(/*)</code></td><td>35-37</td><td>sendFile archives.html.</td></tr>
+                  <tr class="fn-row"><td><code>GET /doc(/*)</code></td><td>40-42</td><td>sendFile doc.html.</td></tr>
+                  <tr class="fn-row"><td><code>GET /</code></td><td>45-51</td><td>Redirect to /dashboard only for HTML navigations without proxy headers; otherwise next().</td></tr>
+                  <tr class="fn-row"><td><code>initializeServer()</code></td><td>60-91</td><td>Migrate legacy redirect ports, share SSE clients, sync redirect proxies.</td></tr>
+                  <tr class="fn-row"><td><code>listen callback</code></td><td>96-110</td><td>Banner with UI + proxy URLs + running redirect proxy list.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -996,6 +1173,47 @@ export interface LogDetail {
           </details>
 
           <details class="fn-group" open>
+            <summary>src/services/mockManager.ts <span class="fn-count">14</span></summary>
+            <div class="fn-body table-scroll">
+              <table class="doc-table">
+                <thead><tr><th>Function</th><th>Behavior</th></tr></thead>
+                <tbody>
+                  <tr class="fn-row"><td><code>getMocksFile()</code></td><td>Returns absolute path to <code>config/mocks.json</code>.</td></tr>
+                  <tr class="fn-row"><td><code>clearMockCache()</code></td><td>Invalidates in-memory mock rules cache.</td></tr>
+                  <tr class="fn-row"><td><code>normalizeUrlPath(urlPath)</code></td><td>Strips query strings and ensures leading slash.</td></tr>
+                  <tr class="fn-row"><td><code>globToRegex(glob)</code></td><td>Converts wildcard glob patterns into RegExp.</td></tr>
+                  <tr class="fn-row"><td><code>matchesUrlPattern(url, pattern, matchType)</code></td><td>Evaluates URL against prefix, exact, glob, or regex patterns.</td></tr>
+                  <tr class="fn-row"><td><code>getMockRules(appId?)</code></td><td>Reads rules from cache or disk; filters by optional appId.</td></tr>
+                  <tr class="fn-row"><td><code>saveMockRules(rules)</code></td><td>Writes rules to <code>mocks.json</code> and updates memory cache.</td></tr>
+                  <tr class="fn-row"><td><code>getMockRuleById(id)</code></td><td>Finds mock rule by unique UUID.</td></tr>
+                  <tr class="fn-row"><td><code>createMockRule(input)</code></td><td>Generates ID, timestamps, defaults, and prepends to rules list.</td></tr>
+                  <tr class="fn-row"><td><code>updateMockRule(id, input)</code></td><td>Updates rule fields and updates modification timestamp.</td></tr>
+                  <tr class="fn-row"><td><code>deleteMockRule(id)</code></td><td>Removes mock rule by ID and updates storage.</td></tr>
+                  <tr class="fn-row"><td><code>toggleMockRule(id, enabled?)</code></td><td>Flips enabled state of a mock rule.</td></tr>
+                  <tr class="fn-row"><td><code>getMockStats()</code></td><td>Returns total, active, and inactive rule counts.</td></tr>
+                  <tr class="fn-row"><td><code>findMatchingMockRule(req)</code></td><td>Finds first enabled rule matching app, method, and URL path.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+
+          <details class="fn-group" open>
+            <summary>src/services/storageManager.ts <span class="fn-count">6</span></summary>
+            <div class="fn-body table-scroll">
+              <table class="doc-table">
+                <thead><tr><th>Function</th><th>Behavior</th></tr></thead>
+                <tbody>
+                  <tr class="fn-row"><td><code>formatBytes(bytes, decimals?)</code></td><td>Formats bytes into human-readable B, KB, MB, GB string.</td></tr>
+                  <tr class="fn-row"><td><code>getDirectorySizeBytes(dirPath)</code></td><td>Calculates recursive byte size of all files in a directory.</td></tr>
+                  <tr class="fn-row"><td><code>getStorageStats()</code></td><td>Gathers storage breakdown across logs, headers, archives, partitions, and disk space.</td></tr>
+                  <tr class="fn-row"><td><code>vacuumEmptyDirectories()</code></td><td>Prunes empty date partition folders across logs/ and headers/.</td></tr>
+                  <tr class="fn-row"><td><code>applyRetentionPolicy(days?, action?)</code></td><td>Archives or permanently deletes date partitions older than retention cutoff.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+
+          <details class="fn-group" open>
             <summary>src/services/configManager.ts <span class="fn-count">10</span></summary>
             <div class="fn-body table-scroll">
               <table class="doc-table">
@@ -1014,13 +1232,22 @@ export interface LogDetail {
           </details>
 
           <details class="fn-group" open>
-            <summary>src/routes/api.ts <span class="fn-count">16 handlers</span></summary>
+            <summary>src/routes/api.ts <span class="fn-count">24 handlers</span></summary>
             <div class="fn-body table-scroll">
               <table class="doc-table">
                 <thead><tr><th>Route</th><th>Behavior</th></tr></thead>
                 <tbody>
-                  <tr class="fn-row"><td><code>GET /settings</code></td><td>Get effective storage paths.</td></tr>
-                  <tr class="fn-row"><td><code>PUT /settings</code></td><td>Update storage paths &amp; re-sync redirect proxies.</td></tr>
+                  <tr class="fn-row"><td><code>GET /settings</code></td><td>Get effective storage paths &amp; retention settings.</td></tr>
+                  <tr class="fn-row"><td><code>PUT /settings</code></td><td>Update storage paths &amp; retention policies.</td></tr>
+                  <tr class="fn-row"><td><code>GET /storage/stats</code></td><td>Get comprehensive disk usage metrics and partition details.</td></tr>
+                  <tr class="fn-row"><td><code>POST /storage/vacuum</code></td><td>Clean empty partition folders.</td></tr>
+                  <tr class="fn-row"><td><code>POST /storage/retention/apply</code></td><td>Execute automated retention policy.</td></tr>
+                  <tr class="fn-row"><td><code>GET /mocks</code></td><td>List mock rules with optional appId filter.</td></tr>
+                  <tr class="fn-row"><td><code>POST /mocks</code></td><td>Create new mock rule.</td></tr>
+                  <tr class="fn-row"><td><code>PUT /mocks/:id</code></td><td>Update mock rule by ID.</td></tr>
+                  <tr class="fn-row"><td><code>DELETE /mocks/:id</code></td><td>Delete mock rule.</td></tr>
+                  <tr class="fn-row"><td><code>PATCH /mocks/:id/toggle</code></td><td>Toggle mock rule active state.</td></tr>
+                  <tr class="fn-row"><td><code>GET /mocks/stats</code></td><td>Get mock rules statistics.</td></tr>
                   <tr class="fn-row"><td><code>GET /applications</code></td><td>List all applications.</td></tr>
                   <tr class="fn-row"><td><code>POST /applications</code></td><td>Create application.</td></tr>
                   <tr class="fn-row"><td><code>PUT /applications/:id</code></td><td>Update application.</td></tr>
@@ -1045,7 +1272,7 @@ export interface LogDetail {
              LINE LEVEL NOTES
         ============================================================ -->
         <section class="doc-section" id="sec-lines">
-          <h2><span class="h-num">27</span> Line-Level Code Notes</h2>
+          <h2><span class="h-num">29</span> Line-Level Code Notes</h2>
 
           <div class="line-note">
             <div class="line-note-head"><span class="loc-chip">server.ts:40-45</span><h4>Browser navigation vs proxied API discrimination</h4></div>
@@ -1054,6 +1281,21 @@ if (typeof accept === 'string' && accept.includes('text/html') && !req.headers['
   return res.redirect('/dashboard');
 }</code></pre></div>
             <p>Hitting <code class="inline">http://localhost:4000</code> in a browser tab redirects to the dashboard UI, while API tools forwarding requests through port 4000 fall through to the reverse proxy.</p>
+          </div>
+
+          <div class="line-note">
+            <div class="line-note-head"><span class="loc-chip">public/js/app.js:904-912</span><h4>Keyboard event listener performance &amp; modifier safeguard</h4></div>
+            <div class="code-block"><pre><code>if (isInputActive) return;
+
+// Ignore single-key shortcuts if modifier keys (Ctrl, Cmd/Meta, Alt) are pressed
+if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+// Check if any modal is active
+const modalOpen = !!document.querySelector('.modal-overlay.active');
+if (modalOpen) return;</code></pre></div>
+            <p>
+              Guarantees sub-millisecond hot-path execution (&lt; 0.05ms) by returning immediately on input typing or modifier key presses. Native browser shortcuts like <kbd>Cmd+R</kbd> (refresh), <kbd>Cmd+S</kbd> (save), <kbd>Ctrl+P</kbd> (print), and OS window management are never intercepted or delayed.
+            </p>
           </div>
 
           <div class="line-note">

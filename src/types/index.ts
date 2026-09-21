@@ -118,7 +118,7 @@ export interface SaveLogEntryParams {
   appId: string;
   appName: string;
   backendName?: string | null;
-  routeType?: 'backend' | 'redirect';
+  routeType?: 'backend' | 'redirect' | 'mock';
   targetUrl: string;
   method?: string;
   endpoint?: string;
@@ -238,12 +238,17 @@ export interface AppSettings {
   archivesDir: string;
   isDefaultConfig: boolean;
   isDefaultLogs: boolean;
+  isDefaultArchives: boolean;
+  retentionDays: number; // 0 = unlimited, 7, 14, 30, 60, 90
+  retentionAction: 'archive' | 'delete';
   defaults: {
     configDir: string;
     logsBaseDir: string;
     logsDir: string;
     headersDir: string;
     archivesDir: string;
+    retentionDays: number;
+    retentionAction: 'archive' | 'delete';
   };
 }
 
@@ -251,7 +256,84 @@ export interface AppSettings {
 export interface UpdateSettingsInput {
   configDir?: string;
   logsDir?: string;
+  archivesDir?: string;
+  retentionDays?: number;
+  retentionAction?: 'archive' | 'delete';
   migrateExistingConfig?: boolean;
+}
+
+// =============================================================================
+// Mock & Interception Types
+// =============================================================================
+
+export type MockMatchType = 'prefix' | 'exact' | 'glob' | 'regex';
+export type MockResponseType = 'mock' | 'delay_only';
+
+export interface MockRule {
+  id: string;
+  name: string;
+  appId: string; // specific appId or '*' for all apps
+  enabled: boolean;
+  method: string; // 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | '*'
+  urlPattern: string; // e.g. '/api/v1/payments/*' or regex/exact string
+  matchType: MockMatchType;
+  responseType: MockResponseType;
+  statusCode: number; // e.g. 200, 400, 401, 402, 404, 500
+  statusText?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  contentType?: string; // 'application/json' | 'text/xml' | 'text/plain' | 'text/html'
+  delayMs?: number; // Latency simulation in milliseconds (0 - 10000)
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateMockRuleInput = Omit<MockRule, 'id' | 'createdAt' | 'updatedAt'> & { id?: string };
+export type UpdateMockRuleInput = Partial<Omit<MockRule, 'id' | 'createdAt' | 'updatedAt'>>;
+
+export interface MockStats {
+  total: number;
+  active: number;
+  inactive: number;
+}
+
+// =============================================================================
+// Storage & Disk Retention Types
+// =============================================================================
+
+export interface StorageStats {
+  logsDir: string;
+  headersDir: string;
+  archivesDir: string;
+  logsSizeBytes: number;
+  headersSizeBytes: number;
+  archivesSizeBytes: number;
+  totalSizeBytes: number;
+  formattedTotalSize: string;
+  totalTransactions: number;
+  activeDatePartitions: string[];
+  archivedDatePartitions: string[];
+  freeDiskBytes?: number;
+  totalDiskBytes?: number;
+}
+
+export interface VacuumResult {
+  cleanedDateFolders: number;
+  freedBytes: number;
+  remainingDateFolders: number;
+}
+
+export type RetentionAction = 'archive' | 'delete';
+
+export interface RetentionPolicy {
+  retentionDays: number;
+  retentionAction: RetentionAction;
+}
+
+export interface RetentionResult {
+  processedPartitions: string[];
+  actionTaken: RetentionAction;
+  affectedTransactionsCount: number;
 }
 
 // =============================================================================

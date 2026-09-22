@@ -204,7 +204,7 @@
 <pre><code>  Browser / Vite dev app             Proxy Server App (Node.js + TypeScript :4000)
  +------------------+               +-------------------------------------------------------------+
  |  localhost:3000  |   any HTTP    |  server.ts (Express entrypoint)                             |
- |  fetch('/api/x') | ------------&gt; |   |-- cors() + compression()                                |
+ |  fetch('/api/x') | ------------&gt; |   |-- cors()                                                |
  +------------------+               |   |-- /dashboard-api  --&gt; src/routes/api.ts                 |
                                     |   |-- /dashboard       --&gt; public/index.html (Dashboard SPA)|
         Web Interfaces              |   |-- /mocking         --&gt; public/mocking.html (Mock Rules) |
@@ -259,13 +259,12 @@
                 <tr><td>Language</td><td>TypeScript 5.9</td><td>Type-safe backend architecture; interfaces for entities, requests, metas, mock rules, storage metrics, and Express augmentations (<span class="file-ref">src/types/index.ts</span>).</td></tr>
                 <tr><td>Compiler &amp; Execution</td><td>tsc + ts-node</td><td>Compiled to <code class="inline">dist/</code> via <code class="inline">npm run build</code>; dev watch via <code class="inline">node --watch -r ts-node/register server.ts</code> (<span class="file-ref">package.json</span>).</td></tr>
                 <tr><td>Test Suite</td><td>Jest 30 + ts-jest</td><td>Comprehensive unit &amp; integration testing across routes, services, and utils (18 suites, 197 tests).</td></tr>
-                <tr><td>HTTP framework</td><td>express ^4.21.2</td><td>Routing, static serving, JSON parsing, compression middleware (<span class="file-ref">server.ts</span>, <span class="file-ref">src/routes/api.ts</span>).</td></tr>
+                <tr><td>HTTP framework</td><td>express ^4.21.2</td><td>Routing, static serving, and JSON parsing (<span class="file-ref">server.ts</span>, <span class="file-ref">src/routes/api.ts</span>).</td></tr>
                 <tr><td>Proxy core</td><td>http-proxy ^1.18.1</td><td><code class="inline">selfHandleResponse</code> mode with memory payload safety capping and mock rule evaluation (<span class="file-ref">src/services/proxyEngine.ts</span>, <span class="file-ref">src/utils/payload.ts</span>).</td></tr>
                 <tr><td>Mock Engine</td><td>Custom in-memory + JSON store</td><td>Multi-mode pattern matching (exact, prefix, glob, regex), delay simulation, and mock response synthesis (<span class="file-ref">src/services/mockManager.ts</span>).</td></tr>
                 <tr><td>Storage &amp; Retention</td><td>Custom filesystem engine</td><td>Directory size analytics, disk space probe, partition vacuuming, and retention policies (<span class="file-ref">src/services/storageManager.ts</span>).</td></tr>
                 <tr><td>Redirect proxies</td><td>http-proxy + core http</td><td>A dedicated Express/http server per external target URL with automatic port allocation (<span class="file-ref">src/services/redirectProxyManager.ts</span>).</td></tr>
                 <tr><td>CORS</td><td>cors ^2.8.5</td><td>Allows dashboards/tools from other origins to query the admin API (<span class="file-ref">server.ts</span>).</td></tr>
-                <tr><td>Compression</td><td>compression ^1.8.1</td><td>Gzip/deflate response compression for API endpoints and static assets (<span class="file-ref">server.ts</span>).</td></tr>
                 <tr><td>Editor</td><td>Monaco Editor (Local npm package)</td><td>Self-hosted AMD loader from <code class="inline">monaco-editor</code>; offline-capable viewers &amp; editors for request/response bodies and mock definitions (<span class="file-ref">public/js/monaco-init.js</span>).</td></tr>
                 <tr><td>UI &amp; Icons</td><td>Vanilla JS + Vector SVGs</td><td>No framework; Catppuccin Mocha/Latte theming via CSS variables, 2-tier responsive toolbar, and stroke SVGs (<span class="file-ref">public/css/styles.css</span>).</td></tr>
                 <tr><td>IDs</td><td>Custom RFC-4122 UUID v4</td><td>Dependency-free UUID v4 generator (<span class="file-ref">src/utils/uuid.ts</span>).</td></tr>
@@ -284,8 +283,8 @@
           <div class="code-block">
             <div class="code-head"><span>project tree</span></div>
 <pre><code>ProxyServerApp/
-|-- server.ts                     Application entry point, compression, graceful shutdown &amp; Express bootstrap
-|-- package.json                  Scripts: build, dev, start, test; deps: express, cors, http-proxy, compression
+|-- server.ts                     Application entry point, graceful shutdown &amp; Express bootstrap
+|-- package.json                  Scripts: build, dev, start, test; deps: express, cors, http-proxy, monaco-editor
 |-- tsconfig.json                 TypeScript compiler configuration (target: ES2022, outDir: dist)
 |-- jest.config.js                Jest test runner configured with ts-jest
 |-- improvements.md               Architecture &amp; improvements roadmap document
@@ -314,7 +313,7 @@
 |       |-- monaco-init.js        Monaco loading, Catppuccin themes, 4-space tab + JSON/XML formatting helpers
 |       '-- doc.js                Interactivity for this page (scroll-spy, search, copy)
 '-- src/
-    |-- server.test.ts            Unit tests for server entry point, compression &amp; graceful shutdown
+    |-- server.test.ts            Unit tests for server entry point &amp; graceful shutdown
     |-- routes/
     |   |-- api.ts                All /dashboard-api endpoints (Applications, Logs, Mocks, Storage, Archives, SSE)
     |   |-- api.test.ts           Unit tests for API routes
@@ -359,7 +358,7 @@
         <section class="doc-section" id="sec-lifecycle">
           <h2><span class="h-num">05</span> Proxied Request Lifecycle (end to end)</h2>
           <ol class="steps">
-            <li>A client hits any path on port 4000. Express middleware chain runs: CORS &rarr; compression &rarr; admin API &rarr; static &rarr; dashboard/doc &rarr; root redirect; everything else reaches <strong>proxyMiddleware</strong> (<span class="file-ref">server.ts</span>).</li>
+            <li>A client hits any path on port 4000. Express middleware chain runs: CORS &rarr; admin API &rarr; static &rarr; dashboard/doc &rarr; root redirect; everything else reaches <strong>proxyMiddleware</strong> (<span class="file-ref">server.ts</span>).</li>
             <li>The middleware captures the raw request body with memory safety protection (<span class="file-ref">src/utils/payload.ts</span>), stashing <code class="inline">req._proxyRawBodyStr</code> and <code class="inline">req._proxyRawBuffer</code> (<span class="file-ref">src/services/proxyEngine.ts</span>).</li>
             <li>It resolves the effective path, optionally stripping an explicit <code class="inline">/proxy/:appId</code> prefix, then retrieves active apps from in-memory configuration cache (<span class="file-ref">src/services/configManager.ts</span>).</li>
             <li><strong>Target selection cascade:</strong>

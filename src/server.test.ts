@@ -82,11 +82,8 @@ describe('Server Root & Middleware (server.ts)', () => {
     expect(res.headers['content-type']).toContain('javascript');
   });
 
-  it('should compress responses when Accept-Encoding is gzip', async () => {
-    const res = await request(app)
-      .get('/dashboard-api/logs/dates')
-      .set('Accept-Encoding', 'gzip');
-    // Express response should succeed
+  it('should serve /dashboard-api/logs/dates successfully', async () => {
+    const res = await request(app).get('/dashboard-api/logs/dates');
     expect(res.status).toBe(200);
   });
 

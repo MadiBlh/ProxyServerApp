@@ -2,7 +2,6 @@ import './src/utils/bootstrap';
 
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import compression from 'compression';
 import path from 'path';
 import apiRoutes from './src/routes/api';
 import { proxyMiddleware, sseClients, closeAllSseClients } from './src/services/proxyEngine';
@@ -13,16 +12,8 @@ import type { Application, RedirectUrl } from './src/types';
 export const app = express();
 const PORT = Number(process.env.PORT) || 4000;
 
-// Enable CORS and Response Compression
+// Enable CORS
 app.use(cors());
-app.use(compression({
-  filter: (req: Request, res: Response) => {
-    if (req.headers['x-no-compression'] || req.path === '/dashboard-api/events') {
-      return false;
-    }
-    return compression.filter(req, res);
-  }
-}));
 
 // 1. Dashboard Admin Management API (/dashboard-api/applications, /dashboard-api/logs, /dashboard-api/events)
 app.use('/dashboard-api', apiRoutes);

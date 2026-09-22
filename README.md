@@ -25,7 +25,6 @@ with a web UI instead of a desktop app."
 - **2-Tier Toolbar & Quick Filter Preset Pills** — dedicated primary actions bar (`.toolbar`) and filters/search sub-bar (`.sub-toolbar`) with quick filter pills (`All`, `Errors`, `Mocks`, `Redirects`, `Slow`).
 - **Keyboard Shortcuts Engine** — global hotkeys (`/`, `?`/`h`, `r`, `s`, `m`, `a`, `d`, `t`, `e`, `p`, `Esc`) with non-blocking modifier key safeguards preserving browser native shortcuts.
 - **Real-Time Live Feed with Frame Batching** — newly captured transactions are pushed instantly to open dashboard tabs via Server-Sent Events (`/dashboard-api/events`) and batch-rendered on `requestAnimationFrame`.
-- **Response Compression** — built-in gzip/deflate compression for static assets and REST API endpoints.
 - **Graceful Process Shutdown** — handles `SIGINT` and `SIGTERM` to close active SSE clients, terminate redirect proxy servers, and close the HTTP server cleanly.
 - **Inspect** — Monaco editor panes auto-detect JSON/XML and pretty-print; cookie headers get special handling.
 - **Replay** — re-fire any captured call with edited URL, method, headers and body (`src/services/replayService.ts`).
@@ -440,8 +439,8 @@ server (see `src/services/redirectProxyManager.ts`).
 
 ```
 ProxyServerApp/
-|-- server.ts                     Application entry point, compression, graceful shutdown & Express bootstrap
-|-- package.json                  Scripts: build, dev, start, test; deps: express, cors, http-proxy, compression
+|-- server.ts                     Application entry point, graceful shutdown & Express bootstrap
+|-- package.json                  Scripts: build, dev, start, test; deps: express, cors, http-proxy, monaco-editor
 |-- tsconfig.json                 TypeScript compiler configuration (target: ES2022, outDir: dist)
 |-- jest.config.js                Jest test runner configured with ts-jest
 |-- improvements.md               Architecture & improvements roadmap document
@@ -470,7 +469,7 @@ ProxyServerApp/
 |       |-- monaco-init.js        Monaco loading, Catppuccin themes, 4-space tab + JSON/XML formatting helpers
 |       '-- doc.js                Documentation controller: scroll-spy, search, code copying
 '-- src/
-    |-- server.test.ts            Unit tests for server entry point, compression & graceful shutdown
+    |-- server.test.ts            Unit tests for server entry point & graceful shutdown
     |-- routes/
     |   |-- api.ts                All /dashboard-api endpoints (Applications, Logs, Mocks, Storage, Archives, SSE)
     |   |-- api.test.ts           Unit tests for API routes
